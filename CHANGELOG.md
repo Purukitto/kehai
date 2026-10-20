@@ -28,7 +28,8 @@ First public release.
   - Windows toast notifications via `UserNotificationListener`, dismissable from the
     widget.
   - Agent token usage over a rolling five-hour window, tallied from local session
-    transcripts.
+    transcripts. Optional: with no transcripts the source reports itself
+    unavailable, naming the path it looked in, instead of going silent.
 - **Eight widgets**: stage, telemetry, vitals, quota, media, notify, clock, sprint.
   Each declares its own minimum size and the topics it reads, and is reached only
   through the registry — a layout naming an unknown widget renders a placeholder
@@ -36,11 +37,12 @@ First public release.
 - **Per-tile responsiveness.** Widgets branch on the size of their own grid cell, with
   a dead zone at each breakpoint so a tile sitting on a threshold cannot oscillate.
 - **Three layout presets** — Stage, Panel and Ambient — differing only in tile areas
-  and props.
+  and props. Stage drops a tab whose source has nothing to report.
 - **Three themes** — Amber, Phosphor and Ice — each thirteen CSS custom properties
   under a class on the root element.
 - **Settings screen** covering presets, theme, widgets, window, sources and about,
-  with layout Export and Import.
+  with layout Export and Import. Each source reads as reporting, silent, or
+  unavailable with the reason it gave.
 - **Tile arranger**: drag to move, drag a corner to resize up to the neighbours, drop
   onto an occupied tile to swap the two, and `tidy()` as the escape hatch out of an
   already-overlapping layout.
@@ -57,6 +59,8 @@ First public release.
 
 - Linux and macOS: media (MPRIS) and notifications (D-Bus) are not wired and report as
   unavailable. Telemetry works.
+- CPU temperature is usually unavailable on Windows. Reading it needs a kernel-mode
+  driver, which Kehai deliberately does not install.
 - JetBrains Mono is loaded from Google Fonts, so first paint needs a network round
   trip and the desktop build does not yet work fully offline.
 - Installers are unsigned, so SmartScreen warns on first launch.

@@ -80,13 +80,32 @@ write the layout as JSON if you want to commit or share one.
 | Source | Windows | Linux / macOS |
 | --- | --- | --- |
 | CPU, memory, network, disk | via `sysinfo` | via `sysinfo` |
-| CPU package temperature | needs a vendor driver, else reported as no sensor | label varies by platform |
+| CPU package temperature | usually unavailable — see below | label varies by platform |
 | Media session and transport | via GSMTC, including cover art | MPRIS not wired yet |
 | Notifications | via `UserNotificationListener` | D-Bus not wired yet |
-| Agent token usage | yes | yes |
+| Agent token usage | optional — needs local agent transcripts | same |
 
-Where a source is unavailable the widget says so. It never shows a zero it does not
-have — see [Design notes](docs/design.md).
+Where a source is unavailable the widget says so, and Settings → Sources shows it as
+**UNAVAILABLE** with the reason. Nothing shows a zero it does not have — see
+[Design notes](docs/design.md). The Stage preset drops a tab whose source has
+nothing to report rather than leaving it blank.
+
+<details>
+<summary><strong>Why CPU temperature is usually missing on Windows</strong></summary>
+
+CPU die temperature lives in model-specific registers — the digital thermal sensor
+on Intel, Tctl on AMD — and reading one takes the `rdmsr` instruction, which only
+kernel mode can execute. The two routes Windows offers ordinary processes are an
+ACPI thermal zone, which needs elevation and on many desktops reports a chassis
+zone or nothing at all, and `Win32_TemperatureProbe`, which almost no hardware
+populates.
+
+Tools like HWMonitor and HWiNFO get around this by installing a kernel driver.
+Kehai deliberately does not: a driver needs administrator rights to install, and
+generic MSR-access drivers have a history of letting unprivileged code read and
+write hardware registers. That is a poor trade for one number on a dashboard.
+
+</details>
 
 ## Privacy
 
@@ -105,7 +124,7 @@ Two sources are worth stating plainly:
   agent session transcripts under `~/.claude/projects` — file modification times and
   the usage counters on assistant turns. No prompt or response text is read, retained
   or displayed. There is no API call and no account involved; if the directory does not
-  exist the source stays empty.
+  exist the source reports itself unavailable and the rest of the panel is unaffected.
 
 ## Building from source
 
