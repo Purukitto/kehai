@@ -23,7 +23,7 @@ jobs:
     name: Renderer
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
@@ -48,7 +48,7 @@ jobs:
     # cfg(windows), so anywhere else leaves the interesting code unchecked.
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -72,7 +72,7 @@ jobs:
     # silently until someone tries to build on Linux.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install Tauri system dependencies
         run: |
