@@ -33,6 +33,41 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # Tauri requires its Rust crate and its npm package to agree on
+      # major.minor, and refuses to build when they do not — by exiting 0
+      # without building anything. Dependabot updates cargo and npm in separate
+      # pull requests, so the two drift apart one merge at a time. Catching it
+      # here costs seconds; catching it at `tauri build` costs a release.
+      - name: Check Rust and npm Tauri versions agree
+        run: |
+          set -euo pipefail
+          crate_version() {
+            awk -v n="$1" '$0 == "name = \"" n "\"" { found = 1; next }
+                           found && /^version = / { gsub(/[",]/, "", $3); print $3; exit }' \
+              src-tauri/Cargo.lock
+          }
+          npm_version() {
+            node -p "require('./node_modules/$1/package.json').version"
+          }
+          minor() { cut -d. -f1,2 <<< "$1"; }
+
+          status=0
+          check() {
+            local crate npm cv nv
+            crate=$1; npm=$2
+            cv=$(crate_version "$crate"); nv=$(npm_version "$npm")
+            if [ "$(minor "$cv")" != "$(minor "$nv")" ]; then
+              echo "::error::$crate $cv and $npm $nv differ on major.minor"
+              status=1
+            else
+              echo "ok  $crate $cv  ==  $npm $nv"
+            fi
+          }
+
+          check tauri                   @tauri-apps/api
+          check tauri-plugin-autostart  @tauri-apps/plugin-autostart
+          exit $status
+
       # tsc runs with noUnusedLocals, noUnusedParameters and
       # noFallthroughCasesInSwitch, and is the only automated check on the
       # front end.

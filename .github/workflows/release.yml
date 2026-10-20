@@ -73,6 +73,23 @@ jobs:
       - name: Build installers
         run: bunx tauri build
 
+      # `tauri build` exits 0 when it refuses to start — a Rust/npm version
+      # mismatch between the tauri crate and @tauri-apps/api stops it before
+      # the first compile, and nothing downstream would notice until a release
+      # shipped with no binaries in it. Assert the outputs exist.
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          $expected = @(
+            'src-tauri/target/release/kehai.exe',
+            'src-tauri/target/release/bundle/msi/*.msi',
+            'src-tauri/target/release/bundle/nsis/*-setup.exe'
+          )
+          $missing = $expected | Where-Object { -not (Get-ChildItem $_ -ErrorAction SilentlyContinue) }
+          if ($missing) { throw "tauri build produced nothing for: $($missing -join ', ')" }
+          Get-ChildItem src-tauri/target/release/bundle -Recurse -File |
+            Select-Object Name, Length
+
       # The installers are the normal path; this is for people who would rather
       # not run one. It is the same GUI-subsystem binary the installers carry.
       - name: Package portable build
