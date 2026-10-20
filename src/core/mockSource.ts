@@ -115,6 +115,8 @@ export function startMockSource(options: MockOptions = {}): () => void {
     });
 
     pub<QuotaPayload>('dev:llm_tokens', 'mock.quota', {
+      available: true,
+      reason: null,
       provider: 'Mock agent',
       tokensIn: 1_240_000,
       tokensOut: 186_000,

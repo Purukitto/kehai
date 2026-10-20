@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { compact, humanDuration, sparkPath } from '../core/format';
 import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
@@ -31,6 +32,18 @@ export function budgetPct(quota: QuotaPayload, budget?: number | null): number |
   return Math.round((totalTokens(quota) / limit) * 100);
 }
 
+/** The single-row layout the Ambient preset uses, with or without data. */
+const LINE: CSSProperties = {
+  background: 'var(--cc-pane)',
+  padding: '0 40px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 18,
+  minWidth: 0,
+  overflow: 'hidden',
+  flex: 1,
+};
+
 function Quota({ props }: WidgetProps) {
   const quota = useTopic<QuotaPayload>('dev:llm_tokens');
   const size = useTileSize();
@@ -45,6 +58,36 @@ function Quota({ props }: WidgetProps) {
     );
   }
 
+  // Nothing to read is not a failure: the source is optional, so this stays
+  // out of the danger colour a refused notification listener uses.
+  if (!quota.available) {
+    if (line) {
+      return (
+        <div style={LINE}>
+          <span className="cc-mini" style={{ letterSpacing: '0.22em', flex: 'none' }}>
+            AGENT TOKENS
+          </span>
+          <span className="cc-mini" style={{ color: 'var(--cc-dim)' }}>
+            NO SOURCE
+          </span>
+        </div>
+      );
+    }
+    return (
+      <Pane label="LLM QUOTA" topic="dev:llm_tokens">
+        <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NO AGENT TRANSCRIPTS</div>
+          <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
+            {quota.reason}
+          </div>
+          <div className="cc-mini" style={{ marginTop: 6 }}>
+            THIS SOURCE IS OPTIONAL
+          </div>
+        </div>
+      </Pane>
+    );
+  }
+
   const pct = budgetPct(quota, settings.budgetTokens);
   const status = budgetStatus(pct);
   const used = totalTokens(quota);
@@ -52,18 +95,7 @@ function Quota({ props }: WidgetProps) {
 
   if (line) {
     return (
-      <div
-        style={{
-          background: 'var(--cc-pane)',
-          padding: '0 40px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 18,
-          minWidth: 0,
-          overflow: 'hidden',
-          flex: 1,
-        }}
-      >
+      <div style={LINE}>
         <span className="cc-mini" style={{ letterSpacing: '0.22em', flex: 'none' }}>
           {quota.windowHours}H USAGE
         </span>

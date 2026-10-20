@@ -12,11 +12,16 @@ use crate::bus;
 const INTERVAL: Duration = Duration::from_millis(30_000);
 const WINDOW_HOURS: i64 = 5;
 const BUCKETS: usize = 56;
+const PROVIDER: &str = "Coding agent";
 
 /// Mirrors `QuotaPayload` in `src/core/payloads.ts`.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct QuotaPayload {
+    /// False when there is nothing to read — not the same as a quiet window.
+    /// Going silent instead would be indistinguishable from a slow first poll.
+    pub available: bool,
+    pub reason: Option<String>,
     pub provider: String,
     pub tokens_in: u64,
     pub tokens_out: u64,
@@ -32,6 +37,30 @@ pub struct QuotaPayload {
     /// the user sets a budget. The widget shows counts rather than inventing a
     /// percentage against a number nobody published.
     pub budget_tokens: Option<u64>,
+}
+
+impl QuotaPayload {
+    /// Nothing to read from. Counters are zeroed rather than omitted so the
+    /// widget can render without special-casing every field, and `history`
+    /// keeps its length so the sparkline still has a well-formed series.
+    fn unavailable(reason: String) -> Self {
+        Self {
+            available: false,
+            reason: Some(reason),
+            provider: PROVIDER.to_string(),
+            tokens_in: 0,
+            tokens_out: 0,
+            cache_read: 0,
+            cache_write: 0,
+            requests: 0,
+            window_hours: WINDOW_HOURS,
+            resets_in_ms: 0,
+            burn_per_min: 0,
+            models: Vec::new(),
+            history: vec![0; BUCKETS],
+            budget_tokens: None,
+        }
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -52,9 +81,21 @@ struct Event {
 
 pub fn spawn(app: AppHandle) {
     thread::spawn(move || {
-        let Some(root) = transcript_root() else {
-            eprintln!("poller.quota: no ~/.claude/projects directory; quota stays empty");
-            return;
+        // Say so rather than going quiet. A poller that simply returns leaves
+        // the widget on "awaiting first event" forever, which is what a slow
+        // first poll looks like too.
+        let root = match transcript_root() {
+            Ok(root) => root,
+            Err(reason) => {
+                eprintln!("poller.quota: {reason}");
+                bus::publish(
+                    &app,
+                    "dev:llm_tokens",
+                    "poller.quota",
+                    QuotaPayload::unavailable(reason),
+                );
+                return;
+            }
         };
 
         eprintln!(
@@ -139,7 +180,9 @@ fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
     };
 
     QuotaPayload {
-        provider: "Coding agent".to_string(),
+        available: true,
+        reason: None,
+        provider: PROVIDER.to_string(),
         tokens_in,
         tokens_out,
         cache_read,
@@ -291,8 +334,21 @@ fn now_ms() -> i64 {
         .unwrap_or(0)
 }
 
-fn transcript_root() -> Option<PathBuf> {
-    let home = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))?;
+/// The directory the poller tails, or a reason the widget can show the user.
+/// The path is worth carrying into the failure: it is the one piece of
+/// information that explains what is missing.
+fn transcript_root() -> Result<PathBuf, String> {
+    let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) else {
+        return Err("no home directory in the environment".to_string());
+    };
+
     let root = PathBuf::from(home).join(".claude").join("projects");
-    root.is_dir().then_some(root)
+    if root.is_dir() {
+        Ok(root)
+    } else {
+        Err(format!(
+            "no agent session transcripts at {}",
+            root.display()
+        ))
+    }
 }

@@ -21,7 +21,7 @@ interface Hero {
 
 function Stage({ props }: WidgetProps) {
   const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'machine', 'sprint']).filter(Boolean);
-  const [tab, setTab] = useState(tabs[0] ?? 'quota');
+  const [picked, setPicked] = useState(tabs[0] ?? 'quota');
   const { settings } = useSettings();
 
   const quota = useTopic<QuotaPayload>('dev:llm_tokens');
@@ -29,9 +29,19 @@ function Stage({ props }: WidgetProps) {
   const mem = useTopic<MemPayload>('telemetry:mem');
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
 
+  // A tab whose source has said it cannot report is dropped rather than left
+  // as a dead end in the hero tile. Only an explicit refusal counts: a topic
+  // that has not published yet is still on its way, and hiding it would empty
+  // the strip for the first seconds after launch. Derived rather than synced
+  // into state, so the tab comes back by itself if its source turns up.
+  const noSource = (t: string) => t === 'quota' && quota?.available === false;
+  const visible = tabs.filter((t) => !noSource(t));
+  const shown = visible.length > 0 ? visible : tabs;
+  const tab = shown.includes(picked) ? picked : (shown[0] ?? 'quota');
+
   let hero: Hero | null = null;
 
-  if (tab === 'quota' && quota) {
+  if (tab === 'quota' && quota?.available) {
     const pct = budgetPct(quota, settings.budgetTokens);
     const status = budgetStatus(pct);
     hero = {
@@ -99,10 +109,10 @@ function Stage({ props }: WidgetProps) {
       }}
     >
       <div style={{ display: 'flex', flex: 'none', background: 'var(--cc-inset)' }}>
-        {tabs.map((t) => (
+        {shown.map((t) => (
           <button
             key={t}
-            onClick={() => setTab(t)}
+            onClick={() => setPicked(t)}
             style={{
               height: 33,
               padding: '0 20px',
@@ -126,7 +136,9 @@ function Stage({ props }: WidgetProps) {
           <div style={{ margin: 'auto', textAlign: 'center' }}>
             <div className="cc-label">{tab.toUpperCase()}</div>
             <div style={{ fontSize: 30, fontWeight: 200, color: 'var(--cc-line-2)', marginTop: 10 }}>--</div>
-            <div className="cc-mini" style={{ marginTop: 8 }}>AWAITING FIRST EVENT</div>
+            <div className="cc-mini" style={{ marginTop: 8 }}>
+              {noSource(tab) ? 'NO SOURCE' : 'AWAITING FIRST EVENT'}
+            </div>
           </div>
         ) : (
           <>

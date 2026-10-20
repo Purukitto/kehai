@@ -42,6 +42,9 @@ export interface ModelUsage {
 }
 
 export interface QuotaPayload {
+  /** False when there is nothing to read — not the same as a quiet window. */
+  available: boolean;
+  reason: string | null;
   provider: string;
   /** Tokens counted inside the rolling window. */
   tokensIn: number;
