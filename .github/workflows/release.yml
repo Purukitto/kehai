@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build and release, e.g. v0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      # The tag is the single source of truth for a release, so a mismatch with
+      # the manifests would ship a binary whose About screen lies. Fail here
+      # rather than after a twenty-minute build.
+      - name: Resolve and verify version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = if ('${{ inputs.tag }}') { '${{ inputs.tag }}' } else { '${{ github.ref_name }}' }
+          $version = $tag -replace '^v', ''
+          Write-Host "Tag $tag -> version $version"
+
+          $pkg = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $conf = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
+          $cargo = (Select-String -Path src-tauri/Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+
+          $bad = @()
+          if ($pkg   -ne $version) { $bad += "package.json: $pkg" }
+          if ($conf  -ne $version) { $bad += "tauri.conf.json: $conf" }
+          if ($cargo -ne $version) { $bad += "Cargo.toml: $cargo" }
+          if ($bad.Count -gt 0) {
+            throw "Tag says $version but " + ($bad -join ', ')
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=$tag"         >> $env:GITHUB_OUTPUT
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: release
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Runs the frontend build via beforeBuildCommand, embeds dist/ in the
+      # binary, then produces the MSI and NSIS installers.
+      - name: Build installers
+        run: bunx tauri build
+
+      # The installers are the normal path; this is for people who would rather
+      # not run one. It is the same GUI-subsystem binary the installers carry.
+      - name: Package portable build
+        shell: pwsh
+        run: |
+          $name = "kehai-${{ steps.version.outputs.version }}-windows-x64-portable"
+          New-Item -ItemType Directory -Path "artifacts/$name" | Out-Null
+          Copy-Item src-tauri/target/release/kehai.exe "artifacts/$name/"
+          Copy-Item README.md, LICENSE, CHANGELOG.md "artifacts/$name/"
+          Compress-Archive -Path "artifacts/$name" -DestinationPath "artifacts/$name.zip"
+
+      - name: Collect installers
+        shell: pwsh
+        run: |
+          Copy-Item src-tauri/target/release/bundle/msi/*.msi  artifacts/
+          Copy-Item src-tauri/target/release/bundle/nsis/*.exe artifacts/
+          Get-ChildItem artifacts -File | Select-Object Name, Length
+
+      - name: Checksums
+        shell: pwsh
+        run: |
+          Get-ChildItem artifacts -File |
+            ForEach-Object { "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower())  $($_.Name)" } |
+            Set-Content artifacts/SHA256SUMS.txt -Encoding ascii
+          Get-Content artifacts/SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kehai-windows-x64
+          path: artifacts/*
+          if-no-files-found: error
+
+      # Draft, so the release notes can be read over before anyone can download
+      # the binaries. Publishing it is one click in the Releases tab.
+      - name: Draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Kehai ${{ steps.version.outputs.tag }}
+          draft: true
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/*.msi
+            artifacts/*.exe
+            artifacts/*.zip
+            artifacts/SHA256SUMS.txt
+          body: |
+            ## Install
+
+            | File | What it is |
+            | --- | --- |
+            | `Kehai_${{ steps.version.outputs.version }}_x64-setup.exe` | NSIS installer. The usual choice. |
+            | `Kehai_${{ steps.version.outputs.version }}_x64_en-US.msi` | MSI, for policy-managed or scripted installs. |
+            | `kehai-${{ steps.version.outputs.version }}-windows-x64-portable.zip` | A single `kehai.exe`. No install, no uninstaller. |
+
+            Windows 10 1803 or newer, x64. Needs the WebView2 runtime, which ships with
+            Windows 11 and current Windows 10 — the installer offers to fetch it otherwise.
+
+            The binaries are unsigned, so SmartScreen will warn on first launch.
+            `SHA256SUMS.txt` has the checksums.
+
+            See [CHANGELOG.md](https://github.com/Purukitto/kehai/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md)
+            for what changed.

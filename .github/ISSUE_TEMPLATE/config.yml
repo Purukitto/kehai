@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/Purukitto/kehai/discussions
+    about: Anything that is not a bug report or a concrete feature request.
+  - name: Security vulnerability
+    url: https://github.com/Purukitto/kehai/security/advisories/new
+    about: Report privately. Please do not open a public issue.

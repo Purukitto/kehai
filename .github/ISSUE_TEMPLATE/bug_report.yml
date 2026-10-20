@@ -1,0 +1,108 @@
+name: Bug report
+description: Something behaves wrongly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. If this is security-sensitive, please read
+        [SECURITY.md](https://github.com/Purukitto/kehai/blob/main/SECURITY.md)
+        instead of filing here.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: |
+        Dragged the quota tile onto the clock tile expecting them to swap.
+        Both tiles ended up stacked in the same cells.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build
+    attributes:
+      label: Which build
+      options:
+        - Installer (NSIS .exe)
+        - Installer (MSI)
+        - Portable .zip
+        - Built from source (release)
+        - Built from source (debug)
+        - Dev server in a browser (bun run dev)
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: From Settings → About, or the commit if you built it yourself.
+      placeholder: 0.1.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 Pro 24H2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: source
+    attributes:
+      label: Which source is involved
+      description: Leave blank if it is not about a specific reading.
+      multiple: true
+      options:
+        - CPU / memory / network / disk
+        - CPU temperature
+        - Media session or cover art
+        - Notifications
+        - Agent token usage
+        - Layout, presets or the arranger
+        - Settings or persistence
+        - Window, autostart or placement
+        - Not source-specific
+
+  - type: dropdown
+    id: header
+    attributes:
+      label: Does the header read ENGINE or MOCK
+      description: Top-right of the dashboard. MOCK means the Rust engine is not attached.
+      options:
+        - ENGINE (green dot)
+        - MOCK
+        - Not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Diagnostics
+      description: >
+        A debug build (`bunx tauri build --debug --no-bundle`) keeps a terminal and
+        prints every poller's diagnostics to it. Paste anything relevant, plus the
+        browser console if this is a renderer issue.
+      render: text
+
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else
+      description: Screenshots, an exported layout, display resolution and scaling.

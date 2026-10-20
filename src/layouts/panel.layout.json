@@ -1,0 +1,83 @@
+{
+  "id": "panel",
+  "name": "Panel",
+  "theme": "amber",
+  "grid": {
+    "cols": 12,
+    "rows": 12,
+    "gap": 1
+  },
+  "tiles": [
+    {
+      "widget": "clock",
+      "area": [
+        1,
+        1,
+        7,
+        5
+      ],
+      "props": {
+        "seconds": false
+      }
+    },
+    {
+      "widget": "quota",
+      "area": [
+        1,
+        5,
+        7,
+        9
+      ],
+      "props": {}
+    },
+    {
+      "widget": "sprint",
+      "area": [
+        1,
+        9,
+        7,
+        13
+      ],
+      "props": {}
+    },
+    {
+      "widget": "media",
+      "area": [
+        7,
+        1,
+        12,
+        6
+      ],
+      "props": {
+        "art": true,
+        "equaliser": "bar"
+      }
+    },
+    {
+      "widget": "notify",
+      "area": [
+        7,
+        6,
+        12,
+        13
+      ],
+      "props": {}
+    },
+    {
+      "widget": "vitals",
+      "area": [
+        12,
+        1,
+        13,
+        13
+      ],
+      "props": {
+        "show": [
+          "cpu",
+          "mem",
+          "net"
+        ]
+      }
+    }
+  ]
+}

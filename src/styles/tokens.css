@@ -1,0 +1,53 @@
+:root {
+  --cc-font: 'JetBrains Mono', 'Cascadia Mono', ui-monospace, Consolas, 'Liberation Mono', monospace;
+}
+
+/* Thirteen custom properties per theme. A theme is a class on the root, nothing else. */
+
+.t-amber {
+  --cc-bg: #0d0c0a;
+  --cc-pane: #161512;
+  --cc-pane-2: #1d1c18;
+  --cc-inset: #100f0e;
+  --cc-line: #2a2823;
+  --cc-line-2: #3b3931;
+  --cc-text: #e9e5dc;
+  --cc-muted: #a09a8d;
+  --cc-dim: #6b665c;
+  --cc-accent: #f0a83c;
+  --cc-accent-2: #3fc6dc;
+  --cc-danger: #e5484d;
+  --cc-ok: #4cc38a;
+}
+
+.t-phosphor {
+  --cc-bg: #050806;
+  --cc-pane: #0a100b;
+  --cc-pane-2: #0f1810;
+  --cc-inset: #071009;
+  --cc-line: #173a1c;
+  --cc-line-2: #245c2a;
+  --cc-text: #a9f5b4;
+  --cc-muted: #5fa86b;
+  --cc-dim: #3c6b45;
+  --cc-accent: #6cf58a;
+  --cc-accent-2: #c8ff8f;
+  --cc-danger: #ff6b5e;
+  --cc-ok: #6cf58a;
+}
+
+.t-ice {
+  --cc-bg: #090d12;
+  --cc-pane: #121820;
+  --cc-pane-2: #18202a;
+  --cc-inset: #0e141b;
+  --cc-line: #23303d;
+  --cc-line-2: #33465a;
+  --cc-text: #dce6f2;
+  --cc-muted: #8b9bad;
+  --cc-dim: #5b6b7d;
+  --cc-accent: #56cfe1;
+  --cc-accent-2: #9d8cff;
+  --cc-danger: #ff6b81;
+  --cc-ok: #57d9a3;
+}

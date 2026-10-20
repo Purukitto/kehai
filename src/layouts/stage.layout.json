@@ -1,0 +1,70 @@
+{
+  "id": "stage",
+  "name": "Stage",
+  "theme": "amber",
+  "grid": {
+    "cols": 12,
+    "rows": 12,
+    "gap": 1
+  },
+  "tiles": [
+    {
+      "widget": "stage",
+      "area": [
+        1,
+        1,
+        10,
+        13
+      ],
+      "props": {
+        "tabs": [
+          "quota",
+          "machine",
+          "sprint"
+        ]
+      }
+    },
+    {
+      "widget": "clock",
+      "area": [
+        10,
+        1,
+        13,
+        4
+      ],
+      "props": {
+        "seconds": false,
+        "date": "long"
+      }
+    },
+    {
+      "widget": "media",
+      "area": [
+        10,
+        4,
+        13,
+        10
+      ],
+      "props": {
+        "art": true,
+        "equaliser": "bar"
+      }
+    },
+    {
+      "widget": "vitals",
+      "area": [
+        10,
+        10,
+        13,
+        13
+      ],
+      "props": {
+        "show": [
+          "cpu",
+          "mem",
+          "unread"
+        ]
+      }
+    }
+  ]
+}

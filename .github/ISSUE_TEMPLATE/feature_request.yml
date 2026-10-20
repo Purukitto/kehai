@@ -1,0 +1,57 @@
+name: Feature request
+description: Suggest a widget, a source or a change
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Kehai is deliberately small. The strongest case for a feature is a concrete
+        thing you want to see on a panel across the room, not a capability in the
+        abstract.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of change
+      options:
+        - A new widget
+        - A new source or poller
+        - A theme
+        - Layout or the arranger
+        - Settings
+        - Platform support (Linux / macOS)
+        - The headless API
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you want to know at a glance
+      description: The thing you currently switch windows to find out.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: >
+        For a widget, what it shows at its largest and what it drops as it shrinks.
+        For a source, where the data comes from and how often it changes.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+      description: Including whether an existing widget could be extended instead.
+
+  - type: checkboxes
+    id: help
+    attributes:
+      label: Would you like to build it
+      options:
+        - label: I would be willing to open a pull request for this

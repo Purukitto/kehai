@@ -1,0 +1,12 @@
+{
+  "id": "ambient",
+  "name": "Ambient",
+  "theme": "ice",
+  "grid": { "cols": 12, "rows": 12, "gap": 1 },
+  "tiles": [
+    { "widget": "clock", "area": [1, 1, 9, 13], "props": { "seconds": false, "size": "hero" } },
+    { "widget": "quota", "area": [9, 1, 11, 13], "props": { "density": "line" } },
+    { "widget": "media", "area": [11, 1, 13, 8], "props": { "art": false, "equaliser": "bar" } },
+    { "widget": "vitals", "area": [11, 8, 13, 13], "props": { "show": ["cpu", "mem"] } }
+  ]
+}

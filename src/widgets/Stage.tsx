@@ -1,0 +1,182 @@
+import { useState } from 'react';
+import { compact, mmss, sparkPath } from '../core/format';
+import { useSettings } from '../core/settings';
+import { useTopic } from '../core/useTopic';
+import type { CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
+import type { WidgetProps, WidgetSpec } from '../core/types';
+import { Meter } from './chrome';
+import { budgetPct, budgetStatus, totalTokens } from './Quota';
+
+interface Hero {
+  label: string;
+  value: string;
+  status: string;
+  sub: string;
+  meter: number;
+  color: string;
+  series: number[];
+  axisA: string;
+  axisB: string;
+}
+
+function Stage({ props }: WidgetProps) {
+  const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'machine', 'sprint']).filter(Boolean);
+  const [tab, setTab] = useState(tabs[0] ?? 'quota');
+  const { settings } = useSettings();
+
+  const quota = useTopic<QuotaPayload>('dev:llm_tokens');
+  const cpu = useTopic<CpuPayload>('telemetry:cpu');
+  const mem = useTopic<MemPayload>('telemetry:mem');
+  const sprint = useTopic<SprintPayload>('flow:pomodoro');
+
+  let hero: Hero | null = null;
+
+  if (tab === 'quota' && quota) {
+    const pct = budgetPct(quota, settings.budgetTokens);
+    const status = budgetStatus(pct);
+    hero = {
+      label: quota.provider.toUpperCase() + ' / ' + quota.windowHours + 'H ROLLING',
+      value: pct === null ? compact(totalTokens(quota)) : pct + '%',
+      status: status.label,
+      sub:
+        compact(quota.cacheRead) +
+        ' read from cache, ' +
+        compact(quota.cacheWrite) +
+        ' written, ' +
+        compact(quota.tokensOut) +
+        ' out across ' +
+        quota.requests +
+        ' requests.',
+      meter: pct ?? Math.min(100, quota.burnPerMin / 500),
+      color: status.color,
+      series: quota.history,
+      axisA: '-' + quota.windowHours + 'H',
+      axisB: 'NOW',
+    };
+  } else if (tab === 'machine' && cpu) {
+    hero = {
+      label: 'CPU / ' + cpu.threads.length + ' THREADS',
+      value: cpu.pct + '%',
+      status: cpu.tempC === null ? 'NO SENSOR' : cpu.tempC.toFixed(0) + '\u00b0C',
+      sub: mem
+        ? mem.usedGib.toFixed(1) + ' of ' + mem.totalGib.toFixed(1) + ' GiB used at ' + cpu.clockGhz.toFixed(2) + ' GHz.'
+        : 'Memory poller has not reported yet.',
+      meter: cpu.pct,
+      color: 'var(--cc-accent)',
+      series: cpu.threads,
+      axisA: 'PER THREAD',
+      axisB: 'T' + (cpu.threads.length - 1),
+    };
+  } else if (tab === 'sprint' && sprint) {
+    hero = {
+      label: 'FOCUS SPRINT ' + sprint.index + ' OF ' + sprint.total,
+      value: mmss(sprint.remainingSec),
+      status: sprint.running ? 'RUNNING' : 'PAUSED',
+      sub:
+        Math.floor(sprint.focusedTodaySec / 3600) +
+        'h ' +
+        Math.floor((sprint.focusedTodaySec % 3600) / 60) +
+        'm focused today.',
+      meter: 100 - (sprint.remainingSec / 1500) * 100,
+      color: 'var(--cc-accent)',
+      series: [],
+      axisA: '',
+      axisB: '',
+    };
+  }
+
+  const path = hero && hero.series.length > 1 ? sparkPath(hero.series, 1000, 132) : '';
+
+  return (
+    <div
+      style={{
+        background: 'var(--cc-pane)',
+        display: 'flex',
+        flexDirection: 'column',
+        minWidth: 0,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}
+    >
+      <div style={{ display: 'flex', flex: 'none', background: 'var(--cc-inset)' }}>
+        {tabs.map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            style={{
+              height: 33,
+              padding: '0 20px',
+              fontSize: 10,
+              letterSpacing: '0.16em',
+              border: 0,
+              borderBottom: '1px solid ' + (tab === t ? 'transparent' : 'var(--cc-line)'),
+              background: tab === t ? 'var(--cc-pane)' : 'transparent',
+              color: tab === t ? 'var(--cc-text)' : 'var(--cc-dim)',
+              boxShadow: tab === t ? 'inset 0 2px 0 var(--cc-accent)' : 'none',
+            }}
+          >
+            {t.toUpperCase()}
+          </button>
+        ))}
+        <div style={{ flex: 1, borderBottom: '1px solid var(--cc-line)' }} />
+      </div>
+
+      <div style={{ flex: 1, minHeight: 0, padding: '32px 40px 24px', display: 'flex', flexDirection: 'column' }}>
+        {!hero ? (
+          <div style={{ margin: 'auto', textAlign: 'center' }}>
+            <div className="cc-label">{tab.toUpperCase()}</div>
+            <div style={{ fontSize: 30, fontWeight: 200, color: 'var(--cc-line-2)', marginTop: 10 }}>--</div>
+            <div className="cc-mini" style={{ marginTop: 8 }}>AWAITING FIRST EVENT</div>
+          </div>
+        ) : (
+          <>
+            <span className="cc-label" style={{ fontSize: 11 }}>{hero.label}</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 26, marginTop: 10 }}>
+              <span
+                style={{
+                  fontSize: 'clamp(56px, 13vw, 168px)',
+                  fontWeight: 200,
+                  lineHeight: 0.9,
+                  letterSpacing: '-0.045em',
+                  color: hero.color,
+                }}
+              >
+                {hero.value}
+              </span>
+              <span style={{ fontSize: 17, letterSpacing: '0.16em', color: hero.color }}>{hero.status}</span>
+            </div>
+            <span style={{ fontSize: 17, color: 'var(--cc-muted)', marginTop: 20 }}>{hero.sub}</span>
+            <div style={{ marginTop: 24 }}>
+              <Meter pct={hero.meter} color={hero.color} height={14} />
+            </div>
+            <div style={{ flex: 1 }} />
+            {path && (
+              <>
+                <svg
+                  width="100%"
+                  height="132"
+                  viewBox="0 0 1000 132"
+                  preserveAspectRatio="none"
+                  style={{ display: 'block' }}
+                >
+                  <path d={path + ' L1000 132 L0 132 Z'} fill={hero.color} opacity="0.1" />
+                  <path d={path} fill="none" stroke={hero.color} strokeWidth="1.6" />
+                </svg>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9 }}>
+                  <span className="cc-mini">{hero.axisA}</span>
+                  <span className="cc-mini">{hero.axisB}</span>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export const stageSpec: WidgetSpec = {
+  min: [6, 4],
+  topics: ['dev:llm_tokens', 'telemetry:cpu', 'telemetry:mem', 'flow:pomodoro'],
+  component: Stage,
+};
