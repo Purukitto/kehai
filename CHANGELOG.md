@@ -11,7 +11,7 @@ topics; those are always listed here.
 
 Nothing yet.
 
-## [0.1.0] - 2026-09-03
+## [0.1.0] - 2026-10-20
 
 First public release.
 

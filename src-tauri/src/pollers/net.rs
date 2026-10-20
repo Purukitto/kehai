@@ -54,6 +54,17 @@ pub fn spawn(app: AppHandle) {
                 .filter(|i| i.rx_bytes_per_sec > 0 || i.tx_bytes_per_sec > 0)
                 .collect();
 
+            // Windows enumerates a filter driver — an NDIS LightWeight Filter,
+            // a VPN shim — as a second interface that mirrors the adapter it
+            // sits on byte for byte. Summing both reports twice the traffic
+            // that actually moved. Collapse readings identical within the same
+            // interval, keeping the shortest name: the mirror is always the
+            // adapter's name plus the filter's description.
+            active.sort_by_key(|i| (i.rx_bytes_per_sec, i.tx_bytes_per_sec, i.name.len()));
+            active.dedup_by(|a, b| {
+                a.rx_bytes_per_sec == b.rx_bytes_per_sec && a.tx_bytes_per_sec == b.tx_bytes_per_sec
+            });
+
             active.sort_by_key(|i| std::cmp::Reverse(i.rx_bytes_per_sec + i.tx_bytes_per_sec));
             active.truncate(4);
 
