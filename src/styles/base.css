@@ -147,6 +147,26 @@ button {
   font-weight: 600;
 }
 
+/* Text entry sits beside chips, so it borrows their hairline rather than the
+   platform's rounded field and focus glow. */
+.cc-field {
+  font: inherit;
+  font-size: 11px;
+  padding: 7px 10px;
+  color: var(--cc-text);
+  background: var(--cc-inset);
+  border: 1px solid var(--cc-line);
+  outline: none;
+}
+
+.cc-field::placeholder {
+  color: var(--cc-dim);
+}
+
+.cc-field:focus {
+  border-color: var(--cc-accent);
+}
+
 /* Dismiss stays out of the way until you go looking for it: the sink is
    something you read, not a queue demanding to be cleared. */
 .cc-dismiss {

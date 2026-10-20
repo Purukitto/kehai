@@ -1,15 +1,19 @@
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use serde::Serialize;
-use tauri::AppHandle;
+use serde::{Deserialize, Serialize};
+use tauri::{AppHandle, Listener};
 
 use crate::bus;
 
 const INTERVAL: Duration = Duration::from_millis(30_000);
+/// How long the first read waits for the renderer to say which folder to use.
+/// See `spawn`.
+const FIRST_ROOT_GRACE: Duration = Duration::from_millis(5_000);
 const WINDOW_HOURS: i64 = 5;
 const BUCKETS: usize = 56;
 const PROVIDER: &str = "Coding agent";
@@ -79,57 +83,100 @@ struct Event {
     cache_write: u64,
 }
 
+/// Mirrors `QuotaCommand` in `src/core/payloads.ts`. The folder is kept in the
+/// renderer's settings, so this is the only way the engine learns it.
+#[derive(Deserialize)]
+struct Command {
+    action: String,
+    /// `None` means the default location.
+    path: Option<String>,
+}
+
 pub fn spawn(app: AppHandle) {
-    thread::spawn(move || {
-        // Say so rather than going quiet. A poller that simply returns leaves
-        // the widget on "awaiting first event" forever, which is what a slow
-        // first poll looks like too.
-        let root = match transcript_root() {
-            Ok(root) => root,
-            Err(reason) => {
-                eprintln!("poller.quota: {reason}");
-                bus::publish(
-                    &app,
-                    "dev:llm_tokens",
-                    "poller.quota",
-                    QuotaPayload::unavailable(reason),
-                );
-                return;
-            }
+    let (chosen_tx, chosen_rx) = mpsc::channel::<Option<PathBuf>>();
+
+    let commands = app.clone();
+    commands.listen("quota:command", move |event| {
+        let Ok(cmd) = serde_json::from_str::<Command>(event.payload()) else {
+            return;
         };
+        if cmd.action != "set_root" {
+            return;
+        }
+        let path = cmd.path.filter(|p| !p.trim().is_empty()).map(PathBuf::from);
+        // The read itself happens on the poller thread, which this wakes; a
+        // folder with a lot of recent transcripts takes a while to tally.
+        let _ = chosen_tx.send(path);
+    });
 
-        eprintln!(
-            "poller.quota: reading local transcripts from {}",
-            root.display()
-        );
-
-        let mut announced = false;
+    thread::spawn(move || {
+        // The renderer sends its choice once its bridge is up, which is after
+        // this thread starts. Reading the default first would publish another
+        // folder's figures, or its absence, which drops the quota tab from
+        // Stage, only to replace them a second later.
+        let mut chosen = chosen_rx.recv_timeout(FIRST_ROOT_GRACE).ok().flatten();
+        let mut last_said = String::new();
 
         loop {
-            let window_ms = WINDOW_HOURS * 60 * 60 * 1000;
-            let now = now_ms();
-            let since = now - window_ms;
+            // Resolved every pass rather than once at start, so a changed
+            // setting, or a folder that appears after launch, is picked up.
+            let (payload, said) = match read(chosen.as_deref()) {
+                Ok((root, payload)) => (
+                    payload,
+                    format!("reading local transcripts from {}", root.display()),
+                ),
+                Err(reason) => (QuotaPayload::unavailable(reason.clone()), reason),
+            };
 
-            let events = collect(&root, since);
-            let payload = summarise(events, now, since);
-
-            if !announced {
-                announced = true;
-                eprintln!(
-                    "poller.quota: {}h window, {} requests, {} in / {} out tokens, {} models",
-                    payload.window_hours,
-                    payload.requests,
-                    payload.tokens_in,
-                    payload.tokens_out,
-                    payload.models.len()
-                );
+            if said != last_said {
+                eprintln!("poller.quota: {said}");
+                if payload.available {
+                    eprintln!(
+                        "poller.quota: {}h window, {} requests, {} in / {} out tokens, {} models",
+                        payload.window_hours,
+                        payload.requests,
+                        payload.tokens_in,
+                        payload.tokens_out,
+                        payload.models.len()
+                    );
+                }
+                last_said = said;
             }
 
             bus::publish(&app, "dev:llm_tokens", "poller.quota", payload);
 
-            thread::sleep(INTERVAL);
+            // Wait out the interval, but wake for a new folder: a path edited
+            // in Settings should show its effect now, not up to 30 s later.
+            match chosen_rx.recv_timeout(INTERVAL) {
+                // Several changes queued behind a slow read: only the last counts.
+                Ok(path) => chosen = chosen_rx.try_iter().last().unwrap_or(path),
+                Err(RecvTimeoutError::Timeout) => {}
+                // Only if the listener is gone. Without the sleep this would spin.
+                Err(RecvTimeoutError::Disconnected) => thread::sleep(INTERVAL),
+            }
         }
     });
+}
+
+/// One pass over the chosen folder, or the default. A folder with no
+/// transcripts in it at all is reported as such: counting it as a quiet window
+/// would show zeroes for a source that is not there.
+fn read(chosen: Option<&Path>) -> Result<(PathBuf, QuotaPayload), String> {
+    let root = transcript_root(chosen)?;
+
+    let window_ms = WINDOW_HOURS * 60 * 60 * 1000;
+    let now = now_ms();
+    let since = now - window_ms;
+
+    let Some(events) = collect(&root, since) else {
+        return Err(format!(
+            "no agent session transcripts at {}",
+            root.display()
+        ));
+    };
+
+    let payload = summarise(events, now, since);
+    Ok((root, payload))
 }
 
 fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
@@ -201,13 +248,13 @@ fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
     }
 }
 
-/// Walks `projects/*/**.jsonl`, skipping files untouched since the window opened.
-fn collect(root: &PathBuf, since: i64) -> Vec<Event> {
+/// Walks `<root>/<project>/*.jsonl`, skipping files untouched since the window
+/// opened. `None` when there is not a single transcript, however old.
+fn collect(root: &Path, since: i64) -> Option<Vec<Event>> {
     let mut events = Vec::new();
+    let mut found = false;
 
-    let Ok(projects) = fs::read_dir(root) else {
-        return events;
-    };
+    let projects = fs::read_dir(root).ok()?;
 
     for project in projects.flatten() {
         let Ok(files) = fs::read_dir(project.path()) else {
@@ -219,6 +266,7 @@ fn collect(root: &PathBuf, since: i64) -> Vec<Event> {
             if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
                 continue;
             }
+            found = true;
             if modified_ms(&entry) < since {
                 continue;
             }
@@ -226,10 +274,10 @@ fn collect(root: &PathBuf, since: i64) -> Vec<Event> {
         }
     }
 
-    events
+    found.then_some(events)
 }
 
-fn read_file(path: &PathBuf, since: i64, out: &mut Vec<Event>) {
+fn read_file(path: &Path, since: i64, out: &mut Vec<Event>) {
     let Ok(file) = File::open(path) else { return };
 
     for line in BufReader::new(file).lines().map_while(Result::ok) {
@@ -337,14 +385,27 @@ fn now_ms() -> i64 {
 /// The directory the poller tails, or a reason the widget can show the user.
 /// The path is worth carrying into the failure: it is the one piece of
 /// information that explains what is missing.
-fn transcript_root() -> Result<PathBuf, String> {
-    let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME")) else {
-        return Err("no home directory in the environment".to_string());
+fn transcript_root(chosen: Option<&Path>) -> Result<PathBuf, String> {
+    let root = match chosen {
+        // A relative path would resolve against wherever the app was launched
+        // from, and read a different folder depending on how it was started.
+        Some(path) if !path.is_absolute() => {
+            return Err(format!("{} is not an absolute path", path.display()));
+        }
+        Some(path) => path.to_path_buf(),
+        None => {
+            let Some(home) = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"))
+            else {
+                return Err("no home directory in the environment".to_string());
+            };
+            PathBuf::from(home).join(".claude").join("projects")
+        }
     };
 
-    let root = PathBuf::from(home).join(".claude").join("projects");
     if root.is_dir() {
         Ok(root)
+    } else if root.exists() {
+        Err(format!("{} is not a folder", root.display()))
     } else {
         Err(format!(
             "no agent session transcripts at {}",

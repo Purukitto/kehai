@@ -47,9 +47,10 @@ and that is the only time anyone sees the JSON.
 Every widget subscribes to bus topics and renders what arrives. It cannot poll, it
 cannot call an API, and it holds no state that another widget needs.
 
-The single exception is commands — media transport and notification dismissal — which
-*publish* an intent onto the bus. The engine owns the side effect and runs it off the
-event thread, so a wedged media player can never freeze the panel.
+The single exception is commands — media transport, notification dismissal, and the
+folder the token poller reads — which *publish* an intent onto the bus. The engine owns
+the side effect and runs it off the event thread, so a wedged media player can never
+freeze the panel.
 
 This is what makes the mock source useful rather than a toy: it publishes the same
 envelopes on the same topics, so the entire UI can be built and reviewed in a browser

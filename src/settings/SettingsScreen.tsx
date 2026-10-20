@@ -236,6 +236,68 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
   );
 }
 
+/**
+ * Committed on Enter or when focus leaves, not per keystroke: each commit makes
+ * the engine re-read the folder, and a half-typed path is a folder that does
+ * not exist. Whether the folder worked shows on the Agent tokens row above.
+ */
+function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit: (path: string | null) => void }) {
+  const [draft, setDraft] = useState(value ?? '');
+
+  useEffect(() => setDraft(value ?? ''), [value]);
+
+  const commit = () => {
+    const next = draft.trim() === '' ? null : draft.trim();
+    if (next !== value) onCommit(next);
+  };
+
+  // Laid out as a SourceRow with no dot, so it reads as part of Agent tokens
+  // rather than as a separate source.
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--cc-line)',
+      }}
+    >
+      <span style={{ width: 6, flex: 'none' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12 }}>Transcript folder</div>
+        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+          One subfolder per project, each holding .jsonl transcripts. Blank uses ~/.claude/projects.
+        </div>
+      </div>
+      <div style={{ display: 'flex', flex: 'none' }}>
+        <input
+          className="cc-field"
+          style={{ width: 280 }}
+          value={draft}
+          placeholder="~/.claude/projects"
+          spellCheck={false}
+          aria-label="Transcript folder"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+            if (e.key === 'Escape') setDraft(value ?? '');
+          }}
+        />
+        <button
+          className={value === null ? 'cc-chip cc-chip-on' : 'cc-chip'}
+          style={{ padding: '7px 13px', marginLeft: -1 }}
+          onClick={() => onCommit(null)}
+          title="Read from the default location"
+        >
+          DEFAULT
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; onArrange: () => void }) {
   const {
     settings,
@@ -243,6 +305,7 @@ export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; on
     setTheme,
     setBudget,
     setAutoHideBar,
+    setTranscriptRoot,
     setGrid,
     toggleWidget,
     setTileProp,
@@ -515,6 +578,7 @@ export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; on
               <SourceRow label="Network" topic="telemetry:net" desc="Throughput per interface." />
               <SourceRow label="Disk" topic="telemetry:disk" desc="Volumes and capacity." />
               <SourceRow label="Agent tokens" topic="dev:llm_tokens" desc="Tallied from local session transcripts. Never leaves the machine." />
+              <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />
               <SourceRow label="Notifications" topic="sys:notify" desc="Intercepted from the system tray." />
             </div>

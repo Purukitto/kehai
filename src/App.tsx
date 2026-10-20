@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { WindowControls } from './components/WindowControls';
+import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
+import type { QuotaCommand } from './core/payloads';
 import { useSettings } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { Arranger } from './grid/Arranger';
@@ -53,6 +55,17 @@ export default function App() {
       stopMock();
     };
   }, []);
+
+  // The engine reads transcripts from wherever this says, and has no other way
+  // to learn it. On launch this runs before the bridge above has attached; the
+  // bus retains the command, so the bridge forwards it as soon as it subscribes,
+  // ahead of its hello.
+  useEffect(() => {
+    bus.publish<QuotaCommand>('quota:command', 'settings', {
+      action: 'set_root',
+      path: settings.transcriptRoot,
+    });
+  }, [settings.transcriptRoot]);
 
   useEffect(() => {
     document.documentElement.className = 't-' + layout.theme;

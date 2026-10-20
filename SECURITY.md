@@ -34,9 +34,10 @@ surface is what it reads and what it exposes:
 - **Transcript reading.** The quota poller tails local session transcripts for token
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.
-- **The IPC boundary.** Widgets are read-only except for `media:command` and
-  `notify:command`. A path that lets renderer content reach anything else in the
-  engine is in scope.
+- **The IPC boundary.** The renderer is read-only except for `media:command`,
+  `notify:command` and `quota:command`, the last of which only changes the folder the
+  quota poller reads — it still reads nothing but usage counters. A path that lets
+  renderer content reach anything else in the engine is in scope.
 - **The content-security policy.** Kehai makes no network requests other than the web
   font. A way to make it egress data is in scope.
 - **Installer and build integrity.** Anything that lets a build or an installer run

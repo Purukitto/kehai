@@ -25,6 +25,12 @@ export interface Settings {
   budgetTokens: number | null;
   /** Hide the header until the pointer reaches the top edge. */
   autoHideBar: boolean;
+  /**
+   * Where the quota poller reads agent session transcripts. Null means the
+   * engine's default. Kept here because this is the only settings store; the
+   * engine hears it over `quota:command`.
+   */
+  transcriptRoot: string | null;
 }
 
 const STORAGE_KEY = 'kehai.settings.v1';
@@ -32,7 +38,18 @@ const STORAGE_KEY = 'kehai.settings.v1';
 const LEGACY_KEY = 'command-center.settings.v1';
 
 function defaults(): Settings {
-  return { presetId: 'stage', layout: PRESETS.stage, budgetTokens: null, autoHideBar: false };
+  return {
+    presetId: 'stage',
+    layout: PRESETS.stage,
+    budgetTokens: null,
+    autoHideBar: false,
+    transcriptRoot: null,
+  };
+}
+
+/** Blank means the default, so it is stored as null rather than as ''. */
+function folder(path: unknown): string | null {
+  return typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
 function load(): Settings {
@@ -52,6 +69,7 @@ function load(): Settings {
       layout: layout.layout,
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
+      transcriptRoot: folder(parsed.transcriptRoot),
     };
   } catch {
     return defaults();
@@ -64,6 +82,7 @@ interface Store {
   setTheme: (theme: ThemeId) => void;
   setBudget: (tokens: number | null) => void;
   setAutoHideBar: (on: boolean) => void;
+  setTranscriptRoot: (path: string | null) => void;
   setTiles: (tiles: Tile[]) => void;
   setTileArea: (index: number, area: Area) => void;
   setTileProp: (index: number, key: string, value: unknown) => void;
@@ -119,6 +138,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setBudget: (budgetTokens) => setSettings((prev) => ({ ...prev, budgetTokens })),
 
       setAutoHideBar: (autoHideBar) => setSettings((prev) => ({ ...prev, autoHideBar })),
+
+      setTranscriptRoot: (path) => setSettings((prev) => ({ ...prev, transcriptRoot: folder(path) })),
 
       setTiles: (tiles) => editLayout((layout) => ({ ...layout, tiles })),
 

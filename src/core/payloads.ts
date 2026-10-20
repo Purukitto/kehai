@@ -67,6 +67,13 @@ export interface QuotaPayload {
   budgetTokens: number | null;
 }
 
+/** Renderer → engine on `quota:command`. Mirrors `Command` in `quota.rs`. */
+export interface QuotaCommand {
+  action: 'set_root';
+  /** Folder holding one subfolder of `.jsonl` transcripts per project. Null means the default. */
+  path: string | null;
+}
+
 export interface MediaPayload {
   playing: boolean;
   title: string;

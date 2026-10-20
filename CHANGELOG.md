@@ -28,8 +28,9 @@ First public release.
   - Windows toast notifications via `UserNotificationListener`, dismissable from the
     widget.
   - Agent token usage over a rolling five-hour window, tallied from local session
-    transcripts. Optional: with no transcripts the source reports itself
-    unavailable, naming the path it looked in, instead of going silent.
+    transcripts, from a folder you can change in Settings → Sources. Optional: with
+    no transcripts the source reports itself unavailable, naming the path it looked
+    in, instead of going silent — and recovers by itself if the folder turns up.
 - **Eight widgets**: stage, telemetry, vitals, quota, media, notify, clock, sprint.
   Each declares its own minimum size and the topics it reads, and is reached only
   through the registry — a layout naming an unknown widget renders a placeholder

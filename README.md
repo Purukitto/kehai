@@ -121,10 +121,12 @@ Two sources are worth stating plainly:
   the first time. Deny it and the widget reports the refusal rather than showing an
   empty feed.
 - **Agent token usage.** The quota widget tallies token counts by tailing local coding
-  agent session transcripts under `~/.claude/projects` — file modification times and
-  the usage counters on assistant turns. No prompt or response text is read, retained
-  or displayed. There is no API call and no account involved; if the directory does not
-  exist the source reports itself unavailable and the rest of the panel is unaffected.
+  agent session transcripts — under `~/.claude/projects` unless you point
+  Settings → Sources at another folder — reading file modification times and the usage
+  counters on assistant turns. No prompt or response text is read, retained or
+  displayed. There is no API call and no account involved; if the folder does not exist
+  or holds no transcripts, the source reports itself unavailable and the rest of the
+  panel is unaffected.
 
 ## Building from source
 
