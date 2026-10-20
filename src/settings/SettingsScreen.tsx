@@ -207,8 +207,11 @@ function PresetCard({
 }
 
 function SourceRow({ label, topic, desc }: { label: string; topic: string; desc: string }) {
-  const value = useTopic<unknown>(topic);
-  const live = value !== undefined && value !== null;
+  const value = useTopic<{ available?: boolean; reason?: string | null } | null>(topic);
+  // A payload that says it cannot report is not a live source. Counting any
+  // payload as live showed a refused notification listener as reporting.
+  const refused = value?.available === false;
+  const live = value !== undefined && value !== null && !refused;
   return (
     <div
       style={{
@@ -223,11 +226,11 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12 }}>{label}</div>
         <div className="cc-mini" style={{ marginTop: 4 }}>
-          {desc}
+          {refused && value?.reason ? value.reason : desc}
         </div>
       </div>
       <span className="cc-mini" style={{ flex: 'none' }}>
-        {live ? 'REPORTING' : 'SILENT'}
+        {live ? 'REPORTING' : refused ? 'UNAVAILABLE' : 'SILENT'}
       </span>
     </div>
   );

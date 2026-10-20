@@ -2,7 +2,7 @@ import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import { rate } from '../core/format';
-import type { CpuPayload, MemPayload, NetPayload } from '../core/payloads';
+import type { CpuPayload, MemPayload, NetPayload, NotifyPayload } from '../core/payloads';
 import type { WidgetProps, WidgetSpec } from '../core/types';
 
 /** Below this the rows lay out along one line instead of stacking. */
@@ -13,15 +13,21 @@ function Vitals({ props }: WidgetProps) {
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
   const mem = useTopic<MemPayload>('telemetry:mem');
   const net = useTopic<NetPayload>('telemetry:net');
+  const notify = useTopic<NotifyPayload>('sys:notify');
   const show = (props.show as string[] | undefined) ?? ['cpu', 'mem', 'unread'];
 
   const inline = useBreakpoint(size.h, ROW_BELOW);
+
+  // Toasts in the tray. A refused listener is stated rather than shown as
+  // zero: an empty tray and an unreadable one are different facts.
+  const counting = notify?.available === true;
+  const unread = !notify ? '--' : counting ? String(notify.items.length) : 'N/A';
 
   const values: Record<string, string> = {
     cpu: cpu ? cpu.pct + '%' : '--',
     mem: mem ? mem.usedGib.toFixed(1) + 'G' : '--',
     net: net ? rate(net.rxBytesPerSec) : '--',
-    unread: '3',
+    unread,
   };
 
   return (
@@ -60,7 +66,7 @@ function Vitals({ props }: WidgetProps) {
             style={{
               fontSize: inline ? 15 : 18,
               whiteSpace: 'nowrap',
-              color: key === 'unread' ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
+              color: key === 'unread' && counting ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
             }}
           >
             {values[key] ?? '--'}
@@ -73,6 +79,6 @@ function Vitals({ props }: WidgetProps) {
 
 export const vitalsSpec: WidgetSpec = {
   min: [2, 1],
-  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net'],
+  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'sys:notify'],
   component: Vitals,
 };
