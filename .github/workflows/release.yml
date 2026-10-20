@@ -109,7 +109,7 @@ jobs:
       # Draft, so the release notes can be read over before anyone can download
       # the binaries. Publishing it is one click in the Releases tab.
       - name: Draft release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Kehai ${{ steps.version.outputs.tag }}
