@@ -228,7 +228,7 @@ jobs:
           $install = @"
           ## Install
 
-          Installed copies from 0.2.0 on update themselves from **Settings → About**.
+          Installed copies update themselves from **Settings → About**.
 
           | File | What it is |
           | --- | --- |

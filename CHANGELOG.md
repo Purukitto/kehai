@@ -9,19 +9,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
-### Added
-
-- Kehai can update itself. **Settings → About** checks for a new version and installs
-  it: Kehai closes, updates and opens again. **Check automatically** looks once a day,
-  and is off unless you turn it on.
-- Coming from 0.1.0? Install this version by hand once. Every version after it can
-  update itself.
-
-### Fixed
-
-- Settings → About shows the version you are actually running.
-
-## [0.1.0] - 2026-10-20
+## [0.1.0] - 2026-10-21
 
 First public release.
 
@@ -33,6 +21,9 @@ First public release.
 - Drag tiles to move and resize them, and share an arrangement as JSON.
 - Reopens on the display you left it on, can start with Windows, and goes fullscreen
   with F11.
+- Updates itself. **Settings → About** checks for a new version and installs it:
+  Kehai closes, updates and opens again. **Check automatically** looks once a day, and
+  is off unless you turn it on.
 
 ### Known issues
 

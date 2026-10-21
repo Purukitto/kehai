@@ -47,7 +47,7 @@ takes about five minutes if you would rather not trust a stranger's exe.
 
 ### Updating
 
-From 0.2.0 on, an installed copy updates itself. **Settings → About → Check** asks
+An installed copy updates itself. **Settings → About → Check** asks
 GitHub for the latest release, shows what changed, and **Install** closes Kehai,
 runs the new installer and opens it again. Turn on **Check automatically** to have
 it look once a day; it is off until you do.
