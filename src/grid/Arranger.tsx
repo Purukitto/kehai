@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { firstFree, overlaps } from '../core/layout';
 import { useSettings } from '../core/settings';
 import type { Area, Tile } from '../core/types';
 import { registry } from '../widgets/registry';
@@ -14,11 +15,6 @@ interface Drag {
 }
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-
-/** Half-open on both axes, so tiles that merely touch do not count. */
-function overlaps(a: Area, b: Area): boolean {
-  return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1];
-}
 
 function hitList(area: Area, tiles: Tile[], ignore: number): number[] {
   const hits: number[] = [];
@@ -40,16 +36,7 @@ function tidy(tiles: Tile[], cols: number, rows: number): Tile[] {
   for (const tile of tiles) {
     const h = tile.area[2] - tile.area[0];
     const w = tile.area[3] - tile.area[1];
-    let found: Area | null = null;
-
-    for (let r = 1; r + h <= rows + 1 && !found; r += 1) {
-      for (let c = 1; c + w <= cols + 1 && !found; c += 1) {
-        const candidate: Area = [r, c, r + h, c + w];
-        if (!placed.some((p) => overlaps(candidate, p.area))) found = candidate;
-      }
-    }
-
-    placed.push({ ...tile, area: found ?? tile.area });
+    placed.push({ ...tile, area: firstFree(placed, w, h, cols, rows) ?? tile.area });
   }
 
   return placed;
@@ -67,7 +54,7 @@ function tidy(tiles: Tile[], cols: number, rows: number): Tile[] {
  * is marked while you hold it there.
  */
 export function Arranger({ onDone }: { onDone: () => void }) {
-  const { settings, setTiles, toggleWidget } = useSettings();
+  const { settings, setTiles, removeTile } = useSettings();
   const layout = settings.layout;
   const surface = useRef<HTMLDivElement | null>(null);
   const [drag, setDrag] = useState<Drag | null>(null);
@@ -202,7 +189,15 @@ export function Arranger({ onDone }: { onDone: () => void }) {
           </span>
         )}
         {current && (
-          <button className="cc-chip" onClick={() => toggleWidget(current.widget)}>
+          // Only the selected tile: a layout can hold two of one widget, and
+          // removing by kind took both.
+          <button
+            className="cc-chip"
+            onClick={() => {
+              removeTile(selected);
+              setSelected(0);
+            }}
+          >
             REMOVE
           </button>
         )}
