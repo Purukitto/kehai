@@ -72,10 +72,16 @@ The window is undecorated and draws its own title bar; drag it by the top strip.
 **Settings → Window** turns on autostart and the auto-hiding top bar, and position and
 size are restored per display, so the panel reopens where you left it.
 
-Three presets ship — **Stage** (default), **Panel** and **Ambient** — and
-**Settings → Arrange** is a direct-manipulation grid editor: drag a tile to move it,
-drag its corner to resize, drop it onto another tile to swap the two. Export and Import
-write the layout as JSON if you want to commit or share one.
+Three presets ship — **Stage** (default), **Panel** and **Ambient** — each arranged
+three ways: for a landscape panel, a bar display and a portrait screen. Kehai shows
+the arrangement that fits its window, so the same layout works on a 16:10 panel, a
+1920 × 480 bar and a tablet on its end.
+
+**Settings → Layout** lists the presets and the layouts of your own. **Arrange** opens
+a direct-manipulation grid editor, one tab per shape: drag a tile to move it, drag its
+corner to resize, drop it onto another tile to swap the two. Presets themselves never
+change; the first change to one saves a copy under **Yours**. Export and Import write
+a layout as JSON if you want to commit or share one.
 
 <p align="center">
   <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: CPU load, temperature and per-thread usage" width="32%">
@@ -329,7 +335,8 @@ only while the host allows control; the engine checks every one again.
 | `src/core/tauriSource.ts` | Bridges engine events onto the bus, both directions |
 | `src/core/remoteSource.ts` | The same, for a remote panel, over a WebSocket |
 | `src/core/payloads.ts` | Every payload shape, mirrored by hand from Rust |
-| `src/core/layout.ts` | Validates a stored or imported layout |
+| `src/core/layout.ts` | Validates a stored or imported layout, in either format |
+| `src/core/useWindowShape.ts` | Picks landscape, bar or portrait from the window |
 | `src/core/settings.tsx` | The settings store and everything that persists |
 | `src/grid/Grid.tsx` | Renders a layout onto a CSS grid |
 | `src/grid/Arranger.tsx` | The tile arranger |

@@ -19,8 +19,8 @@ underlying value is genuinely moving.
 
 ## Presets
 
-Three arrangements ship, and they differ **only** in `tiles[].area` and
-`tiles[].props`. Same grid, same widgets, same theme system.
+Three layouts ship, and they differ **only** in `tiles[].area` and `tiles[].props`.
+Same widgets, same theme system.
 
 | Preset | Idea |
 | --- | --- |
@@ -32,15 +32,46 @@ That constraint is load-bearing. If a single schema could not produce all three 
 the same widget set, the layout system would not really be configurable — it would be
 three hard-coded screens wearing a data structure.
 
+## One arrangement per shape of display
+
+A small display is not always 16:10. Bar displays run at 4:1 or wider, and a tablet
+used as a remote panel stands on its end. One arrangement stretched over all of them
+gives tiles three times too wide on a bar and a clock cut off in portrait.
+
+So a layout holds three arrangements, each with its own grid:
+
+| Shape | Window | Grid |
+| --- | --- | --- |
+| landscape | anything from square to 2.4 : 1 | 12 × 8 |
+| bar | wider than 2.4 : 1 | 16 × 4 |
+| portrait | taller than wide | 8 × 12 |
+
+Kehai picks one from the shape of its window, so a remote panel on a tablet turns
+with the tablet. The grids keep cells close to square, so a widget's minimum size in
+cells means about the same on every display.
+
+What matters at a glance comes first in every arrangement, in this order: an agent
+waiting on you, the token block and when it resets, the time, the focus timer, what
+is playing, notifications, then the machine.
+
 ## The settings screen owns the truth
 
-Layouts are stored by the app, not hand-edited. The Arranger is direct manipulation:
-drag a tile to move it, drag its corner to resize. Drop a tile onto an occupied space
-and the two swap, because refusing the drop makes a full grid impossible to
-rearrange — there is nowhere free to stage a tile.
+Layouts are stored by the app, not hand-edited. Presets are never stored at all: they
+cannot be changed, so one nobody has edited always follows the version that shipped.
+The first change to a preset saves a copy under **Yours** instead, and picking a
+layout never throws another away. Selecting a card only selects it; **Use** is what
+changes the screen. The theme is not part of a layout, so changing layout never
+changes colours.
 
-Export and Import exist so an arrangement can be committed to a repository or shared,
-and that is the only time anyone sees the JSON.
+The Arranger is direct manipulation: drag a tile to move it, drag its corner to
+resize. Drop a tile onto an occupied space and the two swap, because refusing the
+drop makes a full grid impossible to rearrange — there is nowhere free to stage a
+tile. Each shape has its own tab, and a shape other than the window's is drawn at its
+own proportions, so a bar display can be laid out from a desk monitor. Changing the
+grid size carries every tile to the same proportion of the new grid.
+
+Export and Import exist so a layout can be committed to a repository or shared, and
+that is the only time anyone sees the JSON.
 
 ## The UI only consumes
 

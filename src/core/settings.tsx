@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { isThemeId, parseLayout, placeTile, regrid, safeParseLayout } from './layout';
-import type { Area, Layout, ThemeId, Tile } from './types';
+import { isThemeId, parseLayout, safeParseLayout } from './layout';
+import type { Arrangement, Layout, Shape, ThemeId } from './types';
 import ambient from '../layouts/ambient.layout.json';
 import panel from '../layouts/panel.layout.json';
 import stage from '../layouts/stage.layout.json';
@@ -14,16 +14,20 @@ export const PRESETS: Record<string, Layout> = {
 
 export const PRESET_ORDER = ['stage', 'panel', 'ambient'];
 
+export const isPreset = (id: string): boolean => Object.hasOwn(PRESETS, id);
+
 export interface Settings {
-  /** The preset this came from, or 'custom' once the layout is edited. */
-  presetId: string;
-  layout: Layout;
+  /** The layout on screen: a preset's id, or the id of one of yours. */
+  layoutId: string;
   /**
-   * The last edited arrangement, kept while a preset is on screen so that
-   * looking at a preset does not throw it away. Null while the arrangement on
-   * screen is the custom one, or when there has never been one.
+   * Layouts you made: copies of a preset or of each other, and imports.
+   * Presets are never stored, so one nobody has edited always follows the
+   * version that shipped, and a release that adds to Stage reaches the people
+   * using Stage.
    */
-  custom: Layout | null;
+  layouts: Layout[];
+  /** Not part of any layout, so changing layout never changes colours. */
+  theme: ThemeId;
   /**
    * Token budget for the quota widget. No local source exposes the real plan
    * limit, so a percentage only exists once you decide what to measure against.
@@ -72,15 +76,20 @@ export interface FocusSettings {
 
 const FOCUS_DEFAULTS: FocusSettings = { focusMin: 25, breakMin: 5, sprints: 4 };
 
-const STORAGE_KEY = 'kehai.settings.v1';
-/** Pre-rename key. Read once so an existing arrangement survives the rename. */
+const STORAGE_KEY = 'kehai.settings.v2';
+/**
+ * Before layouts had shapes. Read when there is nothing newer, and never
+ * written, so going back to 0.3 finds its settings where it left them.
+ */
+const V1_KEY = 'kehai.settings.v1';
+/** Pre-rename key, in the same format as v1. */
 const LEGACY_KEY = 'command-center.settings.v1';
 
 function defaults(): Settings {
   return {
-    presetId: 'stage',
-    layout: PRESETS.stage,
-    custom: null,
+    layoutId: 'stage',
+    layouts: [],
+    theme: 'amber',
     budgetTokens: null,
     autoHideBar: false,
     transcriptRoot: null,
@@ -88,6 +97,26 @@ function defaults(): Settings {
     focus: FOCUS_DEFAULTS,
     remote: REMOTE_DEFAULTS,
   };
+}
+
+export function findLayout(settings: Settings, id: string): Layout | undefined {
+  return isPreset(id) ? PRESETS[id] : settings.layouts.find((l) => l.id === id);
+}
+
+/** The prefix keeps an id of yours from ever naming a preset. */
+function freshId(layouts: Layout[]): string {
+  let n = layouts.length + 1;
+  while (layouts.some((l) => l.id === `yours-${n}`)) n += 1;
+  return `yours-${n}`;
+}
+
+/** `name`, or `name 2`, `name 3`… whichever no layout of yours has yet. */
+function uniqueName(name: string, layouts: Layout[]): string {
+  const taken = (candidate: string) => layouts.some((l) => l.name === candidate);
+  if (!taken(name)) return name;
+  let n = 2;
+  while (taken(`${name} ${n}`)) n += 1;
+  return `${name} ${n}`;
 }
 
 function remote(raw: unknown): RemoteSettings {
@@ -117,33 +146,52 @@ function folder(path: unknown): string | null {
   return typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
 }
 
+type Where = Pick<Settings, 'layoutId' | 'layouts' | 'theme'>;
+
+/**
+ * Settings from before layouts had shapes. Then there was one arrangement of
+ * your own at most — on screen, or kept under Custom while a preset was — and
+ * it becomes a layout of yours with that arrangement in every shape, which is
+ * how it looked on any window then. The theme came from the layout.
+ */
+function fromV1(parsed: Record<string, unknown>): Where {
+  const stored = parsed.layout as { theme?: unknown } | undefined;
+  const theme = isThemeId(stored?.theme) ? stored.theme : 'amber';
+  const presetId = typeof parsed.presetId === 'string' ? parsed.presetId : 'custom';
+
+  const layouts: Layout[] = [];
+  for (const candidate of [presetId === 'custom' ? parsed.layout : undefined, parsed.custom]) {
+    const got = safeParseLayout(candidate);
+    if (got.ok) layouts.push({ ...got.layout, id: freshId(layouts), name: uniqueName('Custom', layouts) });
+  }
+
+  const layoutId = presetId === 'custom' ? (layouts[0]?.id ?? 'stage') : isPreset(presetId) ? presetId : 'stage';
+  return { layoutId, layouts, theme };
+}
+
+/** Each layout of yours on its own, so one that will not parse costs only itself. */
+function fromV2(parsed: Record<string, unknown>): Where {
+  const layouts: Layout[] = [];
+  for (const raw of Array.isArray(parsed.layouts) ? parsed.layouts : []) {
+    const got = safeParseLayout(raw);
+    if (!got.ok) console.warn('stored layout rejected:', got.reason);
+    else if (!isPreset(got.layout.id) && !layouts.some((l) => l.id === got.layout.id)) layouts.push(got.layout);
+  }
+
+  const wanted = typeof parsed.layoutId === 'string' ? parsed.layoutId : 'stage';
+  const layoutId = isPreset(wanted) || layouts.some((l) => l.id === wanted) ? wanted : 'stage';
+  return { layoutId, layouts, theme: isThemeId(parsed.theme) ? parsed.theme : 'amber' };
+}
+
 function load(): Settings {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_KEY);
+    const v2 = localStorage.getItem(STORAGE_KEY);
+    const raw = v2 ?? localStorage.getItem(V1_KEY) ?? localStorage.getItem(LEGACY_KEY);
     if (!raw) return defaults();
 
-    const parsed = JSON.parse(raw) as Partial<Settings>;
-    const stored = safeParseLayout(parsed.layout);
-    const storedId = typeof parsed.presetId === 'string' ? parsed.presetId : 'custom';
-    const custom = safeParseLayout(parsed.custom);
-
-    // An arrangement nobody has edited follows its preset as shipped, so a
-    // release that adds to Stage reaches the people using Stage. Only the
-    // theme is theirs: picking one is not an edit.
-    //
-    // A layout that will not parse costs only the layout. Throwing every other
-    // setting away with it is how a grid change once wiped a budget, focus
-    // lengths and the remote panel along with the arrangement.
-    const presetId = stored.ok || PRESETS[storedId] ? storedId : 'stage';
-    const shipped: Layout | undefined = PRESETS[presetId];
-    if (!stored.ok) console.warn(`stored layout rejected, showing ${presetId} instead:`, stored.reason);
-    const storedTheme = (parsed.layout as Partial<Layout> | undefined)?.theme;
-    const theme = stored.ok ? stored.layout.theme : isThemeId(storedTheme) ? storedTheme : PRESETS.stage.theme;
-
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
     return {
-      presetId,
-      layout: shipped ? { ...shipped, theme } : stored.ok ? stored.layout : PRESETS.stage,
-      custom: custom.ok ? custom.layout : null,
+      ...(v2 ? fromV2(parsed) : fromV1(parsed)),
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
       transcriptRoot: folder(parsed.transcriptRoot),
@@ -158,9 +206,24 @@ function load(): Settings {
 
 interface Store {
   settings: Settings;
-  usePreset: (id: string) => void;
-  /** Puts the kept custom arrangement back on screen. */
-  restoreCustom: () => void;
+  /** The layout on screen. */
+  layout: Layout;
+  useLayout: (id: string) => void;
+  /** Adds a copy under Yours, named after the original, and returns its id. */
+  copyLayout: (id: string) => string;
+  renameLayout: (id: string, name: string) => void;
+  /** Removes one of yours. If it was on screen, Stage takes its place. */
+  deleteLayout: (id: string) => void;
+  /**
+   * Changes one shape of a layout and returns the id of the layout changed.
+   *
+   * A preset cannot change, so the first edit to one makes a copy under
+   * Yours, edits the copy, and puts it on screen if the preset was. The
+   * returned id is the copy's, which is what the next edit should name.
+   */
+  editArrangement: (id: string, shape: Shape, fn: (arrangement: Arrangement) => Arrangement) => string;
+  /** Adds a layout from outside Kehai under Yours. */
+  importLayout: (raw: unknown) => { ok: true; id: string } | { ok: false; reason: string };
   setTheme: (theme: ThemeId) => void;
   setBudget: (tokens: number | null) => void;
   setAutoHideBar: (on: boolean) => void;
@@ -168,19 +231,7 @@ interface Store {
   setAutoCheckUpdates: (on: boolean) => void;
   setFocus: (focus: Partial<FocusSettings>) => void;
   setRemote: (remote: Partial<RemoteSettings>) => void;
-  setTiles: (tiles: Tile[]) => void;
-  setTileArea: (index: number, area: Area) => void;
-  setTileProp: (index: number, key: string, value: unknown) => void;
-  /**
-   * Adds the widget where there is room, or removes every tile of it. False
-   * when there was no room to add it. `minOf` is the registry's minimum sizes,
-   * passed in because the registry's widgets read this store.
-   */
-  toggleWidget: (widget: string, minOf: (widget: string) => [number, number]) => boolean;
-  removeTile: (index: number) => void;
-  setGrid: (grid: Partial<Layout['grid']>) => void;
   reset: () => void;
-  importLayout: (raw: unknown) => string | null;
 }
 
 const SettingsContext = createContext<Store | null>(null);
@@ -203,38 +254,87 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, [settings]);
 
-  // An edit makes what is on screen the custom arrangement, so any kept one is
-  // replaced; Settings says so before you start.
-  const editLayout = useCallback((fn: (layout: Layout) => Layout) => {
-    setSettings((prev) => ({ ...prev, presetId: 'custom', layout: fn(prev.layout), custom: null }));
-  }, []);
+  const store = useMemo<Store>(() => {
+    // Ids are worked out from the settings this store was made with, so the
+    // caller gets one back straight away. The store is remade on every
+    // change, so the next call sees the layout this one added.
+    const nextId = freshId(settings.layouts);
 
-  const store = useMemo<Store>(
-    () => ({
+    return {
       settings,
+      layout: findLayout(settings, settings.layoutId) ?? PRESETS.stage,
 
-      // The theme is not part of what a preset decides, and an arrangement
-      // you made is kept rather than replaced.
-      usePreset: (id) => {
-        const preset = PRESETS[id];
-        if (!preset) return;
+      useLayout: (id) =>
+        setSettings((prev) => (findLayout(prev, id) ? { ...prev, layoutId: id } : prev)),
+
+      copyLayout: (id) => {
+        setSettings((prev) => {
+          const source = findLayout(prev, id);
+          if (!source) return prev;
+          const copy = { ...source, id: nextId, name: uniqueName(`${source.name} copy`, prev.layouts) };
+          return { ...prev, layouts: [...prev.layouts, copy] };
+        });
+        return nextId;
+      },
+
+      renameLayout: (id, name) => {
+        const trimmed = name.trim();
+        if (!trimmed || isPreset(id)) return;
         setSettings((prev) => ({
           ...prev,
-          presetId: id,
-          layout: { ...preset, theme: prev.layout.theme },
-          custom: prev.presetId === 'custom' ? prev.layout : prev.custom,
+          layouts: prev.layouts.map((l) =>
+            l.id === id ? { ...l, name: uniqueName(trimmed, prev.layouts.filter((o) => o.id !== id)) } : l
+          ),
         }));
       },
 
-      restoreCustom: () =>
-        setSettings((prev) =>
-          prev.custom
-            ? { ...prev, presetId: 'custom', layout: { ...prev.custom, theme: prev.layout.theme }, custom: null }
-            : prev
-        ),
+      deleteLayout: (id) =>
+        setSettings((prev) => ({
+          ...prev,
+          layouts: prev.layouts.filter((l) => l.id !== id),
+          layoutId: prev.layoutId === id ? 'stage' : prev.layoutId,
+        })),
 
-      setTheme: (theme) =>
-        setSettings((prev) => ({ ...prev, layout: { ...prev.layout, theme } })),
+      editArrangement: (id, shape, fn) => {
+        if (!isPreset(id)) {
+          setSettings((prev) => ({
+            ...prev,
+            layouts: prev.layouts.map((l) =>
+              l.id === id ? { ...l, shapes: { ...l.shapes, [shape]: fn(l.shapes[shape]) } } : l
+            ),
+          }));
+          return id;
+        }
+        setSettings((prev) => {
+          const preset = PRESETS[id];
+          const copy: Layout = {
+            id: nextId,
+            name: uniqueName(`${preset.name} copy`, prev.layouts),
+            shapes: { ...preset.shapes, [shape]: fn(preset.shapes[shape]) },
+          };
+          return {
+            ...prev,
+            layouts: [...prev.layouts, copy],
+            layoutId: prev.layoutId === id ? nextId : prev.layoutId,
+          };
+        });
+        return nextId;
+      },
+
+      importLayout: (raw) => {
+        const result = safeParseLayout(raw);
+        if (!result.ok) return result;
+        setSettings((prev) => ({
+          ...prev,
+          layouts: [
+            ...prev.layouts,
+            { ...result.layout, id: nextId, name: uniqueName(result.layout.name, prev.layouts) },
+          ],
+        }));
+        return { ok: true, id: nextId };
+      },
+
+      setTheme: (theme) => setSettings((prev) => ({ ...prev, theme })),
 
       setBudget: (budgetTokens) => setSettings((prev) => ({ ...prev, budgetTokens })),
 
@@ -248,55 +348,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
       setRemote: (next) => setSettings((prev) => ({ ...prev, remote: { ...prev.remote, ...next } })),
 
-      setTiles: (tiles) => editLayout((layout) => ({ ...layout, tiles })),
-
-      setTileArea: (index, area) =>
-        editLayout((layout) => ({
-          ...layout,
-          tiles: layout.tiles.map((t, i) => (i === index ? { ...t, area } : t)),
-        })),
-
-      setTileProp: (index, key, value) =>
-        editLayout((layout) => ({
-          ...layout,
-          tiles: layout.tiles.map((t, i) =>
-            i === index ? { ...t, props: { ...(t.props ?? {}), [key]: value } } : t
-          ),
-        })),
-
-      toggleWidget: (widget, minOf) => {
-        if (settings.layout.tiles.some((t) => t.widget === widget)) {
-          editLayout((layout) => ({ ...layout, tiles: layout.tiles.filter((t) => t.widget !== widget) }));
-          return true;
-        }
-        const tiles = placeTile(settings.layout, widget, minOf);
-        if (!tiles) return false;
-        editLayout((layout) => ({ ...layout, tiles }));
-        return true;
-      },
-
-      removeTile: (index) =>
-        editLayout((layout) => ({ ...layout, tiles: layout.tiles.filter((_, i) => i !== index) })),
-
-      setGrid: (grid) =>
-        editLayout((layout) => {
-          const cols = grid.cols ?? layout.grid.cols;
-          const rows = grid.rows ?? layout.grid.rows;
-          const fitted = cols === layout.grid.cols && rows === layout.grid.rows ? layout : regrid(layout, cols, rows);
-          return { ...fitted, grid: { ...fitted.grid, ...grid } };
-        }),
-
       reset: () => setSettings(defaults()),
-
-      importLayout: (raw) => {
-        const result = safeParseLayout(raw);
-        if (!result.ok) return result.reason;
-        setSettings((prev) => ({ ...prev, presetId: 'custom', layout: result.layout, custom: null }));
-        return null;
-      },
-    }),
-    [settings, editLayout]
-  );
+    };
+  }, [settings]);
 
   return <SettingsContext.Provider value={store}>{children}</SettingsContext.Provider>;
 }

@@ -1,25 +1,25 @@
 import { TileSizeProvider } from '../core/TileSize';
-import type { Layout } from '../core/types';
+import type { Arrangement } from '../core/types';
 import { registry } from '../widgets/registry';
 
 /**
- * Renders a layout. The gutters are the grid gap showing the page background
- * through, which is why tiles carry no borders of their own.
+ * Renders one shape of a layout. The gutters are the grid gap showing the page
+ * background through, which is why tiles carry no borders of their own.
  */
-export function Grid({ layout }: { layout: Layout }) {
+export function Grid({ arrangement }: { arrangement: Arrangement }) {
   return (
     <div
       style={{
         height: '100%',
         display: 'grid',
-        gridTemplateColumns: `repeat(${layout.grid.cols}, minmax(0, 1fr))`,
-        gridTemplateRows: `repeat(${layout.grid.rows}, minmax(0, 1fr))`,
-        gap: layout.grid.gap,
+        gridTemplateColumns: `repeat(${arrangement.grid.cols}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${arrangement.grid.rows}, minmax(0, 1fr))`,
+        gap: arrangement.grid.gap,
         // Uncovered cells must read as empty, not as gutter.
         background: 'var(--cc-bg)',
       }}
     >
-      {layout.tiles.map((tile, i) => {
+      {arrangement.tiles.map((tile, i) => {
         const spec = registry[tile.widget];
         const [r1, c1, r2, c2] = tile.area;
         const style: React.CSSProperties = {

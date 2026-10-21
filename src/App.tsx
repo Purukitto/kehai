@@ -9,6 +9,7 @@ import type { RemoteLink } from './core/remoteSource';
 import { useSettings } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { useTopic } from './core/useTopic';
+import { useWindowShape } from './core/useWindowShape';
 import { Arranger } from './grid/Arranger';
 import { Grid } from './grid/Grid';
 import { SettingsScreen } from './settings/SettingsScreen';
@@ -30,14 +31,17 @@ async function toggleFullscreen(): Promise<void> {
 }
 
 export default function App() {
-  const { settings } = useSettings();
+  const { settings, layout } = useSettings();
+  const { shape } = useWindowShape();
   const autoHide = settings.autoHideBar;
   const [mode, setMode] = useState<Mode>('dashboard');
   const [settingsAt, setSettingsAt] = useState<Section | undefined>(undefined);
+  // Which layout the arranger was opened on: Settings can arrange one that is
+  // not on screen.
+  const [arranging, setArranging] = useState(settings.layoutId);
   const [engine, setEngine] = useState(false);
   const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting' });
   const update = useTopic<UpdatePayload>('app:update');
-  const layout = settings.layout;
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
   // mock fills the rest until each poller lands. A remote panel gets the same
@@ -131,8 +135,8 @@ export default function App() {
   }, [mode]);
 
   useEffect(() => {
-    document.documentElement.className = 't-' + layout.theme;
-  }, [layout.theme]);
+    document.documentElement.className = 't-' + settings.theme;
+  }, [settings.theme]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -156,13 +160,16 @@ export default function App() {
       <SettingsScreen
         initialSection={settingsAt}
         onClose={() => setMode('dashboard')}
-        onArrange={() => setMode('arrange')}
+        onArrange={(id) => {
+          setArranging(id);
+          setMode('arrange');
+        }}
       />
     );
   }
 
   if (mode === 'arrange') {
-    return <Arranger onDone={() => setMode('settings')} />;
+    return <Arranger layoutId={arranging} initialShape={shape} onDone={() => setMode('settings')} />;
   }
 
   // What the header says the panel is reading. A remote panel says more,
@@ -225,7 +232,7 @@ export default function App() {
           {source.label}
         </span>
         <span className="cc-mini" style={{ fontSize: 10 }}>
-          {settings.presetId === 'custom' ? 'CUSTOM' : layout.name.toUpperCase()}
+          {layout.name.toUpperCase()}
         </span>
         <button
           className="cc-chip"
@@ -254,7 +261,9 @@ export default function App() {
     >
       {autoHide ? <div className="cc-barzone">{bar}</div> : bar}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        <Grid layout={layout} />
+        {/* Keyed by shape: a tile that moves to another shape starts afresh, rather
+            than keeping a breakpoint its old size decided. */}
+        <Grid key={shape} arrangement={layout.shapes[shape]} />
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
       </div>
     </div>

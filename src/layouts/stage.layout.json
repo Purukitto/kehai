@@ -1,72 +1,33 @@
 {
   "id": "stage",
   "name": "Stage",
-  "theme": "amber",
-  "grid": {
-    "cols": 12,
-    "rows": 12,
-    "gap": 1
-  },
-  "tiles": [
-    {
-      "widget": "stage",
-      "area": [
-        1,
-        1,
-        10,
-        13
-      ],
-      "props": {
-        "tabs": [
-          "quota",
-          "agents",
-          "machine",
-          "sprint"
-        ]
-      }
+  "shapes": {
+    "landscape": {
+      "grid": { "cols": 12, "rows": 8, "gap": 1 },
+      "tiles": [
+        { "widget": "stage", "area": [1, 1, 7, 13], "props": { "tabs": ["quota", "agents", "machine", "sprint"] } },
+        { "widget": "clock", "area": [7, 1, 9, 4], "props": { "seconds": false, "date": "long" } },
+        { "widget": "media", "area": [7, 4, 9, 9], "props": { "art": true, "equaliser": "bar" } },
+        { "widget": "vitals", "area": [7, 9, 9, 13], "props": { "show": ["cpu", "mem", "unread", "agents"] } }
+      ]
     },
-    {
-      "widget": "clock",
-      "area": [
-        10,
-        1,
-        13,
-        4
-      ],
-      "props": {
-        "seconds": false,
-        "date": "long"
-      }
+    "bar": {
+      "grid": { "cols": 16, "rows": 4, "gap": 1 },
+      "tiles": [
+        { "widget": "stage", "area": [1, 1, 5, 10], "props": { "tabs": ["quota", "agents", "machine", "sprint"] } },
+        { "widget": "clock", "area": [1, 10, 3, 13], "props": { "seconds": false, "date": "long" } },
+        { "widget": "vitals", "area": [1, 13, 3, 17], "props": { "show": ["cpu", "mem", "unread", "agents"] } },
+        { "widget": "media", "area": [3, 10, 5, 17], "props": { "art": true, "equaliser": "bar" } }
+      ]
     },
-    {
-      "widget": "media",
-      "area": [
-        10,
-        4,
-        13,
-        10
-      ],
-      "props": {
-        "art": true,
-        "equaliser": "bar"
-      }
-    },
-    {
-      "widget": "vitals",
-      "area": [
-        10,
-        10,
-        13,
-        13
-      ],
-      "props": {
-        "show": [
-          "cpu",
-          "mem",
-          "unread",
-          "agents"
-        ]
-      }
+    "portrait": {
+      "grid": { "cols": 8, "rows": 12, "gap": 1 },
+      "tiles": [
+        { "widget": "stage", "area": [1, 1, 8, 9], "props": { "tabs": ["quota", "agents", "machine", "sprint"] } },
+        { "widget": "clock", "area": [8, 1, 10, 9], "props": { "seconds": false, "date": "long" } },
+        { "widget": "media", "area": [10, 1, 12, 9], "props": { "art": true, "equaliser": "bar" } },
+        { "widget": "vitals", "area": [12, 1, 13, 9], "props": { "show": ["cpu", "mem", "unread", "agents"] } }
+      ]
     }
-  ]
+  }
 }
