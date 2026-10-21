@@ -24,6 +24,7 @@ export const ENGINE_TOPICS = [
   'telemetry:mem',
   'telemetry:net',
   'telemetry:disk',
+  'flow:pomodoro',
   'dev:llm_tokens',
   'media:now_playing',
   'media:art',
@@ -32,7 +33,13 @@ export const ENGINE_TOPICS = [
 ];
 
 /** Topics that travel renderer → engine. The only write path in the app. */
-export const COMMAND_TOPICS = ['media:command', 'notify:command', 'quota:command', 'update:command'];
+export const COMMAND_TOPICS = [
+  'media:command',
+  'notify:command',
+  'flow:command',
+  'quota:command',
+  'update:command',
+];
 
 export async function startTauriSource(): Promise<() => void> {
   const { emit, listen } = await import('@tauri-apps/api/event');

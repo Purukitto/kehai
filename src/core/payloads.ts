@@ -84,14 +84,35 @@ export interface MediaPayload {
   player: string;
 }
 
+/** Engine → renderer on `flow:pomodoro`. Mirrors `SprintPayload` in `flow.rs`. */
 export interface SprintPayload {
-  running: boolean;
+  /** Idle is a block waiting to be started; it shows its full length. */
+  state: 'idle' | 'running' | 'paused';
   mode: 'focus' | 'break';
   remainingSec: number;
+  /**
+   * The block on screen, which is not always the configured length: a changed
+   * setting applies from the next block, not mid-countdown.
+   */
+  lengthSec: number;
+  /** Which focus block this is, or which one the break follows. 1-based. */
   index: number;
   total: number;
+  /** Kept across restarts, and reset at local midnight. */
   focusedTodaySec: number;
 }
+
+/**
+ * Renderer → engine on `flow:command`. Mirrors `Command` in `flow.rs`. Start
+ * and pause are separate rather than one toggle, so a command that arrives
+ * twice cannot undo itself.
+ */
+export type FlowCommand =
+  | { action: 'start' }
+  | { action: 'pause' }
+  | { action: 'skip' }
+  | { action: 'reset' }
+  | { action: 'configure'; focusMin: number; breakMin: number; sprints: number };
 
 export interface ClockPayload {
   iso: string;

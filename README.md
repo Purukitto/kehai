@@ -84,7 +84,7 @@ write the layout as JSON if you want to commit or share one.
 | `media` | Now playing, transport and cover art | `media:now_playing`, `media:art` |
 | `notify` | System notification feed, dismissable | `sys:notify` |
 | `clock` | Time and date | `os:clock` |
-| `sprint` | Pomodoro timer | `flow:pomodoro` |
+| `sprint` | Focus timer — start, pause, skip, reset | `flow:pomodoro` |
 
 ### Sources
 
@@ -95,6 +95,7 @@ write the layout as JSON if you want to commit or share one.
 | Media session and transport | via GSMTC, including cover art | MPRIS not wired yet |
 | Notifications | via `UserNotificationListener` | D-Bus not wired yet |
 | Agent token usage | optional — needs local agent transcripts | same |
+| Focus timer | kept by the engine | same |
 
 Where a source is unavailable the widget says so, and Settings → Sources shows it as
 **UNAVAILABLE** with the reason. Nothing shows a zero it does not have — see
@@ -121,7 +122,9 @@ write hardware registers. That is a poor trade for one number on a dashboard.
 ## Privacy
 
 Kehai reads local sources and publishes them to its own in-process bus. Nothing it
-reads is uploaded, logged to disk or phoned home. It makes two kinds of network
+reads is uploaded, logged to disk or phoned home. The one thing it writes is how long
+the focus timer has run today, to `flow.json` in its own app-data folder, so the total
+survives a restart. It makes two kinds of network
 request, and the renderer's content-security policy forbids anything else:
 
 - **The web font**, which the renderer loads from Google Fonts.
@@ -205,7 +208,7 @@ against a release build.
 flowchart LR
     subgraph engine["Integration engine — Rust"]
         direction TB
-        P["cpu · mem · net · disk<br/>quota · media · notify · update<br/><i>one thread each</i>"]
+        P["cpu · mem · net · disk · flow<br/>quota · media · notify · update<br/><i>one thread each</i>"]
     end
 
     BUS[["Envelope bus<br/><i>last value retained per topic</i>"]]
@@ -234,10 +237,10 @@ stay silent forever after one missed send. The renderer emits `ui:hello` once
 subscribed and the engine replays every retained topic in reply.
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for four command topics — `media:command`, `notify:command`,
-`quota:command` and `update:command`: the UI states an intent, the engine owns the side
-effect and runs it off the event thread, so a wedged media player cannot freeze the
-panel and a slow download cannot either.
+read-only except for five command topics — `media:command`, `notify:command`,
+`flow:command`, `quota:command` and `update:command`: the UI states an intent, the
+engine owns the side effect and runs it off the event thread, so a wedged media player
+cannot freeze the panel and a slow download cannot either.
 
 ### Where things are
 

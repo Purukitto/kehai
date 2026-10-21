@@ -9,8 +9,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- The focus timer has buttons: start, pause, skip and reset it from its tile or from
+  Stage's sprint tab. **Settings → Sources** sets how long focus blocks and breaks
+  are, and today's focused time survives a restart.
+
 ### Fixed
 
+- The focus timer showed a made-up countdown in the desktop app. It now runs for real,
+  and waits for you to start it.
 - Stage's main tile reaches the bottom of its space instead of stopping short.
 
 ## [0.1.0] - 2026-10-21

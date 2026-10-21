@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { bus } from '../core/bus';
 import type { UpdateCommand, UpdatePayload } from '../core/payloads';
 import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
+import type { FocusSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
 import type { Layout, ThemeId } from '../core/types';
 import { registry, widgetNames } from '../widgets/registry';
@@ -300,6 +301,50 @@ function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit
   );
 }
 
+/** A setting that belongs to the source row above it, so it carries no dot. */
+function SubRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--cc-line)',
+      }}
+    >
+      <span style={{ width: 6, flex: 'none' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12 }}>{label}</div>
+        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+          {desc}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+/**
+ * Offered as a few lengths rather than a free field: a panel read from across
+ * a desk is set up once, and every option here is one tap.
+ */
+function FocusRows({ focus, onChange }: { focus: FocusSettings; onChange: (next: Partial<FocusSettings>) => void }) {
+  return (
+    <>
+      <SubRow label="Focus block" desc="A changed length applies from the next block, not the one counting down.">
+        <Seg options={[15, 25, 45, 50, 90]} value={focus.focusMin} format={(v) => `${v}M`} onPick={(focusMin) => onChange({ focusMin })} />
+      </SubRow>
+      <SubRow label="Break" desc="Starts by itself when a focus block runs out. The next block waits for you.">
+        <Seg options={[5, 10, 15]} value={focus.breakMin} format={(v) => `${v}M`} onPick={(breakMin) => onChange({ breakMin })} />
+      </SubRow>
+      <SubRow label="Sprints per round" desc="How many blocks the track shows before it starts again.">
+        <Seg options={[2, 3, 4, 6, 8]} value={focus.sprints} onPick={(sprints) => onChange({ sprints })} />
+      </SubRow>
+    </>
+  );
+}
+
 function sendUpdate(command: UpdateCommand) {
   bus.publish<UpdateCommand>('update:command', 'settings', command);
 }
@@ -482,6 +527,7 @@ export function SettingsScreen({
     setAutoHideBar,
     setTranscriptRoot,
     setAutoCheckUpdates,
+    setFocus,
     setGrid,
     toggleWidget,
     setTileProp,
@@ -754,6 +800,12 @@ export function SettingsScreen({
               <SourceRow label="Memory" topic="telemetry:mem" desc="Physical and swap." />
               <SourceRow label="Network" topic="telemetry:net" desc="Throughput per interface." />
               <SourceRow label="Disk" topic="telemetry:disk" desc="Volumes and capacity." />
+              <SourceRow
+                label="Focus timer"
+                topic="flow:pomodoro"
+                desc="Kept by the engine. Today's total is saved locally and survives a restart."
+              />
+              <FocusRows focus={settings.focus} onChange={setFocus} />
               <SourceRow label="Agent tokens" topic="dev:llm_tokens" desc="Tallied from local session transcripts. Never leaves the machine." />
               <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />

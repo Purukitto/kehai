@@ -4,6 +4,7 @@ import type {
   ClockPayload,
   CpuPayload,
   DiskPayload,
+  FlowCommand,
   MediaPayload,
   MemPayload,
   NetPayload,
@@ -57,13 +58,35 @@ export function startMockSource(options: MockOptions = {}): () => void {
     player: 'Spotify',
   };
 
+  // Walks the same states as `flow.rs`, a second at a time, so the timer's
+  // controls can be built and reviewed without the engine.
+  const flow = { focusMin: 25, breakMin: 5 };
   const sprint: SprintPayload = {
-    running: true,
+    state: 'running',
     mode: 'focus',
     remainingSec: 1122,
+    lengthSec: 1500,
     index: 3,
     total: 4,
     focusedTodaySec: 15120,
+  };
+  const pubSprint = () => pub<SprintPayload>('flow:pomodoro', 'mock.flow', { ...sprint });
+  const idle = () => {
+    sprint.state = 'idle';
+    sprint.remainingSec = sprint.lengthSec;
+  };
+  const finish = (running: boolean) => {
+    if (sprint.mode === 'focus') {
+      sprint.mode = 'break';
+      sprint.lengthSec = flow.breakMin * 60;
+      sprint.remainingSec = sprint.lengthSec;
+      sprint.state = running ? 'running' : 'idle';
+    } else {
+      sprint.mode = 'focus';
+      sprint.index = sprint.index >= sprint.total ? 1 : sprint.index + 1;
+      sprint.lengthSec = flow.focusMin * 60;
+      idle();
+    }
   };
 
   const tick = () => {
@@ -92,8 +115,12 @@ export function startMockSource(options: MockOptions = {}): () => void {
     if (media.playing) media.elapsedSec = (media.elapsedSec + 1) % media.durationSec;
     pub<MediaPayload>('media:now_playing', 'mock.media', { ...media });
 
-    if (sprint.running && sprint.remainingSec > 0) sprint.remainingSec -= 1;
-    pub<SprintPayload>('flow:pomodoro', 'mock.flow', { ...sprint });
+    if (sprint.state === 'running') {
+      sprint.remainingSec -= 1;
+      if (sprint.mode === 'focus') sprint.focusedTodaySec += 1;
+      if (sprint.remainingSec <= 0) finish(true);
+    }
+    pubSprint();
 
     pub<ClockPayload>('os:clock', 'clock', { iso: new Date().toISOString() });
   };
@@ -143,6 +170,38 @@ export function startMockSource(options: MockOptions = {}): () => void {
     const action = (e.data as { action: string }).action;
     if (action === 'playpause') media.playing = !media.playing;
     pub<MediaPayload>('media:now_playing', 'mock.media', { ...media });
+  });
+
+  const unsubFlow = bus.subscribe('flow:command', (e) => {
+    const command = e.data as FlowCommand;
+    switch (command.action) {
+      case 'start':
+        sprint.state = 'running';
+        break;
+      case 'pause':
+        if (sprint.state === 'running') sprint.state = 'paused';
+        break;
+      case 'skip':
+        finish(sprint.state === 'running');
+        break;
+      case 'reset':
+        sprint.mode = 'focus';
+        sprint.index = 1;
+        sprint.lengthSec = flow.focusMin * 60;
+        idle();
+        break;
+      case 'configure':
+        flow.focusMin = command.focusMin;
+        flow.breakMin = command.breakMin;
+        sprint.total = command.sprints;
+        sprint.index = Math.min(sprint.index, sprint.total);
+        if (sprint.state === 'idle') {
+          sprint.lengthSec = (sprint.mode === 'focus' ? flow.focusMin : flow.breakMin) * 60;
+          sprint.remainingSec = sprint.lengthSec;
+        }
+        break;
+    }
+    pubSprint();
   });
 
   // Walks the same states the engine does, so Settings → About can be built
@@ -225,6 +284,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   return () => {
     unsub();
+    unsubFlow();
     unsubUpdate();
     timers.forEach((id) => window.clearInterval(id));
   };

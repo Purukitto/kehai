@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { compact, mmss, sparkPath } from '../core/format';
 import { useSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
@@ -6,6 +7,7 @@ import type { CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../cor
 import type { WidgetProps, WidgetSpec } from '../core/types';
 import { Meter } from './chrome';
 import { budgetPct, budgetStatus, totalTokens } from './Quota';
+import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } from './Sprint';
 
 interface Hero {
   label: string;
@@ -17,6 +19,8 @@ interface Hero {
   series: number[];
   axisA: string;
   axisB: string;
+  /** Sits where the sparkline would, for a tab that has something to operate. */
+  controls?: ReactNode;
 }
 
 function Stage({ props }: WidgetProps) {
@@ -79,19 +83,17 @@ function Stage({ props }: WidgetProps) {
     };
   } else if (tab === 'sprint' && sprint) {
     hero = {
-      label: 'FOCUS SPRINT ' + sprint.index + ' OF ' + sprint.total,
+      label: (sprint.mode === 'focus' ? 'FOCUS ' : '') + sprintLabel(sprint),
       value: mmss(sprint.remainingSec),
-      status: sprint.running ? 'RUNNING' : 'PAUSED',
-      sub:
-        Math.floor(sprint.focusedTodaySec / 3600) +
-        'h ' +
-        Math.floor((sprint.focusedTodaySec % 3600) / 60) +
-        'm focused today.',
-      meter: 100 - (sprint.remainingSec / 1500) * 100,
-      color: 'var(--cc-accent)',
+      status: sprintStatus(sprint),
+      sub: focusedToday(sprint) + ' focused today.',
+      meter: sprint.lengthSec > 0 ? 100 - (sprint.remainingSec / sprint.lengthSec) * 100 : 0,
+      // As on the Sprint tile: a countdown that is not counting is not lit.
+      color: sprint.state === 'running' ? sprintColor(sprint) : 'var(--cc-muted)',
       series: [],
       axisA: '',
       axisB: '',
+      controls: <SprintControls sprint={sprint} height={36} />,
     };
   }
 
@@ -183,6 +185,7 @@ function Stage({ props }: WidgetProps) {
                 </div>
               </>
             )}
+            {hero.controls}
           </>
         )}
       </div>

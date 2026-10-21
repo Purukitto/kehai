@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
-import type { QuotaCommand, UpdateCommand, UpdatePayload } from './core/payloads';
+import type { FlowCommand, QuotaCommand, UpdateCommand, UpdatePayload } from './core/payloads';
 import { useSettings } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { useTopic } from './core/useTopic';
@@ -80,6 +80,13 @@ export default function App() {
       on: settings.autoCheckUpdates,
     });
   }, [settings.autoCheckUpdates]);
+
+  // And the focus timer's block lengths. The engine waits a moment for these
+  // before showing the timer, so the first countdown is already the right one.
+  const { focusMin, breakMin, sprints } = settings.focus;
+  useEffect(() => {
+    bus.publish<FlowCommand>('flow:command', 'settings', { action: 'configure', focusMin, breakMin, sprints });
+  }, [focusMin, breakMin, sprints]);
 
   // Opening settings from the update badge lands on About. Every other way in,
   // including back from the arranger, starts where it always has.

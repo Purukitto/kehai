@@ -30,6 +30,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.39"
 base64 = "0.23.1"
+# Already in the tree through Tauri. The focus timer needs the local date to
+# know when today ends.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"

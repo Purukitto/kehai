@@ -36,7 +36,20 @@ export interface Settings {
    * on: the README promises no requests beyond the font, and this is one.
    */
   autoCheckUpdates: boolean;
+  /**
+   * Block lengths for the focus timer. The engine runs the timer, so it hears
+   * these over `flow:command` and cannot persist them itself.
+   */
+  focus: FocusSettings;
 }
+
+export interface FocusSettings {
+  focusMin: number;
+  breakMin: number;
+  sprints: number;
+}
+
+const FOCUS_DEFAULTS: FocusSettings = { focusMin: 25, breakMin: 5, sprints: 4 };
 
 const STORAGE_KEY = 'kehai.settings.v1';
 /** Pre-rename key. Read once so an existing arrangement survives the rename. */
@@ -50,6 +63,19 @@ function defaults(): Settings {
     autoHideBar: false,
     transcriptRoot: null,
     autoCheckUpdates: false,
+    focus: FOCUS_DEFAULTS,
+  };
+}
+
+/** Each length on its own, so one bad field does not discard the others. */
+function focus(raw: unknown): FocusSettings {
+  const r = (raw ?? {}) as Partial<Record<keyof FocusSettings, unknown>>;
+  const pick = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isInteger(v) && v > 0 ? v : fallback;
+  return {
+    focusMin: pick(r.focusMin, FOCUS_DEFAULTS.focusMin),
+    breakMin: pick(r.breakMin, FOCUS_DEFAULTS.breakMin),
+    sprints: pick(r.sprints, FOCUS_DEFAULTS.sprints),
   };
 }
 
@@ -77,6 +103,7 @@ function load(): Settings {
       autoHideBar: parsed.autoHideBar === true,
       transcriptRoot: folder(parsed.transcriptRoot),
       autoCheckUpdates: parsed.autoCheckUpdates === true,
+      focus: focus(parsed.focus),
     };
   } catch {
     return defaults();
@@ -91,6 +118,7 @@ interface Store {
   setAutoHideBar: (on: boolean) => void;
   setTranscriptRoot: (path: string | null) => void;
   setAutoCheckUpdates: (on: boolean) => void;
+  setFocus: (focus: Partial<FocusSettings>) => void;
   setTiles: (tiles: Tile[]) => void;
   setTileArea: (index: number, area: Area) => void;
   setTileProp: (index: number, key: string, value: unknown) => void;
@@ -150,6 +178,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setTranscriptRoot: (path) => setSettings((prev) => ({ ...prev, transcriptRoot: folder(path) })),
 
       setAutoCheckUpdates: (autoCheckUpdates) => setSettings((prev) => ({ ...prev, autoCheckUpdates })),
+
+      setFocus: (next) => setSettings((prev) => ({ ...prev, focus: { ...prev.focus, ...next } })),
 
       setTiles: (tiles) => editLayout((layout) => ({ ...layout, tiles })),
 

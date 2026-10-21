@@ -48,7 +48,8 @@ Every widget subscribes to bus topics and renders what arrives. It cannot poll, 
 cannot call an API, and it holds no state that another widget needs.
 
 The single exception is commands — media transport, notification dismissal, the
-folder the token poller reads, and checking for or installing an update — which
+focus timer's buttons and block lengths, the folder the token poller reads, and
+checking for or installing an update — which
 *publish* an intent onto the bus. The engine owns
 the side effect and runs it off the event thread, so a wedged media player can never
 freeze the panel.

@@ -35,8 +35,11 @@ surface is what it reads and what it exposes:
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
-  `notify:command`, `quota:command` and `update:command`. `quota:command` only changes
-  the folder the quota poller reads — it still reads nothing but usage counters.
+  `notify:command`, `flow:command`, `quota:command` and `update:command`.
+  `flow:command` drives the focus timer and sets its block lengths, which the engine
+  clamps; the only file it leads to is the timer's own daily total. `quota:command`
+  only changes the folder the quota poller reads — it still reads nothing but usage
+  counters.
   `update:command` can ask for a check, an install, or the release page, but names no
   URL: the update feed and the key updates must be signed with are compiled in. A path
   that lets renderer content reach anything else in the engine is in scope.
