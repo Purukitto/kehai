@@ -9,6 +9,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Fixed
+
+- Stage's main tile reaches the bottom of its space instead of stopping short.
+
 ## [0.1.0] - 2026-10-21
 
 First public release.

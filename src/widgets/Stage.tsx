@@ -100,6 +100,9 @@ function Stage({ props }: WidgetProps) {
   return (
     <div
       style={{
+        // Fill the tile, as Pane does. Without this the hero is only as tall as
+        // its tab's content and the cell shows through beneath it.
+        flex: 1,
         background: 'var(--cc-pane)',
         display: 'flex',
         flexDirection: 'column',
