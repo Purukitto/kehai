@@ -6,6 +6,7 @@ pub mod mem;
 pub mod net;
 pub mod notify;
 pub mod quota;
+mod transcripts;
 pub mod update;
 
 use tauri::AppHandle;
