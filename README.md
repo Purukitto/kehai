@@ -17,6 +17,10 @@
   <img alt="Platform" src="https://img.shields.io/badge/platform-Windows%2010%2B-lightgrey">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/stage.png" alt="Kehai's Stage preset in the Amber theme: a large token-usage readout with a five-hour history, and clock, now playing and CPU, memory and unread tiles along the bottom">
+</p>
+
 ---
 
 Kehai is built for one specific thing: a small always-on display — a 10-inch
@@ -72,6 +76,14 @@ Three presets ship — **Stage** (default), **Panel** and **Ambient** — and
 **Settings → Arrange** is a direct-manipulation grid editor: drag a tile to move it,
 drag its corner to resize, drop it onto another tile to swap the two. Export and Import
 write the layout as JSON if you want to commit or share one.
+
+<p align="center">
+  <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: CPU load, temperature and per-thread usage" width="32%">
+  <img src="docs/screenshots/panel.png" alt="Panel preset in the Amber theme: clock, token quota, sprint timer, now playing, notifications and a vitals strip, evenly weighted" width="32%">
+  <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock with token usage, now playing, CPU and memory below it" width="32%">
+  <br>
+  <sub>Stage in Phosphor · Panel in Amber · Ambient in Ice. Any preset takes any theme.</sub>
+</p>
 
 ### Widgets
 
