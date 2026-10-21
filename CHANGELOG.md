@@ -9,6 +9,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+The first published release. 0.1.0 never left draft, so everything it lists is in
+here too; what follows is what changed since.
+
 ### Added
 
 - The focus timer has buttons: start, pause, skip and reset it from its tile or from
@@ -41,9 +44,16 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 - Agent token usage includes sub-agents, whose transcripts sit in folders the count
   never looked in.
 
+### Known issues
+
+- CPU temperature is usually missing on Windows, where reading it needs a kernel driver.
+- Media and notifications are not available on macOS.
+- The remote panel is plain HTTP. Use it on a network you trust.
+- The installers are unsigned, so SmartScreen warns the first time you run one.
+
 ## [0.1.0] - 2026-10-21
 
-First public release.
+Cut but never published. Everything here first shipped in 0.2.0.
 
 ### Added
 
