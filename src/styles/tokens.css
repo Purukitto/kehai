@@ -1,5 +1,8 @@
 :root {
-  --cc-font: 'JetBrains Mono', 'Cascadia Mono', ui-monospace, Consolas, 'Liberation Mono', monospace;
+  /* Bundled from @fontsource-variable, so nothing is fetched to draw text. The
+     plain name still matches a copy installed on the system. */
+  --cc-font: 'JetBrains Mono Variable', 'JetBrains Mono', 'Cascadia Mono', ui-monospace, Consolas,
+    'Liberation Mono', monospace;
 }
 
 /* Thirteen custom properties per theme. A theme is a class on the root, nothing else. */

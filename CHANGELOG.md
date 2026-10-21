@@ -20,6 +20,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 - The focus timer showed a made-up countdown in the desktop app. It now runs for real,
   and waits for you to start it.
 - Stage's main tile reaches the bottom of its space instead of stopping short.
+- The font is built in. Kehai no longer fetches it from Google Fonts, and looks right
+  on a machine that has never been online.
 
 ## [0.1.0] - 2026-10-21
 

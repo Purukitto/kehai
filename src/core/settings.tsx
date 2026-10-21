@@ -33,7 +33,7 @@ export interface Settings {
   transcriptRoot: string | null;
   /**
    * Let the engine ask GitHub for a new release once a day. Off unless turned
-   * on: the README promises no requests beyond the font, and this is one.
+   * on: it is the only request Kehai makes, and the README promises none unasked.
    */
   autoCheckUpdates: boolean;
   /**

@@ -124,14 +124,14 @@ write hardware registers. That is a poor trade for one number on a dashboard.
 Kehai reads local sources and publishes them to its own in-process bus. Nothing it
 reads is uploaded, logged to disk or phoned home. The one thing it writes is how long
 the focus timer has run today, to `flow.json` in its own app-data folder, so the total
-survives a restart. It makes two kinds of network
-request, and the renderer's content-security policy forbids anything else:
+survives a restart.
 
-- **The web font**, which the renderer loads from Google Fonts.
-- **The update check**, and only when you press Check or turn on Check
-  automatically. It fetches `latest.json` from this repository's latest GitHub
-  release, which tells GitHub your IP address and that some copy of Kehai asked —
-  nothing more. Installing downloads the installer from the same release.
+The font is built in, so Kehai makes one kind of network request, and the renderer's
+content-security policy forbids anything else: **the update check**, and only when you
+press Check or turn on Check automatically. It fetches `latest.json` from this
+repository's latest GitHub release, which tells GitHub your IP address and that some
+copy of Kehai asked — nothing more. Installing downloads the installer from the same
+release.
 
 Two sources are worth stating plainly:
 
@@ -271,10 +271,11 @@ adding a widget or a poller.
 
 - The headless WebSocket/REST surface, for driving a panel from another machine
 - Linux media (MPRIS) and notifications (D-Bus) — currently report unavailable
-- JetBrains Mono is loaded from Google Fonts and needs vendoring before the desktop
-  build can claim to work offline
 - Code signing, so installers stop tripping SmartScreen
 
 ## Licence
 
 [MIT](LICENSE) © Pulkit Sambhavi Singh
+
+The bundled [JetBrains Mono](https://www.jetbrains.com/lp/mono/) typeface is © JetBrains
+and distributed under the [SIL Open Font License 1.1](https://openfontlicense.org).
