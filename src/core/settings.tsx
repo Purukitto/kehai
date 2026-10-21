@@ -41,7 +41,22 @@ export interface Settings {
    * these over `flow:command` and cannot persist them itself.
    */
   focus: FocusSettings;
+  /**
+   * Whether the engine serves this panel to browsers on other machines. Off
+   * unless turned on: it opens a port. The engine hears it over
+   * `remote:command`; the key it hands out is the engine's, not stored here.
+   */
+  remote: RemoteSettings;
 }
+
+export interface RemoteSettings {
+  on: boolean;
+  port: number;
+  /** Whether remote panels may press media, notification and timer buttons. */
+  control: boolean;
+}
+
+const REMOTE_DEFAULTS: RemoteSettings = { on: false, port: 5280, control: false };
 
 export interface FocusSettings {
   focusMin: number;
@@ -64,6 +79,17 @@ function defaults(): Settings {
     transcriptRoot: null,
     autoCheckUpdates: false,
     focus: FOCUS_DEFAULTS,
+    remote: REMOTE_DEFAULTS,
+  };
+}
+
+function remote(raw: unknown): RemoteSettings {
+  const r = (raw ?? {}) as Partial<Record<keyof RemoteSettings, unknown>>;
+  const port = r.port;
+  return {
+    on: r.on === true,
+    port: typeof port === 'number' && Number.isInteger(port) && port >= 1024 && port <= 65535 ? port : REMOTE_DEFAULTS.port,
+    control: r.control === true,
   };
 }
 
@@ -104,6 +130,7 @@ function load(): Settings {
       transcriptRoot: folder(parsed.transcriptRoot),
       autoCheckUpdates: parsed.autoCheckUpdates === true,
       focus: focus(parsed.focus),
+      remote: remote(parsed.remote),
     };
   } catch {
     return defaults();
@@ -119,6 +146,7 @@ interface Store {
   setTranscriptRoot: (path: string | null) => void;
   setAutoCheckUpdates: (on: boolean) => void;
   setFocus: (focus: Partial<FocusSettings>) => void;
+  setRemote: (remote: Partial<RemoteSettings>) => void;
   setTiles: (tiles: Tile[]) => void;
   setTileArea: (index: number, area: Area) => void;
   setTileProp: (index: number, key: string, value: unknown) => void;
@@ -180,6 +208,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setAutoCheckUpdates: (autoCheckUpdates) => setSettings((prev) => ({ ...prev, autoCheckUpdates })),
 
       setFocus: (next) => setSettings((prev) => ({ ...prev, focus: { ...prev.focus, ...next } })),
+
+      setRemote: (next) => setSettings((prev) => ({ ...prev, remote: { ...prev.remote, ...next } })),
 
       setTiles: (tiles) => editLayout((layout) => ({ ...layout, tiles })),
 

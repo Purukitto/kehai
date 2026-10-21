@@ -2,6 +2,7 @@
 
 mod bus;
 mod pollers;
+mod remote;
 
 use tauri::{Listener, Manager};
 
@@ -33,6 +34,7 @@ fn main() {
             });
 
             pollers::spawn_all(app.handle().clone());
+            remote::spawn(app.handle().clone());
 
             // The window starts hidden so the state plugin can put it back on
             // the display it was closed on before it is ever painted —

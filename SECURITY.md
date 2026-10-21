@@ -37,16 +37,25 @@ surface is what it reads and what it exposes:
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
-  `notify:command`, `flow:command`, `quota:command` and `update:command`.
-  `flow:command` drives the focus timer and sets its block lengths, which the engine
-  clamps; the only file it leads to is the timer's own daily total. `quota:command`
-  only changes the folder the quota poller reads — it still reads nothing but usage
-  counters.
-  `update:command` can ask for a check, an install, or the release page, but names no
-  URL: the update feed and the key updates must be signed with are compiled in. A path
-  that lets renderer content reach anything else in the engine is in scope.
+  `notify:command`, `flow:command`, `quota:command`, `update:command` and
+  `remote:command`. `flow:command` drives the focus timer and sets its block lengths,
+  which the engine clamps; the only file it leads to is the timer's own daily total.
+  `quota:command` only changes the folder the quota poller reads — it still reads
+  nothing but usage counters. `update:command` can ask for a check, an install, or the
+  release page, but names no URL: the update feed and the key updates must be signed
+  with are compiled in. `remote:command` turns the remote panel on or off, picks its
+  port and whether remote panels may press buttons, or replaces its key. A path that
+  lets renderer content reach anything else in the engine is in scope.
 - **Network requests.** Kehai makes none other than, when you ask for it, the update
   check and download. The font is bundled. A way to make it egress data is in scope.
+- **The remote panel.** Off by default. When on, `remote.rs` listens on one port. The
+  page itself is public — it is this repository's renderer — but the bus, the API and
+  every topic need the key, and the key and the update state are never sent to a
+  remote. A remote panel can only send the commands in `allowed()` in `remote.rs`,
+  and only while control is on. Reading data without the key, sending any other
+  command, or getting the engine to touch a file or a URL through this server is in
+  scope. Its traffic being readable on the network is not: it is plain HTTP, and the
+  README says so.
 - **Updates.** An installer is only run if its minisign signature verifies against the
   public key in the build, and the signature names the version it was made for, so a
   tampered `latest.json` cannot pair a new version number with an older installer.

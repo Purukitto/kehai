@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { bus } from '../core/bus';
-import type { UpdateCommand, UpdatePayload } from '../core/payloads';
+import type { RemoteCommand, RemotePayload, UpdateCommand, UpdatePayload } from '../core/payloads';
+import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
 import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
-import type { FocusSettings } from '../core/settings';
+import type { FocusSettings, RemoteSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
 import type { Layout, ThemeId } from '../core/types';
 import { registry, widgetNames } from '../widgets/registry';
 
-const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'ABOUT'] as const;
+const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
 export type Section = (typeof NAV)[number];
 
 const NAV_ICON: Record<Section, string> = {
@@ -18,6 +19,7 @@ const NAV_ICON: Record<Section, string> = {
   SOURCES:
     'M2.5 4.4c0-1.2 2.5-2.2 5.5-2.2s5.5 1 5.5 2.2-2.5 2.2-5.5 2.2-5.5-1-5.5-2.2M2.5 4.4v7.2c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2V4.4M2.5 8c0 1.2 2.5 2.2 5.5 2.2s5.5-1 5.5-2.2',
   WINDOW: 'M1.8 3.2h12.4v9.6H1.8zM1.8 6h12.4',
+  REMOTE: 'M1.8 2.6h12.4v8.6H1.8zM5.4 13.8h5.2M8 11.2v2.6',
   ABOUT: 'M8 1.8a6.2 6.2 0 1 0 0 12.4 6.2 6.2 0 1 0 0-12.4M8 7.2v4M8 4.9v.1',
 };
 
@@ -345,6 +347,172 @@ function FocusRows({ focus, onChange }: { focus: FocusSettings; onChange: (next:
   );
 }
 
+function sendRemote(command: RemoteCommand) {
+  bus.publish<RemoteCommand>('remote:command', 'settings', command);
+}
+
+/** Committed like the transcript folder: on Enter or blur, and only when valid. */
+function PortField({ value, onCommit }: { value: number; onCommit: (port: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => setDraft(String(value)), [value]);
+
+  const commit = () => {
+    const port = Number(draft.trim());
+    if (Number.isInteger(port) && port >= 1024 && port <= 65535) {
+      if (port !== value) onCommit(port);
+    } else {
+      setDraft(String(value));
+    }
+  };
+
+  return (
+    <input
+      className="cc-field"
+      style={{ width: 96, flex: 'none', textAlign: 'right' }}
+      value={draft}
+      inputMode="numeric"
+      spellCheck={false}
+      aria-label="Port"
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur();
+        if (e.key === 'Escape') setDraft(String(value));
+      }}
+    />
+  );
+}
+
+/** Shown without its key, which is the part that grants access. */
+function masked(link: string): string {
+  return link.replace(/key=[0-9a-f]+/i, 'key=••••••••');
+}
+
+function remoteStatus(status: RemotePayload | undefined): { text: string; danger: boolean } {
+  if (!status) return { text: 'Awaiting the engine.', danger: false };
+  if (status.error) return { text: status.error, danger: true };
+  if (!status.on) return { text: 'Not serving. Nothing is listening.', danger: false };
+  if (!status.listening) return { text: 'Starting.', danger: false };
+  const panels = status.clients === 1 ? '1 remote panel' : `${status.clients} remote panels`;
+  return { text: `Listening on port ${status.port}. ${panels} connected.`, danger: false };
+}
+
+/** On the machine being watched: whether, where and how far to let others in. */
+function RemoteHostRows({
+  remote,
+  onChange,
+  onNote,
+}: {
+  remote: RemoteSettings;
+  onChange: (next: Partial<RemoteSettings>) => void;
+  onNote: (note: string) => void;
+}) {
+  const status = useTopic<RemotePayload>('app:remote');
+  const state = remoteStatus(status);
+
+  const copy = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      onNote('Link copied. Open it on the other machine.');
+    } catch {
+      onNote('Clipboard refused. Nothing was copied.');
+    }
+  };
+
+  return (
+    <>
+      <Row
+        label="Serve a remote panel"
+        desc="Lets a browser on another machine on your network show this panel. Windows may ask whether to let Kehai through its firewall the first time."
+      >
+        <Seg options={['OFF', 'ON']} value={remote.on ? 'ON' : 'OFF'} onPick={(v) => onChange({ on: v === 'ON' })} />
+      </Row>
+      <Row label="Port" desc="1024 to 65535. Changing it disconnects every remote panel.">
+        <PortField value={remote.port} onCommit={(port) => onChange({ port })} />
+      </Row>
+      <Row
+        label="Allow control"
+        desc="Remote panels can press the media, notification and focus-timer buttons. Never anything else, whatever this says."
+      >
+        <Seg
+          options={['OFF', 'ON']}
+          value={remote.control ? 'ON' : 'OFF'}
+          onPick={(v) => onChange({ control: v === 'ON' })}
+        />
+      </Row>
+      <Row
+        label="Status"
+        desc={<span style={{ color: state.danger ? 'var(--cc-danger)' : undefined }}>{state.text}</span>}
+      />
+      {status?.listening && status.links.length === 0 && (
+        <Row label="Link" desc="This machine has no network address another one could reach." />
+      )}
+      {status?.listening &&
+        status.links.map((link) => (
+          <Row
+            key={link}
+            label="Link"
+            desc={
+              <>
+                {masked(link)}
+                <span style={{ display: 'block' }}>
+                  Anyone with this link can see the panel, notifications included, until you make a new key.
+                </span>
+              </>
+            }
+          >
+            <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => void copy(link)}>
+              COPY
+            </button>
+          </Row>
+        ))}
+      <Row
+        label="New key"
+        desc="Disconnects every remote panel. Each then needs the new link. Use it when a link has gone somewhere it should not."
+      >
+        <button
+          className="cc-chip"
+          style={{ padding: '8px 16px' }}
+          disabled={!status?.key}
+          onClick={() => {
+            sendRemote({ action: 'new_key' });
+            onNote('New key made. Remote panels need the new link.');
+          }}
+        >
+          NEW KEY
+        </button>
+      </Row>
+    </>
+  );
+}
+
+/** On a remote panel: what it is showing, and the way out. */
+function RemotePanelRows({ onNote }: { onNote: (note: string) => void }) {
+  return (
+    <>
+      <Row
+        label="This panel"
+        desc={`Shows the Kehai running at ${location.host}. Layout, theme and token budget here belong to this browser alone.`}
+      >
+        <span className="cc-mini" style={{ flex: 'none' }}>REMOTE</span>
+      </Row>
+      <Row label="Forget the key" desc="This browser stops showing the host until it is paired again.">
+        <button
+          className="cc-chip"
+          style={{ padding: '8px 16px' }}
+          onClick={() => {
+            forgetRemote();
+            onNote('Key forgotten.');
+          }}
+        >
+          FORGET
+        </button>
+      </Row>
+    </>
+  );
+}
+
 function sendUpdate(command: UpdateCommand) {
   bus.publish<UpdateCommand>('update:command', 'settings', command);
 }
@@ -528,6 +696,7 @@ export function SettingsScreen({
     setTranscriptRoot,
     setAutoCheckUpdates,
     setFocus,
+    setRemote,
     setGrid,
     toggleWidget,
     setTileProp,
@@ -758,20 +927,23 @@ export function SettingsScreen({
 
           {section === 'WINDOW' && (
             <div style={{ marginTop: 18 }}>
-              <Row
-                label="Start with Windows"
-                desc="Registers the app to launch at sign-in. Written to the OS, not to these settings."
-              >
-                {autostart === null ? (
-                  <span className="cc-mini" style={{ flex: 'none' }}>UNAVAILABLE HERE</span>
-                ) : (
-                  <Seg
-                    options={['OFF', 'ON']}
-                    value={autostart ? 'ON' : 'OFF'}
-                    onPick={(v) => setAutostart(v === 'ON')}
-                  />
-                )}
-              </Row>
+              {/* A remote panel is a browser tab: it starts with nothing and has no window to remember. */}
+              {!REMOTE_PANEL && (
+                <Row
+                  label="Start with Windows"
+                  desc="Registers the app to launch at sign-in. Written to the OS, not to these settings."
+                >
+                  {autostart === null ? (
+                    <span className="cc-mini" style={{ flex: 'none' }}>UNAVAILABLE HERE</span>
+                  ) : (
+                    <Seg
+                      options={['OFF', 'ON']}
+                      value={autostart ? 'ON' : 'OFF'}
+                      onPick={(v) => setAutostart(v === 'ON')}
+                    />
+                  )}
+                </Row>
+              )}
               <Row
                 label="Auto-hide the top bar"
                 desc="The header slides away and returns when the pointer reaches the top edge."
@@ -782,12 +954,14 @@ export function SettingsScreen({
                   onPick={(v) => setAutoHideBar(v === 'ON')}
                 />
               </Row>
-              <Row
-                label="Remember where it was"
-                desc="Position and size are saved on exit and restored on launch, so it reopens on the display you left it on."
-              >
-                <span className="cc-mini" style={{ flex: 'none' }}>ALWAYS ON</span>
-              </Row>
+              {!REMOTE_PANEL && (
+                <Row
+                  label="Remember where it was"
+                  desc="Position and size are saved on exit and restored on launch, so it reopens on the display you left it on."
+                >
+                  <span className="cc-mini" style={{ flex: 'none' }}>ALWAYS ON</span>
+                </Row>
+              )}
               <Row label="Fullscreen" desc="F11 toggles it at any time.">
                 <span className="cc-mini" style={{ flex: 'none' }}>F11</span>
               </Row>
@@ -805,33 +979,48 @@ export function SettingsScreen({
                 topic="flow:pomodoro"
                 desc="Kept by the engine. Today's total is saved locally and survives a restart."
               />
-              <FocusRows focus={settings.focus} onChange={setFocus} />
+              {!REMOTE_PANEL && <FocusRows focus={settings.focus} onChange={setFocus} />}
               <SourceRow label="Agent tokens" topic="dev:llm_tokens" desc="Tallied from local session transcripts. Never leaves the machine." />
-              <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />
+              {!REMOTE_PANEL && <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />}
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />
               <SourceRow label="Notifications" topic="sys:notify" desc="Intercepted from the system tray." />
             </div>
           )}
 
+          {section === 'REMOTE' && (
+            <div style={{ marginTop: 18 }}>
+              {REMOTE_PANEL ? (
+                <RemotePanelRows onNote={setNote} />
+              ) : (
+                <RemoteHostRows remote={settings.remote} onChange={setRemote} onNote={setNote} />
+              )}
+            </div>
+          )}
+
           {section === 'ABOUT' && (
             <div style={{ marginTop: 18 }}>
-              <Row label="Version" desc={update && !update.installable ? (update.reason ?? undefined) : undefined}>
-                <span style={{ fontSize: 12, color: 'var(--cc-muted)' }}>{update?.current ?? '--'}</span>
-              </Row>
-              <UpdateRow update={update} />
-              {update?.notes && (update.state === 'available' || update.state === 'downloading') && (
-                <ReleaseNotes text={update.notes} />
+              {/* Updating belongs to the machine running Kehai, which a remote panel is not. */}
+              {!REMOTE_PANEL && (
+                <>
+                  <Row label="Version" desc={update && !update.installable ? (update.reason ?? undefined) : undefined}>
+                    <span style={{ fontSize: 12, color: 'var(--cc-muted)' }}>{update?.current ?? '--'}</span>
+                  </Row>
+                  <UpdateRow update={update} />
+                  {update?.notes && (update.state === 'available' || update.state === 'downloading') && (
+                    <ReleaseNotes text={update.notes} />
+                  )}
+                  <Row
+                    label="Check automatically"
+                    desc="Once a day, starting a minute after launch. Asks github.com for the latest release and sends nothing else."
+                  >
+                    <Seg
+                      options={['OFF', 'ON']}
+                      value={settings.autoCheckUpdates ? 'ON' : 'OFF'}
+                      onPick={(v) => setAutoCheckUpdates(v === 'ON')}
+                    />
+                  </Row>
+                </>
               )}
-              <Row
-                label="Check automatically"
-                desc="Once a day, starting a minute after launch. Asks github.com for the latest release and sends nothing else."
-              >
-                <Seg
-                  options={['OFF', 'ON']}
-                  value={settings.autoCheckUpdates ? 'ON' : 'OFF'}
-                  onPick={(v) => setAutoCheckUpdates(v === 'ON')}
-                />
-              </Row>
               <Row
                 label="Token budget"
                 desc="No local source exposes your real plan limit, so a percentage only means something once you pick a number to measure against."

@@ -48,8 +48,8 @@ Every widget subscribes to bus topics and renders what arrives. It cannot poll, 
 cannot call an API, and it holds no state that another widget needs.
 
 The single exception is commands — media transport, notification dismissal, the
-focus timer's buttons and block lengths, the folder the token poller reads, and
-checking for or installing an update — which
+focus timer's buttons and block lengths, the folder the token poller reads, whether
+to serve remote panels, and checking for or installing an update — which
 *publish* an intent onto the bus. The engine owns
 the side effect and runs it off the event thread, so a wedged media player can never
 freeze the panel.
@@ -57,6 +57,10 @@ freeze the panel.
 This is what makes the mock source useful rather than a toy: it publishes the same
 envelopes on the same topics, so the entire UI can be built and reviewed in a browser
 with no Rust in the loop.
+
+It is also what makes the remote panel nearly free. A browser on another machine
+runs the same renderer; only the source differs, a WebSocket in place of the Tauri
+bridge. Nothing above the bus knows which one it has.
 
 ## `undefined` is a real state
 

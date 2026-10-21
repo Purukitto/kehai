@@ -17,6 +17,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 - Linux: what is playing, with transport controls, from any MPRIS player, and the
   notification feed. Notifications show from the moment Kehai starts; Linux keeps no
   history to read back.
+- A remote panel: **Settings → Remote** serves the dashboard to a browser on another
+  machine on your network, paired by a link. Remote panels only look, unless you allow
+  them to press the media, notification and timer buttons. The same port has a small
+  API for scripts. It is off until you turn it on.
+- F11 goes fullscreen on a remote panel too.
 
 ### Changed
 

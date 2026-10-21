@@ -173,6 +173,28 @@ export interface UpdatePayload {
 }
 
 /**
+ * Engine → local renderer on `app:remote`. Mirrors `RemotePayload` in
+ * `remote.rs`. Never sent to a remote panel: it carries the key.
+ */
+export interface RemotePayload {
+  on: boolean;
+  listening: boolean;
+  port: number;
+  /** Where another machine can open the panel, one per address, key included. */
+  links: string[];
+  key: string | null;
+  control: boolean;
+  /** Remote panels connected right now. */
+  clients: number;
+  error: string | null;
+}
+
+/** Renderer → engine on `remote:command`. Mirrors `Command` in `remote.rs`. */
+export type RemoteCommand =
+  | { action: 'configure'; on: boolean; port: number; control: boolean }
+  | { action: 'new_key' };
+
+/**
  * Renderer → engine on `update:command`. Mirrors `Command` in `update.rs`.
  * Carries no URL: where updates come from is compiled into the engine.
  */

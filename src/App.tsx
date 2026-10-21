@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { PairPrompt } from './components/PairPrompt';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
-import type { FlowCommand, QuotaCommand, UpdateCommand, UpdatePayload } from './core/payloads';
+import type { FlowCommand, QuotaCommand, RemoteCommand, UpdateCommand, UpdatePayload } from './core/payloads';
+import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
+import type { RemoteLink } from './core/remoteSource';
 import { useSettings } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { useTopic } from './core/useTopic';
@@ -14,7 +17,13 @@ import type { Section } from './settings/SettingsScreen';
 type Mode = 'dashboard' | 'settings' | 'arrange';
 
 async function toggleFullscreen(): Promise<void> {
-  if (!isTauri()) return;
+  // A remote panel is a browser tab, often on a tablet: the page's own
+  // fullscreen is the only one there is.
+  if (!isTauri()) {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else await document.documentElement.requestFullscreen();
+    return;
+  }
   const { getCurrentWindow } = await import('@tauri-apps/api/window');
   const win = getCurrentWindow();
   await win.setFullscreen(!(await win.isFullscreen()));
@@ -26,17 +35,26 @@ export default function App() {
   const [mode, setMode] = useState<Mode>('dashboard');
   const [settingsAt, setSettingsAt] = useState<Section | undefined>(undefined);
   const [engine, setEngine] = useState(false);
+  const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting' });
   const update = useTopic<UpdatePayload>('app:update');
   const layout = settings.layout;
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
-  // mock fills the rest until each poller lands. In a plain browser the mock
-  // covers everything.
+  // mock fills the rest until each poller lands. A remote panel gets the same
+  // topics from another machine's engine. In a plain browser the mock covers
+  // everything.
   useEffect(() => {
     const live = isTauri();
     setEngine(live);
-    const stopMock = startMockSource({ skip: live ? ENGINE_TOPICS : [] });
+    const stopMock = startMockSource({ skip: live || REMOTE ? ENGINE_TOPICS : [] });
 
+    if (REMOTE) {
+      const stopRemote = startRemoteSource(setRemote);
+      return () => {
+        stopRemote();
+        stopMock();
+      };
+    }
     if (!live) return stopMock;
 
     let stopBridge: (() => void) | undefined;
@@ -64,7 +82,11 @@ export default function App() {
   // to learn it. On launch this runs before the bridge above has attached; the
   // bus retains the command, so the bridge forwards it as soon as it subscribes,
   // ahead of its hello.
+  //
+  // None of these settings reach the engine from a remote panel: they belong
+  // to the machine it is watching, and the host would refuse them anyway.
   useEffect(() => {
+    if (REMOTE) return;
     bus.publish<QuotaCommand>('quota:command', 'settings', {
       action: 'set_root',
       path: settings.transcriptRoot,
@@ -75,6 +97,7 @@ export default function App() {
   // checks off and learns the stored choice from this, retained until the
   // bridge forwards it.
   useEffect(() => {
+    if (REMOTE) return;
     bus.publish<UpdateCommand>('update:command', 'settings', {
       action: 'set_auto',
       on: settings.autoCheckUpdates,
@@ -85,8 +108,21 @@ export default function App() {
   // before showing the timer, so the first countdown is already the right one.
   const { focusMin, breakMin, sprints } = settings.focus;
   useEffect(() => {
+    if (REMOTE) return;
     bus.publish<FlowCommand>('flow:command', 'settings', { action: 'configure', focusMin, breakMin, sprints });
   }, [focusMin, breakMin, sprints]);
+
+  // And whether to serve remote panels at all.
+  const { on: serveOn, port: servePort, control: serveControl } = settings.remote;
+  useEffect(() => {
+    if (REMOTE) return;
+    bus.publish<RemoteCommand>('remote:command', 'settings', {
+      action: 'configure',
+      on: serveOn,
+      port: servePort,
+      control: serveControl,
+    });
+  }, [serveOn, servePort, serveControl]);
 
   // Opening settings from the update badge lands on About. Every other way in,
   // including back from the arranger, starts where it always has.
@@ -107,7 +143,8 @@ export default function App() {
       if (e.key === 's' || e.key === 'S') setMode((m) => (m === 'settings' ? 'dashboard' : 'settings'));
       if (e.key === 'F11') {
         e.preventDefault();
-        void toggleFullscreen();
+        // A browser can refuse fullscreen; there is nothing to do about it.
+        toggleFullscreen().catch(() => undefined);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -127,6 +164,22 @@ export default function App() {
   if (mode === 'arrange') {
     return <Arranger onDone={() => setMode('settings')} />;
   }
+
+  // What the header says the panel is reading. A remote panel says more,
+  // because it can be up and still not be showing anything real.
+  const source = REMOTE
+    ? remote.state === 'live'
+      ? { live: true, label: remote.control ? 'REMOTE' : 'REMOTE · VIEW ONLY', title: 'Showing ' + location.host }
+      : remote.state === 'unpaired'
+        ? { live: false, label: 'NOT PAIRED', title: remote.reason }
+        : {
+            live: false,
+            label: remote.state === 'offline' ? 'REMOTE · OFFLINE' : 'REMOTE · CONNECTING',
+            title: 'Reaching ' + location.host,
+          }
+    : engine
+      ? { live: true, label: 'ENGINE', title: 'Rust engine connected' }
+      : { live: false, label: 'MOCK', title: 'Mock source' };
 
   const bar = (
       <div
@@ -165,10 +218,12 @@ export default function App() {
           </button>
         )}
         <span
-          style={{ width: 5, height: 5, flex: 'none', background: engine ? 'var(--cc-ok)' : 'var(--cc-line-2)' }}
-          title={engine ? 'Rust engine connected' : 'Mock source'}
+          style={{ width: 5, height: 5, flex: 'none', background: source.live ? 'var(--cc-ok)' : 'var(--cc-line-2)' }}
+          title={source.title}
         />
-        <span className="cc-mini" style={{ fontSize: 10 }}>{engine ? 'ENGINE' : 'MOCK'}</span>
+        <span className="cc-mini" style={{ fontSize: 10 }} title={source.title}>
+          {source.label}
+        </span>
         <span className="cc-mini" style={{ fontSize: 10 }}>
           {settings.presetId === 'custom' ? 'CUSTOM' : layout.name.toUpperCase()}
         </span>
@@ -198,8 +253,9 @@ export default function App() {
       }}
     >
       {autoHide ? <div className="cc-barzone">{bar}</div> : bar}
-      <div style={{ flex: 1, minHeight: 0 }}>
+      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         <Grid layout={layout} />
+        {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
       </div>
     </div>
   );

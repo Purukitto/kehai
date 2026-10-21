@@ -119,12 +119,48 @@ write hardware registers. That is a poor trade for one number on a dashboard.
 
 </details>
 
+### Remote panel
+
+The display does not have to hang off the machine being watched. Turn on
+**Settings → Remote** and Kehai serves the panel to a browser on another machine on
+the same network — an old laptop, a tablet, a Raspberry Pi driving the 10-inch
+screen.
+
+Settings shows a link for each of this machine's network addresses. Open one on the
+other device and it pairs by itself: the link carries a key, which the remote panel
+keeps and takes out of the address bar. A device where opening a link is awkward can
+paste the link or the key into the prompt instead. **New key** cuts off every remote
+panel at once.
+
+A remote panel has its own layout and theme, kept in its own browser. It only reads
+unless **Allow control** is on, and even then it can only press the buttons the panel
+has — play and skip, dismiss a notification, start or pause the focus timer. It can
+never change a setting, name a file or start an update. The header says `REMOTE`,
+`REMOTE · VIEW ONLY`, or why it is not connected.
+
+The same port answers to scripts, with the key as a bearer token:
+
+```bash
+curl -H "Authorization: Bearer $KEY" http://192.168.1.20:5280/api/topics
+```
+
+| Route | Does |
+| --- | --- |
+| `GET /api/topics` | Every topic's last envelope, by topic |
+| `GET /api/topics/<topic>` | One topic's last envelope, e.g. `/api/topics/telemetry:cpu` |
+| `POST /api/command/<topic>` | A command a remote panel could send, as JSON — `{"action":"start"}` to `flow:command` — when control is on |
+| `ws://…/bus` | The live bus. Send `{"type":"hello","key":"…"}` first |
+
+It is plain HTTP, so the key and everything the panel shows, notifications included,
+cross your network unencrypted. Use it on a network you trust.
+
 ## Privacy
 
 Kehai reads local sources and publishes them to its own in-process bus. Nothing it
 reads is uploaded, logged to disk or phoned home. The one thing it writes is how long
 the focus timer has run today, to `flow.json` in its own app-data folder, so the total
-survives a restart.
+survives a restart — and, once you turn on the remote panel, the key for it, beside it
+in `remote.json`.
 
 The font is built in, so Kehai makes one kind of network request, and the renderer's
 content-security policy forbids anything else: **the update check**, and only when you
@@ -132,6 +168,10 @@ press Check or turn on Check automatically. It fetches `latest.json` from this
 repository's latest GitHub release, which tells GitHub your IP address and that some
 copy of Kehai asked — nothing more. Installing downloads the installer from the same
 release.
+
+It listens for nothing unless you turn on **Settings → Remote**. Then it accepts
+connections on one port from your network, and shows the panel's data only to a
+device holding the key.
 
 Two sources are worth stating plainly:
 
@@ -228,7 +268,8 @@ flowchart LR
 
     P --> BUS
     BUS -- "Tauri event, replayed on attach" --> W
-    W -. "media · notify · quota · update :command" .-> P
+    W -. "media · notify · flow · quota · update · remote :command" .-> P
+    BUS -- "WebSocket, key required" --> RP["Remote panel<br/><i>same renderer, another machine</i>"]
 ```
 
 Everything on the bus is one shape:
@@ -245,10 +286,14 @@ stay silent forever after one missed send. The renderer emits `ui:hello` once
 subscribed and the engine replays every retained topic in reply.
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for five command topics — `media:command`, `notify:command`,
-`flow:command`, `quota:command` and `update:command`: the UI states an intent, the
-engine owns the side effect and runs it off the event thread, so a wedged media player
-cannot freeze the panel and a slow download cannot either.
+read-only except for six command topics — `media:command`, `notify:command`,
+`flow:command`, `quota:command`, `update:command` and `remote:command`: the UI states
+an intent, the engine owns the side effect and runs it off the event thread, so a
+wedged media player cannot freeze the panel and a slow download cannot either.
+
+A remote panel is the same renderer, served by the engine and fed by a WebSocket
+instead of the Tauri bridge. It can forward the first three of those commands, and
+only while the host allows control; the engine checks every one again.
 
 ### Where things are
 
@@ -257,6 +302,7 @@ cannot freeze the panel and a slow download cannot either.
 | `src/core/bus.ts` | Pub/sub with last-value retention and wildcard topics |
 | `src/core/mockSource.ts` | Stand-in for the engine — publishes the real topics |
 | `src/core/tauriSource.ts` | Bridges engine events onto the bus, both directions |
+| `src/core/remoteSource.ts` | The same, for a remote panel, over a WebSocket |
 | `src/core/payloads.ts` | Every payload shape, mirrored by hand from Rust |
 | `src/core/layout.ts` | Validates a stored or imported layout |
 | `src/core/settings.tsx` | The settings store and everything that persists |
@@ -269,6 +315,7 @@ cannot freeze the panel and a slow download cannot either.
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
 | `src-tauri/src/pollers/` | One thread per source |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
+| `src-tauri/src/remote.rs` | Serves the panel, the bus and the API to other machines |
 | `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |
 
 [Design notes](docs/design.md) covers the reasoning behind the presets, the theme
@@ -277,7 +324,7 @@ adding a widget or a poller.
 
 ## Not built yet
 
-- The headless WebSocket/REST surface, for driving a panel from another machine
+- HTTPS for the remote panel, so it can be used on a network you do not trust
 - Media and notifications on macOS, which keeps both behind private frameworks
 - Code signing, so installers stop tripping SmartScreen
 

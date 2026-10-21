@@ -10,6 +10,8 @@ import type {
   NetPayload,
   NotifyPayload,
   QuotaPayload,
+  RemoteCommand,
+  RemotePayload,
   SprintPayload,
   UpdateCommand,
   UpdatePayload,
@@ -275,6 +277,30 @@ export function startMockSource(options: MockOptions = {}): () => void {
     }
   });
 
+  // Pretends to serve, so Settings → Remote can be built without the engine.
+  // Nothing listens: the links lead nowhere.
+  const remote: RemotePayload = {
+    on: false,
+    listening: false,
+    port: 5280,
+    links: [],
+    key: null,
+    control: false,
+    clients: 0,
+    error: null,
+  };
+  const mockKey = () =>
+    Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
+  const unsubRemote = bus.subscribe('remote:command', (e) => {
+    const command = e.data as RemoteCommand;
+    if (command.action === 'configure') {
+      Object.assign(remote, { on: command.on, listening: command.on, port: command.port, control: command.control });
+    }
+    if (command.action === 'new_key' || (remote.on && !remote.key)) remote.key = mockKey();
+    remote.links = remote.listening ? [`http://192.168.1.20:${remote.port}/#key=${remote.key}`] : [];
+    pub<RemotePayload>('app:remote', 'mock.remote', { ...remote });
+  });
+
   pub<ArtPayload>('media:art', 'mock.media', { dataUrl: null });
   pubUpdate();
 
@@ -286,6 +312,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
   return () => {
     unsub();
     unsubFlow();
+    unsubRemote();
     unsubUpdate();
     timers.forEach((id) => window.clearInterval(id));
   };
