@@ -29,8 +29,10 @@ Kehai runs locally with the privileges of the user who started it. The interesti
 surface is what it reads and what it exposes:
 
 - **The notification listener.** On Windows the app can read the title and body of
-  toasts from any application. Anything that widens that beyond the notification
-  widget, or that persists it, is a bug worth reporting.
+  toasts from any application. On Linux it monitors the session bus for notifications
+  sent to the notification server, and the match rules it registers ask for those and
+  nothing else. Anything that widens either beyond the notification widget, or that
+  persists it, is a bug worth reporting.
 - **Transcript reading.** The quota poller tails local session transcripts for token
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.

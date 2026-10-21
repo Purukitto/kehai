@@ -217,9 +217,241 @@ mod platform {
     }
 }
 
-/// Linux reaches players over MPRIS on the session bus. Not wired yet, so the
-/// widget correctly reports nothing playing rather than pretending.
-#[cfg(not(windows))]
+/// Linux reaches players over MPRIS on the session bus.
+#[cfg(target_os = "linux")]
+mod platform {
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+    use std::sync::OnceLock;
+
+    use super::MediaPayload;
+    use zbus::blocking::fdo::DBusProxy;
+    use zbus::blocking::Connection;
+    use zbus::zvariant::{OwnedValue, Value};
+
+    const PREFIX: &str = "org.mpris.MediaPlayer2.";
+    const PATH: &str = "/org/mpris/MediaPlayer2";
+    const ROOT: &str = "org.mpris.MediaPlayer2";
+    const PLAYER: &str = "org.mpris.MediaPlayer2.Player";
+    const PROPERTIES: &str = "org.freedesktop.DBus.Properties";
+
+    type Props = HashMap<String, OwnedValue>;
+
+    /// One connection for the life of the app. Opening the session bus every
+    /// second would be a socket and a handshake per tick.
+    fn bus() -> Option<&'static Connection> {
+        static BUS: OnceLock<Option<Connection>> = OnceLock::new();
+        BUS.get_or_init(|| match Connection::session() {
+            Ok(conn) => Some(conn),
+            Err(err) => {
+                eprintln!("poller.media: no session bus: {err}");
+                None
+            }
+        })
+        .as_ref()
+    }
+
+    /// Read fresh each time rather than through a caching proxy: players are
+    /// not required to announce position changes, so a cache goes stale.
+    fn get_all(bus: &Connection, name: &str, iface: &str) -> Option<Props> {
+        bus.call_method(Some(name), PATH, Some(PROPERTIES), "GetAll", &iface)
+            .ok()?
+            .body()
+            .deserialize::<Props>()
+            .ok()
+    }
+
+    /// Values inside a dictionary of variants arrive wrapped in one more.
+    fn plain<'v, 'a>(v: &'v Value<'a>) -> &'v Value<'a> {
+        match v {
+            Value::Value(inner) => plain(inner),
+            other => other,
+        }
+    }
+
+    fn text(v: Option<&Value<'_>>) -> Option<String> {
+        match plain(v?) {
+            Value::Str(s) => Some(s.as_str().to_string()),
+            _ => None,
+        }
+    }
+
+    /// `xesam:artist` is a list, but some players send a single string.
+    fn texts(v: Option<&Value<'_>>) -> Vec<String> {
+        match v.map(plain) {
+            Some(Value::Array(list)) => list.inner().iter().filter_map(|s| text(Some(s))).collect(),
+            Some(single) => text(Some(single)).into_iter().collect(),
+            None => Vec::new(),
+        }
+    }
+
+    /// Microseconds, which the spec says are signed and some players send
+    /// unsigned.
+    fn micros(v: Option<&Value<'_>>) -> Option<i64> {
+        match plain(v?) {
+            Value::I64(n) => Some(*n),
+            Value::U64(n) => i64::try_from(*n).ok(),
+            Value::I32(n) => Some(i64::from(*n)),
+            Value::U32(n) => Some(i64::from(*n)),
+            _ => None,
+        }
+    }
+
+    fn field<'v>(metadata: &'v Value<'static>, key: &str) -> Option<&'v Value<'static>> {
+        let Value::Dict(dict) = plain(metadata) else {
+            return None;
+        };
+        dict.iter()
+            .find(|(k, _)| matches!(plain(k), Value::Str(s) if s.as_str() == key))
+            .map(|(_, v)| v)
+    }
+
+    fn players(bus: &Connection) -> Vec<String> {
+        let Ok(dbus) = DBusProxy::new(bus) else {
+            return Vec::new();
+        };
+        dbus.list_names()
+            .map(|names| {
+                names
+                    .into_iter()
+                    .map(|n| n.to_string())
+                    .filter(|n| n.starts_with(PREFIX))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// The player worth showing: one that is playing, else one that is paused,
+    /// else any. Windows picks a current session for us; MPRIS leaves the choice
+    /// to whoever is asking.
+    fn current(bus: &Connection) -> Option<(String, Props)> {
+        let mut best: Option<(u8, String, Props)> = None;
+        for name in players(bus) {
+            let Some(props) = get_all(bus, &name, PLAYER) else {
+                continue;
+            };
+            let rank = match text(props.get("PlaybackStatus").map(|v| &**v)).as_deref() {
+                Some("Playing") => 0,
+                Some("Paused") => 1,
+                _ => 2,
+            };
+            if best.as_ref().is_none_or(|(r, _, _)| rank < *r) {
+                best = Some((rank, name, props));
+            }
+        }
+        best.map(|(_, name, props)| (name, props))
+    }
+
+    /// The player's own name for itself, falling back to its bus name, which is
+    /// lower case and can carry an instance suffix.
+    fn identity(bus: &Connection, name: &str) -> String {
+        bus.call_method(
+            Some(name),
+            PATH,
+            Some(PROPERTIES),
+            "Get",
+            &(ROOT, "Identity"),
+        )
+        .ok()
+        .and_then(|reply| reply.body().deserialize::<OwnedValue>().ok())
+        .and_then(|v| text(Some(&v)))
+        .unwrap_or_else(|| {
+            let tail = name.strip_prefix(PREFIX).unwrap_or(name);
+            tail.split('.').next().unwrap_or(tail).to_string()
+        })
+    }
+
+    /// Only art already on disk is shown. A player that offers its cover as a
+    /// web address would have Kehai make a request it promises not to make.
+    fn art_path(metadata: &Value<'static>) -> Option<PathBuf> {
+        let url = text(field(metadata, "mpris:artUrl"))?;
+        if !url.starts_with("file://") {
+            return None;
+        }
+        tauri::Url::parse(&url).ok()?.to_file_path().ok()
+    }
+
+    pub fn snapshot() -> Option<MediaPayload> {
+        let bus = bus()?;
+        let (name, props) = current(bus)?;
+        let metadata = props.get("Metadata")?;
+
+        let title = text(field(metadata, "xesam:title")).unwrap_or_default();
+        if title.is_empty() {
+            return None;
+        }
+
+        let secs = |us: i64| (us.max(0) / 1_000_000) as u64;
+
+        Some(MediaPayload {
+            playing: text(props.get("PlaybackStatus").map(|v| &**v)).as_deref() == Some("Playing"),
+            title,
+            artist: texts(field(metadata, "xesam:artist")).join(", "),
+            elapsed_sec: micros(props.get("Position").map(|v| &**v))
+                .map(secs)
+                .unwrap_or(0),
+            duration_sec: micros(field(metadata, "mpris:length"))
+                .map(secs)
+                .unwrap_or(0),
+            has_art: art_path(metadata).is_some(),
+            player: identity(bus, &name),
+        })
+    }
+
+    /// Reads the cover from disk as a data URL. Players often cache covers
+    /// without an extension, so the type comes from the file's first bytes, and
+    /// anything that is not a recognisable image is left out.
+    pub fn artwork() -> Option<String> {
+        use base64::Engine;
+
+        const MAX_BYTES: u64 = 4 * 1024 * 1024;
+
+        let bus = bus()?;
+        let (_, props) = current(bus)?;
+        let path = art_path(props.get("Metadata")?)?;
+
+        let size = std::fs::metadata(&path).ok()?.len();
+        if size == 0 || size > MAX_BYTES {
+            return None;
+        }
+        let bytes = std::fs::read(&path).ok()?;
+
+        let mime = if bytes.starts_with(b"\x89PNG") {
+            "image/png"
+        } else if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+            "image/jpeg"
+        } else if bytes.starts_with(b"GIF8") {
+            "image/gif"
+        } else if bytes.len() > 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == b"WEBP" {
+            "image/webp"
+        } else {
+            return None;
+        };
+
+        let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+        Some(format!("data:{mime};base64,{encoded}"))
+    }
+
+    pub fn control(action: &str) {
+        let method = match action {
+            "playpause" => "PlayPause",
+            "next" => "Next",
+            "previous" => "Previous",
+            _ => return,
+        };
+        let Some(bus) = bus() else { return };
+        let Some((name, _)) = current(bus) else {
+            return;
+        };
+        if let Err(err) = bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), method, &()) {
+            eprintln!("poller.media: {method} refused by {name}: {err}");
+        }
+    }
+}
+
+/// macOS keeps its now-playing information behind a private framework. Not
+/// wired, so the widget correctly reports nothing playing rather than pretending.
+#[cfg(not(any(windows, target_os = "linux")))]
 mod platform {
     use super::MediaPayload;
 

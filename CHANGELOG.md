@@ -14,6 +14,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 - The focus timer has buttons: start, pause, skip and reset it from its tile or from
   Stage's sprint tab. **Settings → Sources** sets how long focus blocks and breaks
   are, and today's focused time survives a restart.
+- Linux: what is playing, with transport controls, from any MPRIS player, and the
+  notification feed. Notifications show from the moment Kehai starts; Linux keeps no
+  history to read back.
 
 ### Changed
 

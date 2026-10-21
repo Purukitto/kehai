@@ -88,14 +88,14 @@ write the layout as JSON if you want to commit or share one.
 
 ### Sources
 
-| Source | Windows | Linux / macOS |
-| --- | --- | --- |
-| CPU, memory, network, disk | via `sysinfo` | via `sysinfo` |
-| CPU package temperature | usually unavailable — see below | label varies by platform |
-| Media session and transport | via GSMTC, including cover art | MPRIS not wired yet |
-| Notifications | via `UserNotificationListener` | D-Bus not wired yet |
-| Agent token usage | optional — needs local agent transcripts | same |
-| Focus timer | kept by the engine | same |
+| Source | Windows | Linux | macOS |
+| --- | --- | --- | --- |
+| CPU, memory, network, disk | via `sysinfo` | via `sysinfo` | via `sysinfo` |
+| CPU package temperature | usually unavailable — see below | label varies | label varies |
+| Media session and transport | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
+| Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |
+| Agent token usage | optional — needs local agent transcripts | same | same |
+| Focus timer | kept by the engine | same | same |
 
 Where a source is unavailable the widget says so, and Settings → Sources shows it as
 **UNAVAILABLE** with the reason. Nothing shows a zero it does not have — see
@@ -138,7 +138,10 @@ Two sources are worth stating plainly:
 - **Notifications.** On Windows the app registers as a notification listener, which
   means it can read the title and body of toasts from any app. Windows prompts for this
   the first time. Deny it and the widget reports the refusal rather than showing an
-  empty feed.
+  empty feed. On Linux nothing prompts: Kehai asks the session bus to copy it every
+  notification on its way to the notification server, the id the server gives it and
+  word of it closing, and nothing else — the same access `dbus-monitor` uses, which
+  any program running as you already has.
 - **Agent token usage.** The quota widget tallies token counts by tailing local coding
   agent session transcripts — under `~/.claude/projects` unless you point
   Settings → Sources at another folder — reading file modification times, and the usage
@@ -275,7 +278,7 @@ adding a widget or a poller.
 ## Not built yet
 
 - The headless WebSocket/REST surface, for driving a panel from another machine
-- Linux media (MPRIS) and notifications (D-Bus) — currently report unavailable
+- Media and notifications on macOS, which keeps both behind private frameworks
 - Code signing, so installers stop tripping SmartScreen
 
 ## Licence

@@ -103,8 +103,8 @@ jobs:
 
   engine-stubs:
     name: Engine (non-Windows stubs)
-    # The cfg(not(windows)) fallbacks have to keep compiling, or they rot
-    # silently until someone tries to build on Linux.
+    # The Linux media and notification sources only compile here, as do the
+    # fallbacks for everywhere else, so this is what keeps them from rotting.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

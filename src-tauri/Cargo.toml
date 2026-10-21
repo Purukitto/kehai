@@ -46,3 +46,8 @@ strip = true
 
 [target."cfg(windows)".dependencies]
 windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel"] }
+
+# Already in the tree through Tauri. MPRIS players and the notification server
+# are both on the session bus.
+[target."cfg(target_os = \"linux\")".dependencies]
+zbus = "5"

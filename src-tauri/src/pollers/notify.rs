@@ -251,13 +251,283 @@ mod platform {
     }
 }
 
-/// Linux reads the same events off D-Bus. Not wired yet.
-#[cfg(not(windows))]
+/// Linux has no API for reading other applications' notifications, so this
+/// listens on the session bus the way `dbus-monitor` does: as a monitor, seeing
+/// each `Notify` call on its way to the notification server. Only what arrives
+/// while Kehai runs can be seen; there is no history to read back.
+#[cfg(target_os = "linux")]
+mod platform {
+    use std::collections::HashMap;
+    use std::sync::{Mutex, OnceLock};
+    use std::thread;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::Item;
+    use zbus::blocking::fdo::MonitoringProxy;
+    use zbus::blocking::{Connection, MessageIterator};
+    use zbus::message::Type;
+    use zbus::zvariant::OwnedValue;
+    use zbus::MatchRule;
+
+    const SERVICE: &str = "org.freedesktop.Notifications";
+    const PATH: &str = "/org/freedesktop/Notifications";
+    /// As many as the Windows side keeps.
+    const KEEP: usize = 40;
+    /// `NotificationClosed` reasons. Expired means it left the screen by
+    /// itself, which is exactly when a feed read later is useful, so it stays.
+    const EXPIRED: u32 = 1;
+
+    struct Seen {
+        item: Item,
+        /// Whether `item.id` is the server's. Until its reply to `Notify` is
+        /// seen the item carries a stand-in, and closing it by that number
+        /// would close someone else's notification.
+        confirmed: bool,
+    }
+
+    /// Newest first.
+    static FEED: Mutex<Vec<Seen>> = Mutex::new(Vec::new());
+
+    /// The arguments of `Notify`, in order: app name, replaces id, icon,
+    /// summary, body, actions, hints, timeout.
+    type Notify = (
+        String,
+        u32,
+        String,
+        String,
+        String,
+        Vec<String>,
+        HashMap<String, OwnedValue>,
+        i32,
+    );
+
+    /// A monitor connection cannot send, so closing a notification needs one
+    /// of its own.
+    fn sender() -> Option<&'static Connection> {
+        static BUS: OnceLock<Option<Connection>> = OnceLock::new();
+        BUS.get_or_init(|| Connection::session().ok()).as_ref()
+    }
+
+    pub fn request_access() -> Result<(), String> {
+        let rules = rules().map_err(|e| format!("could not describe what to watch: {e}"))?;
+        let conn = Connection::session().map_err(|e| format!("no session bus: {e}"))?;
+        let refused =
+            |e: &dyn std::fmt::Display| format!("the session bus refused to let Kehai watch: {e}");
+        MonitoringProxy::new(&conn)
+            .map_err(|e| refused(&e))?
+            .become_monitor(&rules, 0)
+            .map_err(|e| refused(&e))?;
+        thread::spawn(move || watch(conn));
+        Ok(())
+    }
+
+    /// Notifications going in, the ids the server hands back, and their
+    /// closing. Nothing else on the bus is delivered to this connection.
+    fn rules() -> zbus::Result<Vec<MatchRule<'static>>> {
+        Ok(vec![
+            MatchRule::builder()
+                .msg_type(Type::MethodCall)
+                .interface(SERVICE)?
+                .member("Notify")?
+                .build(),
+            MatchRule::builder()
+                .msg_type(Type::MethodReturn)
+                .sender(SERVICE)?
+                .build(),
+            MatchRule::builder()
+                .msg_type(Type::Signal)
+                .interface(SERVICE)?
+                .member("NotificationClosed")?
+                .build(),
+        ])
+    }
+
+    fn now_ms() -> i64 {
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0)
+    }
+
+    /// Notification bodies may carry a little markup. The widget shows text.
+    fn plain(s: &str) -> String {
+        let mut out = String::with_capacity(s.len());
+        let mut in_tag = false;
+        for c in s.chars() {
+            match c {
+                '<' => in_tag = true,
+                '>' if in_tag => in_tag = false,
+                c if !in_tag => out.push(c),
+                _ => {}
+            }
+        }
+        out.replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn watch(conn: Connection) {
+        // Each `Notify` waits here for the server's reply, keyed by who sent it
+        // and the serial they gave it, since serials are only unique per sender.
+        let mut pending: HashMap<(String, u32), u32> = HashMap::new();
+        // Stand-in ids count down from the top, well clear of the server's.
+        let mut next_local = u32::MAX;
+
+        for message in MessageIterator::from(conn) {
+            let Ok(message) = message else { continue };
+            let header = message.header();
+
+            match header.message_type() {
+                Type::MethodCall if header.member().is_some_and(|m| m.as_str() == "Notify") => {
+                    let Ok((app, replaces, _, summary, body, _, _, _)) =
+                        message.body().deserialize::<Notify>()
+                    else {
+                        continue;
+                    };
+                    let item = Item {
+                        id: next_local,
+                        source: if app.is_empty() {
+                            "Unknown".to_string()
+                        } else {
+                            app
+                        },
+                        title: plain(&summary),
+                        body: plain(&body),
+                        at_ms: now_ms(),
+                    };
+                    let Ok(mut feed) = FEED.lock() else { continue };
+                    // A replacement updates the one on screen, and keeps its id.
+                    if let Some(old) = feed
+                        .iter()
+                        .position(|s| replaces != 0 && s.confirmed && s.item.id == replaces)
+                    {
+                        let mut seen = feed.remove(old);
+                        seen.item = Item {
+                            id: replaces,
+                            ..item
+                        };
+                        feed.insert(0, seen);
+                        continue;
+                    }
+                    if let Some(caller) = header.sender() {
+                        let serial = message.primary_header().serial_num().get();
+                        pending.insert((caller.to_string(), serial), next_local);
+                    }
+                    next_local = next_local.wrapping_sub(1);
+                    feed.insert(
+                        0,
+                        Seen {
+                            item,
+                            confirmed: false,
+                        },
+                    );
+                    feed.truncate(KEEP);
+                }
+
+                Type::MethodReturn => {
+                    let (Some(caller), Some(serial)) =
+                        (header.destination(), header.reply_serial())
+                    else {
+                        continue;
+                    };
+                    let Some(local) = pending.remove(&(caller.to_string(), serial.get())) else {
+                        continue;
+                    };
+                    let Ok(id) = message.body().deserialize::<u32>() else {
+                        continue;
+                    };
+                    if let Ok(mut feed) = FEED.lock() {
+                        if let Some(seen) =
+                            feed.iter_mut().find(|s| !s.confirmed && s.item.id == local)
+                        {
+                            seen.item.id = id;
+                            seen.confirmed = true;
+                        }
+                    }
+                }
+
+                Type::Signal
+                    if header
+                        .member()
+                        .is_some_and(|m| m.as_str() == "NotificationClosed") =>
+                {
+                    let Ok((id, reason)) = message.body().deserialize::<(u32, u32)>() else {
+                        continue;
+                    };
+                    if reason != EXPIRED {
+                        if let Ok(mut feed) = FEED.lock() {
+                            feed.retain(|s| !(s.confirmed && s.item.id == id));
+                        }
+                    }
+                }
+
+                _ => {}
+            }
+
+            // A server that never answers would otherwise grow this forever.
+            if pending.len() > 256 {
+                pending.clear();
+            }
+        }
+
+        eprintln!("poller.notify: the session bus went away; no more notifications");
+    }
+
+    pub fn read() -> Vec<Item> {
+        FEED.lock()
+            .map(|feed| feed.iter().map(|s| s.item.clone()).collect())
+            .unwrap_or_default()
+    }
+
+    /// Closes it on the server too, so the widget stays a view onto the real
+    /// thing — when the server's id for it is known.
+    fn close(id: u32) {
+        let Some(bus) = sender() else { return };
+        if let Err(err) =
+            bus.call_method(Some(SERVICE), PATH, Some(SERVICE), "CloseNotification", &id)
+        {
+            eprintln!("poller.notify: close {id} refused: {err}");
+        }
+    }
+
+    fn take(keep: impl Fn(&Seen) -> bool) -> Vec<Seen> {
+        let Ok(mut feed) = FEED.lock() else {
+            return Vec::new();
+        };
+        let (kept, taken) = feed.drain(..).partition(keep);
+        *feed = kept;
+        taken
+    }
+
+    pub fn dismiss(id: u32) {
+        for seen in take(|s| s.item.id != id) {
+            if seen.confirmed {
+                close(seen.item.id);
+            }
+        }
+    }
+
+    pub fn clear() {
+        for seen in take(|_| false) {
+            if seen.confirmed {
+                close(seen.item.id);
+            }
+        }
+    }
+}
+
+/// macOS keeps its notification centre to itself. Not wired.
+#[cfg(not(any(windows, target_os = "linux")))]
 mod platform {
     use super::Item;
 
     pub fn request_access() -> Result<(), String> {
-        Err("D-Bus notification monitoring is not wired up yet".to_string())
+        Err("this platform does not let other apps read its notifications".to_string())
     }
 
     pub fn read() -> Vec<Item> {

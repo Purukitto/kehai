@@ -2025,6 +2025,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
  "windows 0.61.3",
+ "zbus",
 ]
 
 [[package]]
