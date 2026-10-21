@@ -9,6 +9,32 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- Every layout has an arrangement for a landscape panel, a bar display and a portrait
+  screen, and Kehai shows the one that fits its window. Stage, Panel and Ambient are
+  arranged all three ways, and a remote panel on a tablet turns with the tablet.
+- Layouts of your own, as many as you like. **Settings → Layout** lists them beside the
+  presets, with Use, Arrange, Rename, Export, Import and Delete. Choosing a layout no
+  longer throws another away.
+- The tile arranger has a tab for each shape, and sets the grid's columns, rows and gap.
+
+### Changed
+
+- Presets cannot be changed. The first change to one saves a copy under **Yours**,
+  and a preset you have not changed always matches the latest release.
+- The theme belongs to Kehai rather than to a layout, so changing layout keeps your
+  colours.
+- Clicking a layout selects it; **Use** puts it on screen.
+- An arrangement you made in 0.3 is under **Yours** as "Custom", unchanged.
+- Layouts exported from 0.3 still import. Layouts exported now do not import into 0.3
+  or earlier.
+
+### Removed
+
+- Grid size and tile gap are no longer under Settings → Layout. They are in the
+  arranger, per shape.
+
 ## [0.3.0] - 2026-10-21
 
 ### Added

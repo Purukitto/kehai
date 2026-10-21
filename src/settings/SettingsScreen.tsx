@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { bus } from '../core/bus';
 import type { RemoteCommand, RemotePayload, UpdateCommand, UpdatePayload } from '../core/payloads';
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
-import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
+import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTileProp, withTiles } from '../core/layout';
+import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
 import type { FocusSettings, RemoteSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
-import type { Layout, ThemeId } from '../core/types';
+import { useWindowShape } from '../core/useWindowShape';
+import type { Layout, Shape, ThemeId } from '../core/types';
 import { minSize, registry, widgetNames } from '../widgets/registry';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
@@ -123,97 +125,101 @@ function Seg<T extends string | number>({
   );
 }
 
-function Stepper({ value, onChange, lo, hi }: { value: number; onChange: (v: number) => void; lo: number; hi: number }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'stretch', flex: 'none' }}>
-      <button className="cc-chip" style={{ width: 34 }} onClick={() => onChange(Math.max(lo, value - 1))}>
-        −
-      </button>
-      <div
-        style={{
-          width: 54,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          borderTop: '1px solid var(--cc-line)',
-          borderBottom: '1px solid var(--cc-line)',
-          fontSize: 13,
-        }}
-      >
-        {value}
-      </div>
-      <button className="cc-chip" style={{ width: 34, marginLeft: -1 }} onClick={() => onChange(Math.min(hi, value + 1))}>
-        +
-      </button>
-    </div>
-  );
-}
-
-function PresetCard({
+/**
+ * A layout as it looks on the display Kehai is on. In use is marked in the
+ * accent; selected, which only decides what the buttons below act on, in the
+ * second accent, so picking a card never changes the screen by itself.
+ */
+function LayoutCard({
   layout,
-  name,
-  meta,
-  active,
-  onPick,
+  shape,
+  inUse,
+  selected,
+  onSelect,
 }: {
-  /** Null draws an empty frame: there is nothing to pick yet. */
-  layout: Layout | null;
-  name: string;
-  meta: string;
-  active: boolean;
-  onPick: () => void;
+  layout: Layout;
+  shape: Shape;
+  inUse: boolean;
+  selected: boolean;
+  onSelect: () => void;
 }) {
-  const grid = layout?.grid ?? { cols: 12, rows: 12 };
+  const { grid, tiles } = layout.shapes[shape];
+  const aspect = SHAPE_ASPECT[shape];
+  const width = Math.min(176, 76 * aspect);
   return (
     <button
-      onClick={onPick}
-      disabled={!layout}
+      onClick={onSelect}
+      aria-pressed={selected}
       style={{
-        flex: 1,
         background: 'var(--cc-pane)',
-        border: `1px solid ${active ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
+        border: `1px solid ${inUse ? 'var(--cc-accent)' : selected ? 'var(--cc-accent-2)' : 'var(--cc-line)'}`,
         padding: 10,
         display: 'flex',
         flexDirection: 'column',
         gap: 9,
         minWidth: 0,
-        cursor: layout ? 'pointer' : 'default',
       }}
     >
       <div
         style={{
-          height: 74,
+          height: 88,
           width: '100%',
           background: 'var(--cc-inset)',
-          display: 'grid',
-          gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
-          gap: 2,
-          padding: 5,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
         }}
       >
-        {layout?.tiles.map((t, i) => (
-          <div
-            key={i}
-            style={{
-              gridArea: `${t.area[0]} / ${t.area[1]} / ${t.area[2]} / ${t.area[3]}`,
-              background: active ? 'var(--cc-accent)' : 'var(--cc-line-2)',
-            }}
-          />
-        ))}
+        <div
+          style={{
+            width,
+            height: width / aspect,
+            display: 'grid',
+            gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
+            gap: 2,
+          }}
+        >
+          {tiles.map((t, i) => (
+            <div
+              key={i}
+              style={{
+                gridArea: `${t.area[0]} / ${t.area[1]} / ${t.area[2]} / ${t.area[3]}`,
+                background: inUse ? 'var(--cc-accent)' : 'var(--cc-line-2)',
+              }}
+            />
+          ))}
+        </div>
       </div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, width: '100%' }}>
-        <span style={{ fontSize: 10, letterSpacing: '0.14em', color: active ? 'var(--cc-accent)' : 'var(--cc-muted)' }}>
-          {name}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, width: '100%', minWidth: 0 }}>
+        <span
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.14em',
+            color: inUse ? 'var(--cc-accent)' : selected ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {layout.name.toUpperCase()}
         </span>
         <div style={{ flex: 1 }} />
-        <span className="cc-mini" style={{ fontSize: 9 }}>
-          {meta}
+        <span className="cc-mini" style={{ fontSize: 9, flex: 'none' }}>
+          {inUse ? 'IN USE' : `${tiles.length} TILES`}
         </span>
       </div>
     </button>
   );
 }
+
+/** Rows of cards that wrap rather than squeeze, however many layouts there are. */
+const CARD_GRID: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+  gap: 12,
+  marginTop: 10,
+};
 
 function SourceRow({ label, topic, desc }: { label: string; topic: string; desc: string }) {
   const value = useTopic<{ available?: boolean; reason?: string | null } | null>(topic);
@@ -682,6 +688,17 @@ function ReleaseNotes({ text }: { text: string }) {
   );
 }
 
+/** A second press within a few seconds; one stray tap should not delete anything. */
+function useConfirm(): [boolean, (on: boolean) => void] {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const timer = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(timer);
+  }, [armed]);
+  return [armed, setArmed];
+}
+
 export function SettingsScreen({
   initialSection,
   onClose,
@@ -689,12 +706,18 @@ export function SettingsScreen({
 }: {
   initialSection?: Section;
   onClose: () => void;
-  onArrange: () => void;
+  /** Opens the arranger on a layout, which need not be the one on screen. */
+  onArrange: (layoutId: string) => void;
 }) {
   const {
     settings,
-    usePreset,
-    restoreCustom,
+    layout,
+    useLayout,
+    copyLayout,
+    renameLayout,
+    deleteLayout,
+    editArrangement,
+    importLayout,
     setTheme,
     setBudget,
     setAutoHideBar,
@@ -702,49 +725,76 @@ export function SettingsScreen({
     setAutoCheckUpdates,
     setFocus,
     setRemote,
-    setGrid,
-    toggleWidget,
-    setTileProp,
     reset,
-    importLayout,
   } = useSettings();
+  const display = useWindowShape();
+  const shape = display.shape;
   const [autostart, setAutostart] = useAutostart();
   const [section, setSection] = useState<Section>(initialSection ?? 'LAYOUT');
   const update = useTopic<UpdatePayload>('app:update');
   const [note, setNote] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useConfirm();
+  const [confirmDelete, setConfirmDelete] = useConfirm();
 
-  // Reset takes a second press within a few seconds; one stray tap on a panel
-  // across the desk should not take every setting with it.
-  const [confirmReset, setConfirmReset] = useState(false);
-  useEffect(() => {
-    if (!confirmReset) return;
-    const timer = setTimeout(() => setConfirmReset(false), 4000);
-    return () => clearTimeout(timer);
-  }, [confirmReset]);
+  // What the buttons under the cards act on. Selecting is not using: only USE
+  // changes the screen.
+  const [selectedId, setSelectedId] = useState(settings.layoutId);
+  const selected = findLayout(settings, selectedId) ?? layout;
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const select = (id: string) => {
+    setSelectedId(id);
+    setRenaming(null);
+    setConfirmDelete(false);
+  };
+  const commitRename = () => {
+    if (renaming !== null) renameLayout(selected.id, renaming);
+    setRenaming(null);
+  };
 
-  const layout = settings.layout;
-  const custom = settings.presetId === 'custom' ? layout : settings.custom;
   const label = (name: string) => name.replace(/^\w/, (c) => c.toUpperCase());
-  const mediaIndex = layout.tiles.findIndex((t) => t.widget === 'media');
-  const mediaTile = mediaIndex >= 0 ? layout.tiles[mediaIndex] : undefined;
+  const here = layout.shapes[shape];
+  const mediaIndex = here.tiles.findIndex((t) => t.widget === 'media');
+  const mediaTile = mediaIndex >= 0 ? here.tiles[mediaIndex] : undefined;
+  const editHere = (fn: Parameters<typeof editArrangement>[2]) => editArrangement(settings.layoutId, shape, fn);
 
-  const copyLayout = async () => {
+  const exportSelected = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(layout, null, 2));
-      setNote('Layout copied to the clipboard.');
+      await navigator.clipboard.writeText(JSON.stringify({ format: LAYOUT_FORMAT, ...selected }, null, 2));
+      setNote(`${selected.name} copied to the clipboard.`);
     } catch {
       setNote('Clipboard refused. Nothing was copied.');
     }
   };
 
-  const pasteLayout = async () => {
+  const importFromClipboard = async () => {
     try {
       const text = await navigator.clipboard.readText();
-      const reason = importLayout(JSON.parse(text));
-      setNote(reason ? `Rejected: ${reason}` : 'Layout imported.');
+      const result = importLayout(JSON.parse(text));
+      if (!result.ok) {
+        setNote(`Rejected: ${result.reason}`);
+        return;
+      }
+      setSelectedId(result.id);
+      setNote('Imported under Yours. USE puts it on screen.');
     } catch {
       setNote('Could not read a layout from the clipboard.');
     }
+  };
+
+  const toggleWidget = (name: string, on: boolean) => {
+    const copying = isPreset(settings.layoutId);
+    if (on) {
+      editHere((a) => withTiles(a, a.tiles.filter((t) => t.widget !== name)));
+    } else {
+      const tiles = placeTile(here, name, minSize);
+      if (!tiles) {
+        setNote(`No room for ${label(name)}. Make space with ARRANGE under Layout first.`);
+        return;
+      }
+      editHere((a) => withTiles(a, tiles));
+    }
+    if (copying) setNote(`${layout.name} is a preset, so this changed a copy of it, now under Yours and on screen.`);
+    else if (!on) setNote(`${label(name)} added. ARRANGE under Layout moves it.`);
   };
 
   return (
@@ -826,67 +876,195 @@ export function SettingsScreen({
 
           {section === 'LAYOUT' && (
             <>
-              <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16 }}>
+                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
+                  PRESETS · UPDATED WITH EACH RELEASE
+                </span>
+                <div style={{ flex: 1 }} />
+                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
+                  THIS DISPLAY
+                </span>
+                <span style={{ fontSize: 11 }}>
+                  {display.width} × {display.height} · {shape.toUpperCase()}
+                </span>
+              </div>
+              <div style={CARD_GRID}>
                 {PRESET_ORDER.map((id) => (
-                  <PresetCard
+                  <LayoutCard
                     key={id}
                     layout={PRESETS[id]}
-                    name={PRESETS[id].name.toUpperCase()}
-                    meta={`${PRESETS[id].tiles.length} TILES`}
-                    active={settings.presetId === id}
-                    onPick={() => usePreset(id)}
+                    shape={shape}
+                    inUse={settings.layoutId === id}
+                    selected={selected.id === id}
+                    onSelect={() => select(id)}
                   />
                 ))}
-                <PresetCard
-                  layout={custom}
-                  name="CUSTOM"
-                  meta={custom ? 'YOURS' : 'NONE YET'}
-                  active={settings.presetId === 'custom'}
-                  onPick={restoreCustom}
-                />
               </div>
-              <div style={{ marginTop: 20 }}>
-                <Row
-                  label="Arrange tiles"
-                  desc={
-                    settings.custom
-                      ? `Drag to move, drag a corner to resize. Changing ${layout.name} replaces the arrangement under Custom.`
-                      : 'Drag to move, drag a corner to resize. Snaps to grid cells.'
-                  }
+
+              <div style={{ marginTop: 22 }}>
+                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
+                  YOURS
+                </span>
+              </div>
+              <div style={CARD_GRID}>
+                {settings.layouts.map((l) => (
+                  <LayoutCard
+                    key={l.id}
+                    layout={l}
+                    shape={shape}
+                    inUse={settings.layoutId === l.id}
+                    selected={selected.id === l.id}
+                    onSelect={() => select(l.id)}
+                  />
+                ))}
+                <button
+                  onClick={() => {
+                    const id = copyLayout(settings.layoutId);
+                    select(id);
+                    setNote(`Copied ${layout.name}. ARRANGE changes the copy; USE puts it on screen.`);
+                  }}
+                  style={{
+                    minHeight: 132,
+                    background: 'transparent',
+                    border: '1px dashed var(--cc-line-2)',
+                    color: 'var(--cc-muted)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
                 >
-                  <button className="cc-chip cc-chip-on" style={{ padding: '8px 16px' }} onClick={onArrange}>
-                    OPEN
-                  </button>
-                </Row>
-                <Row label="Grid columns" desc="Tiles keep their proportions. More columns let you place them more finely.">
-                  <Stepper value={layout.grid.cols} lo={4} hi={24} onChange={(cols) => setGrid({ cols })} />
-                </Row>
-                <Row label="Grid rows" desc="Same, vertically.">
-                  <Stepper value={layout.grid.rows} lo={4} hi={24} onChange={(rows) => setGrid({ rows })} />
-                </Row>
-                <Row label="Tile gap" desc="Hairline gutters between tiles, in pixels.">
-                  <Seg options={[0, 1, 2, 4]} value={layout.grid.gap} onPick={(gap) => setGrid({ gap })} />
-                </Row>
+                  <span style={{ fontSize: 22, fontWeight: 200 }}>+</span>
+                  <span className="cc-mini" style={{ letterSpacing: '0.14em', color: 'var(--cc-muted)' }}>
+                    COPY THE ONE IN USE
+                  </span>
+                </button>
+              </div>
+
+              <div
+                style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                  gap: 8,
+                  marginTop: 22,
+                  paddingTop: 16,
+                  borderTop: '1px solid var(--cc-line)',
+                }}
+              >
+                {renaming !== null ? (
+                  <>
+                    <input
+                      autoFocus
+                      aria-label="Layout name"
+                      value={renaming}
+                      maxLength={40}
+                      onChange={(e) => setRenaming(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitRename();
+                        if (e.key === 'Escape') setRenaming(null);
+                      }}
+                      style={{
+                        height: 34,
+                        width: 260,
+                        padding: '0 10px',
+                        background: 'var(--cc-inset)',
+                        border: '1px solid var(--cc-accent-2)',
+                        color: 'var(--cc-text)',
+                        font: 'inherit',
+                        fontSize: 12,
+                      }}
+                    />
+                    <button className="cc-chip cc-chip-on" style={{ height: 34, padding: '0 14px' }} onClick={commitRename}>
+                      SAVE NAME
+                    </button>
+                    <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => setRenaming(null)}>
+                      CANCEL
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="cc-chip cc-chip-on"
+                      style={{ height: 34, padding: '0 14px', opacity: selected.id === settings.layoutId ? 0.5 : 1 }}
+                      disabled={selected.id === settings.layoutId}
+                      onClick={() => {
+                        useLayout(selected.id);
+                        setNote(null);
+                      }}
+                    >
+                      {selected.id === settings.layoutId ? 'IN USE' : `USE ${selected.name.toUpperCase()}`}
+                    </button>
+                    <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => onArrange(selected.id)}>
+                      ARRANGE
+                    </button>
+                    {!isPreset(selected.id) && (
+                      <button
+                        className="cc-chip"
+                        style={{ height: 34, padding: '0 14px' }}
+                        onClick={() => setRenaming(selected.name)}
+                      >
+                        RENAME
+                      </button>
+                    )}
+                    <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => void exportSelected()}>
+                      EXPORT
+                    </button>
+                    <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => void importFromClipboard()}>
+                      IMPORT
+                    </button>
+                    <div style={{ flex: 1 }} />
+                    {!isPreset(selected.id) && (
+                      <button
+                        className="cc-chip"
+                        style={{
+                          height: 34,
+                          padding: '0 14px',
+                          color: confirmDelete ? 'var(--cc-bg)' : 'var(--cc-danger)',
+                          background: confirmDelete ? 'var(--cc-danger)' : 'transparent',
+                          borderColor: 'var(--cc-danger)',
+                        }}
+                        onClick={() => {
+                          if (!confirmDelete) {
+                            setConfirmDelete(true);
+                            return;
+                          }
+                          setConfirmDelete(false);
+                          deleteLayout(selected.id);
+                          select(selected.id === settings.layoutId ? 'stage' : settings.layoutId);
+                          setNote(`${selected.name} deleted.`);
+                        }}
+                      >
+                        {confirmDelete ? 'PRESS AGAIN TO DELETE' : 'DELETE'}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="cc-mini" style={{ marginTop: 10, lineHeight: 1.6 }}>
+                Presets cannot be changed: arranging one saves a copy under Yours. Each layout has an arrangement for
+                landscape, bar and portrait displays, and Kehai shows the one that fits its window. Export copies the
+                selected layout to the clipboard; Import adds one from it.
               </div>
             </>
           )}
 
           {section === 'WIDGETS' && (
             <div style={{ marginTop: 18 }}>
+              <div className="cc-mini" style={{ marginBottom: 6, lineHeight: 1.6 }}>
+                For the {shape} arrangement of {layout.name}, the one on screen.
+                {isPreset(settings.layoutId) ? ' It is a preset, so a change saves a copy under Yours.' : ''}
+              </div>
               {widgetNames.map((name) => {
-                const on = layout.tiles.some((t) => t.widget === name);
+                const on = here.tiles.some((t) => t.widget === name);
                 return (
                   <Row key={name} label={label(name)} desc={registry[name].topics.join(' · ')}>
                     <Seg
                       options={['OFF', 'ON']}
                       value={on ? 'ON' : 'OFF'}
                       onPick={(v) => {
-                        if ((v === 'ON') === on) return;
-                        if (!toggleWidget(name, minSize)) {
-                          setNote(`No room for ${label(name)}. Make space in Layout → Arrange tiles first.`);
-                        } else if (!on) {
-                          setNote(`${label(name)} added. Layout → Arrange tiles moves it.`);
-                        }
+                        if ((v === 'ON') !== on) toggleWidget(name, on);
                       }}
                     />
                   </Row>
@@ -899,14 +1077,14 @@ export function SettingsScreen({
                     <Seg
                       options={['OFF', 'ON']}
                       value={mediaTile.props?.art === false ? 'OFF' : 'ON'}
-                      onPick={(v) => setTileProp(mediaIndex, 'art', v === 'ON')}
+                      onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'art', v === 'ON'))}
                     />
                   </Row>
                   <Row label="Equaliser" desc="A horizontal bar that freezes when playback pauses.">
                     <Seg
                       options={['off', 'bar']}
                       value={mediaTile.props?.equaliser === 'off' ? 'off' : 'bar'}
-                      onPick={(v) => setTileProp(mediaIndex, 'equaliser', v)}
+                      onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'equaliser', v))}
                     />
                   </Row>
                 </>
@@ -923,7 +1101,7 @@ export function SettingsScreen({
                   style={{
                     flex: 1,
                     background: 'var(--cc-pane)',
-                    border: `1px solid ${layout.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
+                    border: `1px solid ${settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
                     padding: 10,
                     display: 'flex',
                     flexDirection: 'column',
@@ -939,7 +1117,7 @@ export function SettingsScreen({
                     style={{
                       fontSize: 10,
                       letterSpacing: '0.14em',
-                      color: layout.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-muted)',
+                      color: settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-muted)',
                     }}
                   >
                     {t.name}
@@ -1061,19 +1239,9 @@ export function SettingsScreen({
                   onPick={(v) => setBudget(v === 0 ? null : v * 1_000_000)}
                 />
               </Row>
-              <Row label="Export layout" desc="Copies the current arrangement as JSON you can keep or share.">
-                <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => void copyLayout()}>
-                  COPY
-                </button>
-              </Row>
-              <Row label="Import layout" desc="Reads an arrangement from the clipboard. It becomes your custom arrangement.">
-                <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => void pasteLayout()}>
-                  PASTE
-                </button>
-              </Row>
               <Row
                 label="Reset everything"
-                desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no custom arrangement, no remote panel."
+                desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no layouts of your own, no remote panel."
               >
                 <button
                   className="cc-chip"

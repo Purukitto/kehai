@@ -19,12 +19,34 @@ export interface Tile {
 
 export type ThemeId = 'amber' | 'phosphor' | 'ice';
 
+/**
+ * The display shapes a layout is drawn for: anything from square to 2.4 : 1,
+ * anything wider, and anything taller than it is wide. Kehai picks one from
+ * the shape of its window.
+ */
+export type Shape = 'landscape' | 'bar' | 'portrait';
+
+export interface GridSize {
+  cols: number;
+  rows: number;
+  gap: number;
+}
+
+/** Where the tiles sit on one shape of display. */
+export interface Arrangement {
+  grid: GridSize;
+  tiles: Tile[];
+}
+
+/**
+ * One arrangement per shape, so the same layout reads well on a 16:10 panel,
+ * a bar display and a tablet on its side instead of being stretched to fit.
+ * The theme is not part of a layout: changing layout never changes colours.
+ */
 export interface Layout {
   id: string;
   name: string;
-  theme: ThemeId;
-  grid: { cols: number; rows: number; gap: number };
-  tiles: Tile[];
+  shapes: Record<Shape, Arrangement>;
 }
 
 export interface WidgetProps {
