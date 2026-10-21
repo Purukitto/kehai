@@ -1,7 +1,7 @@
 <h1 align="center">Kehai</h1>
 
 <p align="center">
-  <em>気配 — the sense that something is present, registered without looking at it directly.</em>
+  <em>気配 — the sense that something is present, without having to looking at it directly.</em>
 </p>
 
 <p align="center">
