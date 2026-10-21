@@ -1,5 +1,6 @@
 import { bus } from './bus';
 import type {
+  AgentsPayload,
   ArtPayload,
   ClockPayload,
   CpuPayload,
@@ -166,6 +167,29 @@ export function startMockSource(options: MockOptions = {}): () => void {
       budgetTokens: null,
     });
   };
+
+  // One session per state, in the order the engine sorts them. The last one
+  // goes back and forth between working and a tool call, so both can be seen
+  // changing without the engine.
+  const started = Date.now();
+  let busyFlip = false;
+  const pubAgents = () => {
+    busyFlip = !busyFlip;
+    const now = Date.now();
+    pub<AgentsPayload>('dev:agents', 'mock.agents', {
+      available: true,
+      reason: null,
+      sessions: [
+        { id: 'm1', project: 'kehai', worktree: 'agent-sessions', state: 'waiting', sinceMs: started - 192_000, subagents: 0 },
+        { id: 'm2', project: 'api-gateway', worktree: null, state: 'tool', sinceMs: started - 38_000, subagents: 2 },
+        busyFlip
+          ? { id: 'm3', project: 'dotfiles', worktree: null, state: 'working', sinceMs: started - 251_000, subagents: 0 }
+          : { id: 'm3', project: 'dotfiles', worktree: null, state: 'tool', sinceMs: now, subagents: 0 },
+      ],
+    });
+  };
+  pubAgents();
+  timers.push(window.setInterval(pubAgents, 20_000));
 
   // media:command is the one topic the UI publishes. The engine owns the side
   // effect; here we reflect it back so the transport feels connected.

@@ -54,10 +54,20 @@
       }
     },
     {
-      "widget": "notify",
+      "widget": "agents",
       "area": [
         7,
         6,
+        12,
+        9
+      ],
+      "props": {}
+    },
+    {
+      "widget": "notify",
+      "area": [
+        7,
+        9,
         12,
         13
       ],
@@ -75,7 +85,8 @@
         "show": [
           "cpu",
           "mem",
-          "net"
+          "net",
+          "agents"
         ]
       }
     }

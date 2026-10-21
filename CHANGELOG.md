@@ -9,6 +9,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- An **Agents** tile shows which coding-agent sessions are working and which are
+  waiting on you, and for how long. Stage has an Agents tab, and the vitals strip can
+  count the ones waiting. It reads the same local transcripts as token usage, never
+  what you or the agent wrote.
+
+### Changed
+
+- Panel has an Agents tile beside the notifications, and Stage counts waiting agents
+  in its corner. A preset you have not rearranged picks up changes like these by
+  itself, and keeps your theme.
+
 ## [0.2.0] - 2026-10-21
 
 The first published release. 0.1.0 never left draft, so everything it lists is in

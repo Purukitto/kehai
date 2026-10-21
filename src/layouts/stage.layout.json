@@ -19,6 +19,7 @@
       "props": {
         "tabs": [
           "quota",
+          "agents",
           "machine",
           "sprint"
         ]
@@ -62,7 +63,8 @@
         "show": [
           "cpu",
           "mem",
-          "unread"
+          "unread",
+          "agents"
         ]
       }
     }

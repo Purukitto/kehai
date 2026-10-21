@@ -26,8 +26,7 @@ bun run tauri:dev
 
 ## Before you open a pull request
 
-There is no test suite. These four commands are what CI runs, and they are the whole
-gate:
+These five commands are what CI runs, and they are the whole gate:
 
 ```bash
 bun run typecheck
@@ -42,11 +41,19 @@ cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 ```
 
 ```bash
+cargo test --manifest-path src-tauri/Cargo.toml
+```
+
+```bash
 bun run build
 ```
 
 `tsc` runs with `noUnusedLocals`, `noUnusedParameters` and `noFallthroughCasesInSwitch`,
 so it catches more than you might expect. Clippy is enforced at `-D warnings`.
+
+The tests are few, and live beside the code they check: the engine's parsing of
+transcripts, where a format nobody documents has to be read right. A poller that
+parses something similar deserves the same. The front end has none.
 
 Keep pull requests to one thing. If a change touches both a poller and a widget, that
 is fine — that is one thing — but a refactor bundled with a feature is two.

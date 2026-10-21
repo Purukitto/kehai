@@ -11,6 +11,7 @@
 - [ ] `bun run typecheck`
 - [ ] `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
 - [ ] `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
+- [ ] `cargo test --manifest-path src-tauri/Cargo.toml`
 - [ ] `bun run build`
 - [ ] A change people will notice has a line under `## [Unreleased]` in `CHANGELOG.md`
 

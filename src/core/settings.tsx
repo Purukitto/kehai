@@ -122,9 +122,15 @@ function load(): Settings {
       return defaults();
     }
 
+    // An arrangement nobody has edited follows its preset as shipped, so a
+    // release that adds to Stage reaches the people using Stage. Only the
+    // theme is theirs: picking one is not an edit.
+    const presetId = typeof parsed.presetId === 'string' ? parsed.presetId : 'custom';
+    const shipped = PRESETS[presetId];
+
     return {
-      presetId: typeof parsed.presetId === 'string' ? parsed.presetId : 'custom',
-      layout: layout.layout,
+      presetId,
+      layout: shipped ? { ...shipped, theme: layout.layout.theme } : layout.layout,
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
       transcriptRoot: folder(parsed.transcriptRoot),

@@ -101,6 +101,9 @@ jobs:
       - name: Clippy
         run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
 
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
   engine-stubs:
     name: Engine (non-Windows stubs)
     # The Linux media and notification sources only compile here, as do the

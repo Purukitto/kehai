@@ -3,8 +3,9 @@ import type { ReactNode } from 'react';
 import { compact, mmss, sparkPath } from '../core/format';
 import { useSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
-import type { CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
+import type { AgentsPayload, CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
 import type { WidgetProps, WidgetSpec } from '../core/types';
+import { AgentRow, agentSentence, useNow, waitingOnYou } from './Agents';
 import { Meter } from './chrome';
 import { blockEnds, budgetPct, budgetStatus, totalTokens } from './Quota';
 import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } from './Sprint';
@@ -24,21 +25,24 @@ interface Hero {
 }
 
 function Stage({ props }: WidgetProps) {
-  const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'machine', 'sprint']).filter(Boolean);
+  const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'agents', 'machine', 'sprint']).filter(Boolean);
   const [picked, setPicked] = useState(tabs[0] ?? 'quota');
   const { settings } = useSettings();
 
   const quota = useTopic<QuotaPayload>('dev:llm_tokens');
+  const agents = useTopic<AgentsPayload>('dev:agents');
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
   const mem = useTopic<MemPayload>('telemetry:mem');
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
+  const now = useNow();
 
   // A tab whose source has said it cannot report is dropped rather than left
   // as a dead end in the hero tile. Only an explicit refusal counts: a topic
   // that has not published yet is still on its way, and hiding it would empty
   // the strip for the first seconds after launch. Derived rather than synced
   // into state, so the tab comes back by itself if its source turns up.
-  const noSource = (t: string) => t === 'quota' && quota?.available === false;
+  const noSource = (t: string) =>
+    (t === 'quota' && quota?.available === false) || (t === 'agents' && agents?.available === false);
   const visible = tabs.filter((t) => !noSource(t));
   const shown = visible.length > 0 ? visible : tabs;
   const tab = shown.includes(picked) ? picked : (shown[0] ?? 'quota');
@@ -68,6 +72,29 @@ function Stage({ props }: WidgetProps) {
       series: quota.history,
       axisA: '-' + quota.windowHours + 'H',
       axisB: 'NOW',
+    };
+  } else if (tab === 'agents' && agents?.available) {
+    const waiting = waitingOnYou(agents);
+    const total = agents.sessions.length;
+    const top = agents.sessions[0];
+    hero = {
+      label: 'AGENTS / ' + total + (total === 1 ? ' SESSION' : ' SESSIONS') + ' IN THE LAST HOUR',
+      value: String(waiting),
+      status: waiting > 0 ? 'WAITING ON YOU' : total > 0 ? 'ALL AT WORK' : 'IDLE',
+      sub: top ? agentSentence(top, now) : 'No session has written anything in the last hour.',
+      meter: total > 0 ? (waiting / total) * 100 : 0,
+      // An error outranks a finished reply: both are yours, one is bad news.
+      color: top?.state === 'error' ? 'var(--cc-danger)' : waiting > 0 ? 'var(--cc-accent)' : 'var(--cc-muted)',
+      series: [],
+      axisA: '',
+      axisB: '',
+      controls: (
+        <div style={{ borderTop: '1px solid var(--cc-line)' }}>
+          {agents.sessions.slice(0, 3).map((session) => (
+            <AgentRow key={session.id} session={session} now={now} />
+          ))}
+        </div>
+      ),
     };
   } else if (tab === 'machine' && cpu) {
     hero = {
@@ -197,6 +224,6 @@ function Stage({ props }: WidgetProps) {
 
 export const stageSpec: WidgetSpec = {
   min: [6, 4],
-  topics: ['dev:llm_tokens', 'telemetry:cpu', 'telemetry:mem', 'flow:pomodoro'],
+  topics: ['dev:llm_tokens', 'dev:agents', 'telemetry:cpu', 'telemetry:mem', 'flow:pomodoro'],
   component: Stage,
 };
