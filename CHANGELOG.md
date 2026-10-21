@@ -33,6 +33,7 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
   from the largest tile, instead of landing on top of other tiles.
 - **Remove** in the tile arranger removes the selected tile, not every tile of that kind.
 - **Reset everything** asks for a second press before it resets.
+- The clock shrinks to fit a narrow tile instead of being cut off.
 
 ## [0.2.0] - 2026-10-21
 

@@ -11,12 +11,19 @@ function Clock({ props }: WidgetProps) {
   const hero = props.size === 'hero';
   const { time, date } = clockParts(tick ? new Date(tick.iso) : new Date(), seconds);
 
+  // Height sets the size; width caps it, so a narrow tile gets a smaller clock
+  // rather than one cut off at the edge. Mono digits advance 0.6em each.
+  const pad = hero ? 40 : 20;
+  const [floor, byHeight, ceiling] = hero ? [48, size.h * 0.42, 208] : [24, size.h * 0.34, 72];
+  const byWidth = size.w > 0 ? (size.w - pad * 2) / (time.length * 0.6) : Infinity;
+  const fontSize = Math.max(12, Math.round(Math.min(Math.max(floor, byHeight), ceiling, byWidth)));
+
   return (
     <div
       style={{
         flex: 1,
         background: 'var(--cc-pane)',
-        padding: hero ? 40 : 20,
+        padding: pad,
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -26,12 +33,11 @@ function Clock({ props }: WidgetProps) {
     >
       <span
         style={{
-          fontSize: hero
-            ? `clamp(48px, ${Math.max(40, Math.round(size.h * 0.42))}px, 208px)`
-            : `clamp(24px, ${Math.max(20, Math.round(size.h * 0.34))}px, 72px)`,
+          fontSize,
           fontWeight: hero ? 100 : 200,
           lineHeight: 0.92,
           letterSpacing: '-0.04em',
+          whiteSpace: 'nowrap',
         }}
       >
         {time}
@@ -43,6 +49,9 @@ function Clock({ props }: WidgetProps) {
           letterSpacing: '0.2em',
           color: 'var(--cc-muted)',
           marginTop: hero ? 24 : 10,
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
         }}
       >
         {date}
