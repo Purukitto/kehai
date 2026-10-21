@@ -1,3 +1,4 @@
+pub mod agents;
 pub mod cpu;
 pub mod disk;
 pub mod flow;
@@ -19,6 +20,7 @@ pub fn spawn_all(app: AppHandle) {
     disk::spawn(app.clone());
     flow::spawn(app.clone());
     quota::spawn(app.clone());
+    agents::spawn(app.clone());
     media::spawn(app.clone());
     update::spawn(app.clone());
     notify::spawn(app);

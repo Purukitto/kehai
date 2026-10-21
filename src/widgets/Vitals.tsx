@@ -2,8 +2,9 @@ import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import { rate } from '../core/format';
-import type { CpuPayload, MemPayload, NetPayload, NotifyPayload } from '../core/payloads';
+import type { AgentsPayload, CpuPayload, MemPayload, NetPayload, NotifyPayload } from '../core/payloads';
 import type { WidgetProps, WidgetSpec } from '../core/types';
+import { agentSummary, waitingOnYou } from './Agents';
 
 /** Below this the rows lay out along one line instead of stacking. */
 const ROW_BELOW = 110;
@@ -14,6 +15,7 @@ function Vitals({ props }: WidgetProps) {
   const mem = useTopic<MemPayload>('telemetry:mem');
   const net = useTopic<NetPayload>('telemetry:net');
   const notify = useTopic<NotifyPayload>('sys:notify');
+  const agents = useTopic<AgentsPayload>('dev:agents');
   const show = (props.show as string[] | undefined) ?? ['cpu', 'mem', 'unread'];
 
   const inline = useBreakpoint(size.h, ROW_BELOW);
@@ -28,6 +30,12 @@ function Vitals({ props }: WidgetProps) {
     mem: mem ? mem.usedGib.toFixed(1) + 'G' : '--',
     net: net ? rate(net.rxBytesPerSec) : '--',
     unread,
+    agents: !agents ? '--' : agents.available ? agentSummary(agents).text : 'N/A',
+  };
+
+  const lit: Record<string, boolean> = {
+    unread: counting,
+    agents: agents?.available === true && waitingOnYou(agents) > 0,
   };
 
   return (
@@ -66,7 +74,11 @@ function Vitals({ props }: WidgetProps) {
             style={{
               fontSize: inline ? 15 : 18,
               whiteSpace: 'nowrap',
-              color: key === 'unread' && counting ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
+              color: !lit[key]
+                ? 'var(--cc-muted)'
+                : key === 'agents'
+                  ? 'var(--cc-accent)'
+                  : 'var(--cc-accent-2)',
             }}
           >
             {values[key] ?? '--'}
@@ -79,6 +91,6 @@ function Vitals({ props }: WidgetProps) {
 
 export const vitalsSpec: WidgetSpec = {
   min: [2, 1],
-  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'sys:notify'],
+  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'sys:notify', 'dev:agents'],
   component: Vitals,
 };

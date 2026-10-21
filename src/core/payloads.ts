@@ -82,6 +82,42 @@ export interface QuotaCommand {
   path: string | null;
 }
 
+/**
+ * Worked out from how each transcript ends. `tool` is a call that has not
+ * returned, which is also all a permission prompt looks like — nothing is
+ * written until it is answered — so nothing claims to know it is one.
+ */
+export type AgentState = 'error' | 'waiting' | 'tool' | 'working';
+
+/** Mirrors `AgentSession` in `agents.rs`. */
+export interface AgentSession {
+  /** The transcript's name, which is the session's id. */
+  id: string;
+  /** The folder the agent works in, or the repository a worktree belongs to. */
+  project: string;
+  worktree: string | null;
+  state: AgentState;
+  /**
+   * When it entered `state`: the prompt that started the turn, the oldest tool
+   * call still unanswered, or the line that stopped it.
+   */
+  sinceMs: number;
+  /** Sub-agents it started that are still at work. */
+  subagents: number;
+}
+
+/** Engine → renderer on `dev:agents`. Mirrors `AgentsPayload` in `agents.rs`. */
+export interface AgentsPayload {
+  /** False when there is nothing to read — not the same as no sessions. */
+  available: boolean;
+  reason: string | null;
+  /**
+   * Sessions written to in the last hour, the ones waiting on you first and
+   * longest-waiting first within each state.
+   */
+  sessions: AgentSession[];
+}
+
 export interface MediaPayload {
   playing: boolean;
   title: string;

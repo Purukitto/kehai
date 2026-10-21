@@ -244,7 +244,7 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
 /**
  * Committed on Enter or when focus leaves, not per keystroke: each commit makes
  * the engine re-read the folder, and a half-typed path is a folder that does
- * not exist. Whether the folder worked shows on the Agent tokens row above.
+ * not exist. Whether the folder worked shows on the two agent rows above.
  */
 function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit: (path: string | null) => void }) {
   const [draft, setDraft] = useState(value ?? '');
@@ -256,8 +256,8 @@ function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit
     if (next !== value) onCommit(next);
   };
 
-  // Laid out as a SourceRow with no dot, so it reads as part of Agent tokens
-  // rather than as a separate source.
+  // Laid out as a SourceRow with no dot, so it reads as part of the agent rows
+  // above, which both read this folder, rather than as a separate source.
   return (
     <div
       style={{
@@ -981,6 +981,11 @@ export function SettingsScreen({
               />
               {!REMOTE_PANEL && <FocusRows focus={settings.focus} onChange={setFocus} />}
               <SourceRow label="Agent tokens" topic="dev:llm_tokens" desc="Tallied from local session transcripts. Never leaves the machine." />
+              <SourceRow
+                label="Agent sessions"
+                topic="dev:agents"
+                desc="Which sessions are working and which wait on you, from the same transcripts."
+              />
               {!REMOTE_PANEL && <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />}
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />
               <SourceRow label="Notifications" topic="sys:notify" desc="Intercepted from the system tray." />

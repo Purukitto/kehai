@@ -1,4 +1,5 @@
 import type { WidgetSpec } from '../core/types';
+import { agentsSpec } from './Agents';
 import { clockSpec } from './Clock';
 import { notifySpec } from './NotificationSink';
 import { mediaSpec } from './NowPlaying';
@@ -14,6 +15,7 @@ import { vitalsSpec } from './Vitals';
  * renders a placeholder rather than crashing the panel.
  */
 export const registry: Record<string, WidgetSpec> = {
+  agents: agentsSpec,
   clock: clockSpec,
   media: mediaSpec,
   notify: notifySpec,

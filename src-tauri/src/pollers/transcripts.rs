@@ -129,6 +129,19 @@ impl<T: Default> Transcripts<T> {
         true
     }
 
+    /// Reads on in the transcripts already followed, without walking the
+    /// folder for new ones. Far cheaper than `collect`, for catching up
+    /// between walks.
+    pub fn refresh(&mut self, mut on_line: impl FnMut(&mut T, &str)) {
+        for (path, tail) in &mut self.files {
+            let Ok(meta) = fs::metadata(path) else {
+                continue;
+            };
+            tail.modified_ms = modified_ms(&meta);
+            follow(path, meta.len(), tail, &mut on_line);
+        }
+    }
+
     pub fn files(&self) -> impl Iterator<Item = (&Path, &Tail<T>)> {
         self.files.iter().map(|(path, tail)| (path.as_path(), tail))
     }

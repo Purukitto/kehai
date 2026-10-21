@@ -5,9 +5,9 @@
 </p>
 
 <p align="center">
-  A companion dashboard for a secondary display. System telemetry, agent token usage,
-  media and notifications, in a terminal-inspired panel you read out of the corner of
-  your eye.
+  A companion dashboard for a secondary display. System telemetry, coding agents and
+  their token usage, media and notifications, in a terminal-inspired panel you read out
+  of the corner of your eye.
 </p>
 
 <p align="center">
@@ -89,9 +89,10 @@ write the layout as JSON if you want to commit or share one.
 
 | Key | Widget | Reads |
 | --- | --- | --- |
-| `stage` | Hero readout with a tab strip | tokens, CPU, memory, timer |
+| `stage` | Hero readout with a tab strip | tokens, agents, CPU, memory, timer |
 | `telemetry` | CPU history, memory, network, volumes | all four telemetry topics |
-| `vitals` | Compact CPU / memory / network strip | CPU, memory, network |
+| `vitals` | Compact strip of CPU, memory, network, unread and agents | CPU, memory, network, notifications, agents |
+| `agents` | Which agent sessions are working and which are waiting on you | `dev:agents` |
 | `quota` | Agent token usage in the current 5-hour block | `dev:llm_tokens` |
 | `media` | Now playing, transport and cover art | `media:now_playing`, `media:art` |
 | `notify` | System notification feed, dismissable | `sys:notify` |
@@ -107,6 +108,7 @@ write the layout as JSON if you want to commit or share one.
 | Media session and transport | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
 | Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |
 | Agent token usage | optional — needs local agent transcripts | same | same |
+| Agent sessions | optional — the same transcripts | same | same |
 | Focus timer | kept by the engine | same | same |
 
 Where a source is unavailable the widget says so, and Settings → Sources shows it as
@@ -185,7 +187,7 @@ It listens for nothing unless you turn on **Settings → Remote**. Then it accep
 connections on one port from your network, and shows the panel's data only to a
 device holding the key.
 
-Two sources are worth stating plainly:
+Three sources are worth stating plainly:
 
 - **Notifications.** On Windows the app registers as a notification listener, which
   means it can read the title and body of toasts from any app. Windows prompts for this
@@ -206,6 +208,17 @@ Two sources are worth stating plainly:
   one closed, on the hour before it, and the widget shows when it resets. The provider
   does not publish how its window works, so that time is an estimate worked out from
   the transcripts, the same way other local usage tools do it.
+- **Agent sessions.** The agents widget reads the same transcripts for how each one
+  ends: whether the last reply finished, which tool calls are still open, when, and the
+  folder the session works in. It does not parse or keep what you or the model wrote.
+  To tell a reply that finished from a turn you cut short or a command that never
+  reached the model, it matches a few fixed markers the agent itself writes in your
+  place, such as the note it leaves when you interrupt it. The folder's name is shown
+  on the panel, and on a remote panel too.
+
+  A tool call that has not returned shows as **TOOL**. That is also all a permission
+  prompt looks like, because nothing is written until it is answered, so Kehai lights
+  one that has been open for half a minute but never claims it is waiting on you.
 
 ## Building from source
 
@@ -268,7 +281,7 @@ against a release build.
 flowchart LR
     subgraph engine["Integration engine — Rust"]
         direction TB
-        P["cpu · mem · net · disk · flow<br/>quota · media · notify · update<br/><i>one thread each</i>"]
+        P["cpu · mem · net · disk · flow<br/>quota · agents · media · notify · update<br/><i>one thread each</i>"]
     end
 
     BUS[["Envelope bus<br/><i>last value retained per topic</i>"]]
@@ -326,6 +339,7 @@ only while the host allows control; the engine checks every one again.
 | `src/styles/tokens.css` | Thirteen custom properties per theme |
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
 | `src-tauri/src/pollers/` | One thread per source |
+| `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/remote.rs` | Serves the panel, the bus and the API to other machines |
 | `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |

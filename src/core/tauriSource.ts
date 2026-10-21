@@ -26,6 +26,7 @@ export const ENGINE_TOPICS = [
   'telemetry:disk',
   'flow:pomodoro',
   'dev:llm_tokens',
+  'dev:agents',
   'media:now_playing',
   'media:art',
   'sys:notify',
