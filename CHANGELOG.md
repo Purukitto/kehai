@@ -22,6 +22,19 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
   in its corner. A preset you have not rearranged picks up changes like these by
   itself, and keeps your theme.
 
+### Fixed
+
+- Changing the grid's columns or rows could make Kehai forget every setting the next
+  time it started. Tiles now keep their proportions when the grid changes, and a
+  layout that cannot be read costs only the layout.
+- Picking a preset no longer throws away your own arrangement or changes your theme.
+  **Custom** brings the arrangement back.
+- A widget turned on in **Settings → Widgets** goes into free space, or takes a strip
+  from the largest tile, instead of landing on top of other tiles.
+- **Remove** in the tile arranger removes the selected tile, not every tile of that kind.
+- **Reset everything** asks for a second press before it resets.
+- The clock shrinks to fit a narrow tile instead of being cut off.
+
 ## [0.2.0] - 2026-10-21
 
 The first published release. 0.1.0 never left draft, so everything it lists is in

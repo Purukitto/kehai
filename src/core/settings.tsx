@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { parseLayout, safeParseLayout } from './layout';
+import { isThemeId, parseLayout, placeTile, regrid, safeParseLayout } from './layout';
 import type { Area, Layout, ThemeId, Tile } from './types';
 import ambient from '../layouts/ambient.layout.json';
 import panel from '../layouts/panel.layout.json';
@@ -18,6 +18,12 @@ export interface Settings {
   /** The preset this came from, or 'custom' once the layout is edited. */
   presetId: string;
   layout: Layout;
+  /**
+   * The last edited arrangement, kept while a preset is on screen so that
+   * looking at a preset does not throw it away. Null while the arrangement on
+   * screen is the custom one, or when there has never been one.
+   */
+  custom: Layout | null;
   /**
    * Token budget for the quota widget. No local source exposes the real plan
    * limit, so a percentage only exists once you decide what to measure against.
@@ -74,6 +80,7 @@ function defaults(): Settings {
   return {
     presetId: 'stage',
     layout: PRESETS.stage,
+    custom: null,
     budgetTokens: null,
     autoHideBar: false,
     transcriptRoot: null,
@@ -116,21 +123,27 @@ function load(): Settings {
     if (!raw) return defaults();
 
     const parsed = JSON.parse(raw) as Partial<Settings>;
-    const layout = safeParseLayout(parsed.layout);
-    if (!layout.ok) {
-      console.warn('stored layout rejected, falling back to Stage:', layout.reason);
-      return defaults();
-    }
+    const stored = safeParseLayout(parsed.layout);
+    const storedId = typeof parsed.presetId === 'string' ? parsed.presetId : 'custom';
+    const custom = safeParseLayout(parsed.custom);
 
     // An arrangement nobody has edited follows its preset as shipped, so a
     // release that adds to Stage reaches the people using Stage. Only the
     // theme is theirs: picking one is not an edit.
-    const presetId = typeof parsed.presetId === 'string' ? parsed.presetId : 'custom';
-    const shipped = PRESETS[presetId];
+    //
+    // A layout that will not parse costs only the layout. Throwing every other
+    // setting away with it is how a grid change once wiped a budget, focus
+    // lengths and the remote panel along with the arrangement.
+    const presetId = stored.ok || PRESETS[storedId] ? storedId : 'stage';
+    const shipped: Layout | undefined = PRESETS[presetId];
+    if (!stored.ok) console.warn(`stored layout rejected, showing ${presetId} instead:`, stored.reason);
+    const storedTheme = (parsed.layout as Partial<Layout> | undefined)?.theme;
+    const theme = stored.ok ? stored.layout.theme : isThemeId(storedTheme) ? storedTheme : PRESETS.stage.theme;
 
     return {
       presetId,
-      layout: shipped ? { ...shipped, theme: layout.layout.theme } : layout.layout,
+      layout: shipped ? { ...shipped, theme } : stored.ok ? stored.layout : PRESETS.stage,
+      custom: custom.ok ? custom.layout : null,
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
       transcriptRoot: folder(parsed.transcriptRoot),
@@ -146,6 +159,8 @@ function load(): Settings {
 interface Store {
   settings: Settings;
   usePreset: (id: string) => void;
+  /** Puts the kept custom arrangement back on screen. */
+  restoreCustom: () => void;
   setTheme: (theme: ThemeId) => void;
   setBudget: (tokens: number | null) => void;
   setAutoHideBar: (on: boolean) => void;
@@ -156,7 +171,13 @@ interface Store {
   setTiles: (tiles: Tile[]) => void;
   setTileArea: (index: number, area: Area) => void;
   setTileProp: (index: number, key: string, value: unknown) => void;
-  toggleWidget: (widget: string) => void;
+  /**
+   * Adds the widget where there is room, or removes every tile of it. False
+   * when there was no room to add it. `minOf` is the registry's minimum sizes,
+   * passed in because the registry's widgets read this store.
+   */
+  toggleWidget: (widget: string, minOf: (widget: string) => [number, number]) => boolean;
+  removeTile: (index: number) => void;
   setGrid: (grid: Partial<Layout['grid']>) => void;
   reset: () => void;
   importLayout: (raw: unknown) => string | null;
@@ -168,13 +189,6 @@ export function useSettings(): Store {
   const store = useContext(SettingsContext);
   if (!store) throw new Error('useSettings used outside SettingsProvider');
   return store;
-}
-
-/** A widget added from settings lands here until it is dragged somewhere. */
-function defaultArea(layout: Layout): Area {
-  const rows = layout.grid.rows;
-  const cols = layout.grid.cols;
-  return [Math.max(1, rows - 3), 1, Math.max(2, rows - 1), Math.min(cols + 1, 5)];
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
@@ -189,18 +203,35 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
   }, [settings]);
 
+  // An edit makes what is on screen the custom arrangement, so any kept one is
+  // replaced; Settings says so before you start.
   const editLayout = useCallback((fn: (layout: Layout) => Layout) => {
-    setSettings((prev) => ({ ...prev, presetId: 'custom', layout: fn(prev.layout) }));
+    setSettings((prev) => ({ ...prev, presetId: 'custom', layout: fn(prev.layout), custom: null }));
   }, []);
 
   const store = useMemo<Store>(
     () => ({
       settings,
 
+      // The theme is not part of what a preset decides, and an arrangement
+      // you made is kept rather than replaced.
       usePreset: (id) => {
         const preset = PRESETS[id];
-        if (preset) setSettings((prev) => ({ ...prev, presetId: id, layout: preset }));
+        if (!preset) return;
+        setSettings((prev) => ({
+          ...prev,
+          presetId: id,
+          layout: { ...preset, theme: prev.layout.theme },
+          custom: prev.presetId === 'custom' ? prev.layout : prev.custom,
+        }));
       },
+
+      restoreCustom: () =>
+        setSettings((prev) =>
+          prev.custom
+            ? { ...prev, presetId: 'custom', layout: { ...prev.custom, theme: prev.layout.theme }, custom: null }
+            : prev
+        ),
 
       setTheme: (theme) =>
         setSettings((prev) => ({ ...prev, layout: { ...prev.layout, theme } })),
@@ -233,24 +264,34 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           ),
         })),
 
-      toggleWidget: (widget) =>
-        editLayout((layout) => {
-          const present = layout.tiles.some((t) => t.widget === widget);
-          if (present) {
-            return { ...layout, tiles: layout.tiles.filter((t) => t.widget !== widget) };
-          }
-          return { ...layout, tiles: [...layout.tiles, { widget, area: defaultArea(layout), props: {} }] };
-        }),
+      toggleWidget: (widget, minOf) => {
+        if (settings.layout.tiles.some((t) => t.widget === widget)) {
+          editLayout((layout) => ({ ...layout, tiles: layout.tiles.filter((t) => t.widget !== widget) }));
+          return true;
+        }
+        const tiles = placeTile(settings.layout, widget, minOf);
+        if (!tiles) return false;
+        editLayout((layout) => ({ ...layout, tiles }));
+        return true;
+      },
+
+      removeTile: (index) =>
+        editLayout((layout) => ({ ...layout, tiles: layout.tiles.filter((_, i) => i !== index) })),
 
       setGrid: (grid) =>
-        editLayout((layout) => ({ ...layout, grid: { ...layout.grid, ...grid } })),
+        editLayout((layout) => {
+          const cols = grid.cols ?? layout.grid.cols;
+          const rows = grid.rows ?? layout.grid.rows;
+          const fitted = cols === layout.grid.cols && rows === layout.grid.rows ? layout : regrid(layout, cols, rows);
+          return { ...fitted, grid: { ...fitted.grid, ...grid } };
+        }),
 
       reset: () => setSettings(defaults()),
 
       importLayout: (raw) => {
         const result = safeParseLayout(raw);
         if (!result.ok) return result.reason;
-        setSettings((prev) => ({ ...prev, presetId: 'custom', layout: result.layout }));
+        setSettings((prev) => ({ ...prev, presetId: 'custom', layout: result.layout, custom: null }));
         return null;
       },
     }),

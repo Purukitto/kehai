@@ -27,3 +27,6 @@ export const registry: Record<string, WidgetSpec> = {
 };
 
 export const widgetNames = Object.keys(registry).sort();
+
+/** A widget's minimum size in cells, [cols, rows]; one cell for one nobody knows. */
+export const minSize = (widget: string): [number, number] => registry[widget]?.min ?? [1, 1];

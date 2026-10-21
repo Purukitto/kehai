@@ -6,7 +6,7 @@ import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
 import type { FocusSettings, RemoteSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
 import type { Layout, ThemeId } from '../core/types';
-import { registry, widgetNames } from '../widgets/registry';
+import { minSize, registry, widgetNames } from '../widgets/registry';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
 export type Section = (typeof NAV)[number];
@@ -156,15 +156,18 @@ function PresetCard({
   active,
   onPick,
 }: {
-  layout: Layout;
+  /** Null draws an empty frame: there is nothing to pick yet. */
+  layout: Layout | null;
   name: string;
   meta: string;
   active: boolean;
   onPick: () => void;
 }) {
+  const grid = layout?.grid ?? { cols: 12, rows: 12 };
   return (
     <button
       onClick={onPick}
+      disabled={!layout}
       style={{
         flex: 1,
         background: 'var(--cc-pane)',
@@ -174,6 +177,7 @@ function PresetCard({
         flexDirection: 'column',
         gap: 9,
         minWidth: 0,
+        cursor: layout ? 'pointer' : 'default',
       }}
     >
       <div
@@ -182,13 +186,13 @@ function PresetCard({
           width: '100%',
           background: 'var(--cc-inset)',
           display: 'grid',
-          gridTemplateColumns: `repeat(${layout.grid.cols}, minmax(0, 1fr))`,
-          gridTemplateRows: `repeat(${layout.grid.rows}, minmax(0, 1fr))`,
+          gridTemplateColumns: `repeat(${grid.cols}, minmax(0, 1fr))`,
+          gridTemplateRows: `repeat(${grid.rows}, minmax(0, 1fr))`,
           gap: 2,
           padding: 5,
         }}
       >
-        {layout.tiles.map((t, i) => (
+        {layout?.tiles.map((t, i) => (
           <div
             key={i}
             style={{
@@ -690,6 +694,7 @@ export function SettingsScreen({
   const {
     settings,
     usePreset,
+    restoreCustom,
     setTheme,
     setBudget,
     setAutoHideBar,
@@ -708,7 +713,18 @@ export function SettingsScreen({
   const update = useTopic<UpdatePayload>('app:update');
   const [note, setNote] = useState<string | null>(null);
 
+  // Reset takes a second press within a few seconds; one stray tap on a panel
+  // across the desk should not take every setting with it.
+  const [confirmReset, setConfirmReset] = useState(false);
+  useEffect(() => {
+    if (!confirmReset) return;
+    const timer = setTimeout(() => setConfirmReset(false), 4000);
+    return () => clearTimeout(timer);
+  }, [confirmReset]);
+
   const layout = settings.layout;
+  const custom = settings.presetId === 'custom' ? layout : settings.custom;
+  const label = (name: string) => name.replace(/^\w/, (c) => c.toUpperCase());
   const mediaIndex = layout.tiles.findIndex((t) => t.widget === 'media');
   const mediaTile = mediaIndex >= 0 ? layout.tiles[mediaIndex] : undefined;
 
@@ -822,20 +838,27 @@ export function SettingsScreen({
                   />
                 ))}
                 <PresetCard
-                  layout={layout}
+                  layout={custom}
                   name="CUSTOM"
-                  meta="YOURS"
+                  meta={custom ? 'YOURS' : 'NONE YET'}
                   active={settings.presetId === 'custom'}
-                  onPick={() => undefined}
+                  onPick={restoreCustom}
                 />
               </div>
               <div style={{ marginTop: 20 }}>
-                <Row label="Arrange tiles" desc="Drag to move, drag a corner to resize. Snaps to grid cells.">
+                <Row
+                  label="Arrange tiles"
+                  desc={
+                    settings.custom
+                      ? `Drag to move, drag a corner to resize. Changing ${layout.name} replaces the arrangement under Custom.`
+                      : 'Drag to move, drag a corner to resize. Snaps to grid cells.'
+                  }
+                >
                   <button className="cc-chip cc-chip-on" style={{ padding: '8px 16px' }} onClick={onArrange}>
                     OPEN
                   </button>
                 </Row>
-                <Row label="Grid columns" desc="More columns let you place things more finely.">
+                <Row label="Grid columns" desc="Tiles keep their proportions. More columns let you place them more finely.">
                   <Stepper value={layout.grid.cols} lo={4} hi={24} onChange={(cols) => setGrid({ cols })} />
                 </Row>
                 <Row label="Grid rows" desc="Same, vertically.">
@@ -853,16 +876,17 @@ export function SettingsScreen({
               {widgetNames.map((name) => {
                 const on = layout.tiles.some((t) => t.widget === name);
                 return (
-                  <Row
-                    key={name}
-                    label={name.replace(/^\w/, (c) => c.toUpperCase())}
-                    desc={registry[name].topics.join(' · ')}
-                  >
+                  <Row key={name} label={label(name)} desc={registry[name].topics.join(' · ')}>
                     <Seg
                       options={['OFF', 'ON']}
                       value={on ? 'ON' : 'OFF'}
                       onPick={(v) => {
-                        if ((v === 'ON') !== on) toggleWidget(name);
+                        if ((v === 'ON') === on) return;
+                        if (!toggleWidget(name, minSize)) {
+                          setNote(`No room for ${label(name)}. Make space in Layout → Arrange tiles first.`);
+                        } else if (!on) {
+                          setNote(`${label(name)} added. Layout → Arrange tiles moves it.`);
+                        }
                       }}
                     />
                   </Row>
@@ -1042,21 +1066,34 @@ export function SettingsScreen({
                   COPY
                 </button>
               </Row>
-              <Row label="Import layout" desc="Reads an arrangement from the clipboard.">
+              <Row label="Import layout" desc="Reads an arrangement from the clipboard. It becomes your custom arrangement.">
                 <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => void pasteLayout()}>
                   PASTE
                 </button>
               </Row>
-              <Row label="Reset everything" desc="Back to the Stage preset and its theme.">
+              <Row
+                label="Reset everything"
+                desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no custom arrangement, no remote panel."
+              >
                 <button
                   className="cc-chip"
-                  style={{ padding: '8px 16px', color: 'var(--cc-danger)', borderColor: 'var(--cc-danger)' }}
+                  style={{
+                    padding: '8px 16px',
+                    color: confirmReset ? 'var(--cc-bg)' : 'var(--cc-danger)',
+                    background: confirmReset ? 'var(--cc-danger)' : 'transparent',
+                    borderColor: 'var(--cc-danger)',
+                  }}
                   onClick={() => {
+                    if (!confirmReset) {
+                      setConfirmReset(true);
+                      return;
+                    }
+                    setConfirmReset(false);
                     reset();
                     setNote('Reset to defaults.');
                   }}
                 >
-                  RESET
+                  {confirmReset ? 'PRESS AGAIN TO RESET' : 'RESET'}
                 </button>
               </Row>
             </div>
