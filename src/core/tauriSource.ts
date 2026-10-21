@@ -28,10 +28,11 @@ export const ENGINE_TOPICS = [
   'media:now_playing',
   'media:art',
   'sys:notify',
+  'app:update',
 ];
 
 /** Topics that travel renderer → engine. The only write path in the app. */
-export const COMMAND_TOPICS = ['media:command', 'notify:command', 'quota:command'];
+export const COMMAND_TOPICS = ['media:command', 'notify:command', 'quota:command', 'update:command'];
 
 export async function startTauriSource(): Promise<() => void> {
   const { emit, listen } = await import('@tauri-apps/api/event');

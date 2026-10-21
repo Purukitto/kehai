@@ -14,6 +14,11 @@ fn main() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        // Driven from the update poller only. The renderer has no updater or
+        // opener permission, so it can ask for a check or an install over
+        // `update:command` but never name a URL.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // The renderer says hello once its bus subscription is live. Without
             // this an IPC failure is silent on both sides: the engine keeps

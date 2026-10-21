@@ -31,6 +31,11 @@ export interface Settings {
    * engine hears it over `quota:command`.
    */
   transcriptRoot: string | null;
+  /**
+   * Let the engine ask GitHub for a new release once a day. Off unless turned
+   * on: the README promises no requests beyond the font, and this is one.
+   */
+  autoCheckUpdates: boolean;
 }
 
 const STORAGE_KEY = 'kehai.settings.v1';
@@ -44,6 +49,7 @@ function defaults(): Settings {
     budgetTokens: null,
     autoHideBar: false,
     transcriptRoot: null,
+    autoCheckUpdates: false,
   };
 }
 
@@ -70,6 +76,7 @@ function load(): Settings {
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
       transcriptRoot: folder(parsed.transcriptRoot),
+      autoCheckUpdates: parsed.autoCheckUpdates === true,
     };
   } catch {
     return defaults();
@@ -83,6 +90,7 @@ interface Store {
   setBudget: (tokens: number | null) => void;
   setAutoHideBar: (on: boolean) => void;
   setTranscriptRoot: (path: string | null) => void;
+  setAutoCheckUpdates: (on: boolean) => void;
   setTiles: (tiles: Tile[]) => void;
   setTileArea: (index: number, area: Area) => void;
   setTileProp: (index: number, key: string, value: unknown) => void;
@@ -140,6 +148,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setAutoHideBar: (autoHideBar) => setSettings((prev) => ({ ...prev, autoHideBar })),
 
       setTranscriptRoot: (path) => setSettings((prev) => ({ ...prev, transcriptRoot: folder(path) })),
+
+      setAutoCheckUpdates: (autoCheckUpdates) => setSettings((prev) => ({ ...prev, autoCheckUpdates })),
 
       setTiles: (tiles) => editLayout((layout) => ({ ...layout, tiles })),
 

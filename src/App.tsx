@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
-import type { QuotaCommand } from './core/payloads';
+import type { QuotaCommand, UpdateCommand, UpdatePayload } from './core/payloads';
 import { useSettings } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
+import { useTopic } from './core/useTopic';
 import { Arranger } from './grid/Arranger';
 import { Grid } from './grid/Grid';
 import { SettingsScreen } from './settings/SettingsScreen';
+import type { Section } from './settings/SettingsScreen';
 
 type Mode = 'dashboard' | 'settings' | 'arrange';
 
@@ -22,7 +24,9 @@ export default function App() {
   const { settings } = useSettings();
   const autoHide = settings.autoHideBar;
   const [mode, setMode] = useState<Mode>('dashboard');
+  const [settingsAt, setSettingsAt] = useState<Section | undefined>(undefined);
   const [engine, setEngine] = useState(false);
+  const update = useTopic<UpdatePayload>('app:update');
   const layout = settings.layout;
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
@@ -67,6 +71,22 @@ export default function App() {
     });
   }, [settings.transcriptRoot]);
 
+  // Same arrangement as the transcript folder: the engine starts with automatic
+  // checks off and learns the stored choice from this, retained until the
+  // bridge forwards it.
+  useEffect(() => {
+    bus.publish<UpdateCommand>('update:command', 'settings', {
+      action: 'set_auto',
+      on: settings.autoCheckUpdates,
+    });
+  }, [settings.autoCheckUpdates]);
+
+  // Opening settings from the update badge lands on About. Every other way in,
+  // including back from the arranger, starts where it always has.
+  useEffect(() => {
+    if (mode !== 'settings') setSettingsAt(undefined);
+  }, [mode]);
+
   useEffect(() => {
     document.documentElement.className = 't-' + layout.theme;
   }, [layout.theme]);
@@ -88,7 +108,13 @@ export default function App() {
   }, []);
 
   if (mode === 'settings') {
-    return <SettingsScreen onClose={() => setMode('dashboard')} onArrange={() => setMode('arrange')} />;
+    return (
+      <SettingsScreen
+        initialSection={settingsAt}
+        onClose={() => setMode('dashboard')}
+        onArrange={() => setMode('arrange')}
+      />
+    );
   }
 
   if (mode === 'arrange') {
@@ -116,6 +142,21 @@ export default function App() {
         </svg>
         <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.24em' }}>KEHAI</span>
         <div style={{ flex: 1 }} />
+        {update?.state === 'available' && (
+          // Waits to be noticed rather than asking: a panel read sideways has no
+          // business flashing for attention.
+          <button
+            className="cc-chip"
+            style={{ padding: '5px 10px', marginRight: 4, color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+            onClick={() => {
+              setSettingsAt('ABOUT');
+              setMode('settings');
+            }}
+            title={`Version ${update.latest} is available`}
+          >
+            UPDATE
+          </button>
+        )}
         <span
           style={{ width: 5, height: 5, flex: 'none', background: engine ? 'var(--cc-ok)' : 'var(--cc-line-2)' }}
           title={engine ? 'Rust engine connected' : 'Mock source'}

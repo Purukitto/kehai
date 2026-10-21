@@ -37,7 +37,7 @@
     "homepage": "https://github.com/Purukitto/kehai",
     "licenseFile": "../LICENSE",
     "shortDescription": "A companion dashboard for a secondary display.",
-    "longDescription": "Kehai is a dashboard for a small always-on secondary display. A Rust integration engine polls system telemetry, media, notifications and local agent token usage on background threads; the renderer lays widgets out on a configurable grid. Everything is read locally and nothing is sent anywhere.",
+    "longDescription": "Kehai is a dashboard for a small always-on secondary display. A Rust integration engine polls system telemetry, media, notifications and local agent token usage on background threads; the renderer lays widgets out on a configurable grid. Everything is read locally and stays on the machine. The only request it makes of its own is an optional check for new releases on GitHub.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -50,6 +50,16 @@
         "installMode": "currentUser",
         "languages": ["English"],
         "displayLanguageSelector": false
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDc2MDNFQ0I1MUM4N0YxNDUKUldSRjhZY2N0ZXdEZG1iaUxtYVgrN2x5MXhUVWdaYW1UTFExL0oyR2daSVQ3amc4MGY3TnNUVWcK",
+      "endpoints": ["https://github.com/Purukitto/kehai/releases/latest/download/latest.json"],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
       }
     }
   }

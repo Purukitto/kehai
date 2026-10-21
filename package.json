@@ -34,7 +34,8 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "tauri build",
+    "release": "bun scripts/release.ts"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

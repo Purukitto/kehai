@@ -116,3 +116,39 @@ export interface ArtPayload {
   /** Data URL of the current cover, or null when the player exposes none. */
   dataUrl: string | null;
 }
+
+/** Engine → renderer on `app:update`. Mirrors `UpdatePayload` in `update.rs`. */
+export interface UpdatePayload {
+  /** The running version, read from the binary. */
+  current: string;
+  state: 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'installing' | 'failed';
+  /** The newer version on offer, or null when none is known. */
+  latest: string | null;
+  /** That release's changelog section, as written in CHANGELOG.md. */
+  notes: string | null;
+  /**
+   * False for the portable build and dev builds: there is no installer to hand
+   * over to, so the offer is a link to the release page instead.
+   */
+  installable: boolean;
+  /** Why `installable` is false. */
+  reason: string | null;
+  /** 0–1 while downloading. Null when the server sent no length. */
+  progress: number | null;
+  /** When a check last succeeded. */
+  checkedAtMs: number | null;
+  /** The last failure, cleared by the next check that succeeds. */
+  error: string | null;
+  /** Whether the engine checks by itself — the setting, echoed back. */
+  auto: boolean;
+}
+
+/**
+ * Renderer → engine on `update:command`. Mirrors `Command` in `update.rs`.
+ * Carries no URL: where updates come from is compiled into the engine.
+ */
+export type UpdateCommand =
+  | { action: 'check' }
+  | { action: 'install' }
+  | { action: 'set_auto'; on: boolean }
+  | { action: 'open_release' };

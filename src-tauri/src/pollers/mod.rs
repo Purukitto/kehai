@@ -5,6 +5,7 @@ pub mod mem;
 pub mod net;
 pub mod notify;
 pub mod quota;
+pub mod update;
 
 use tauri::AppHandle;
 
@@ -16,5 +17,6 @@ pub fn spawn_all(app: AppHandle) {
     disk::spawn(app.clone());
     quota::spawn(app.clone());
     media::spawn(app.clone());
+    update::spawn(app.clone());
     notify::spawn(app);
 }

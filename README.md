@@ -36,7 +36,7 @@ Grab an installer from the [latest release](https://github.com/Purukitto/kehai/r
 | --- | --- |
 | `Kehai_x.y.z_x64-setup.exe` | NSIS installer. The usual choice. |
 | `Kehai_x.y.z_x64_en-US.msi` | MSI, for policy-managed or scripted installs. |
-| `kehai-x.y.z-windows-x64-portable.zip` | A single `kehai.exe`. No install, no uninstaller. |
+| `kehai-x.y.z-windows-x64-portable.zip` | A single `kehai.exe`. No install, no uninstaller, no self-update. |
 
 Windows 10 1803 or newer, x64. Kehai uses the system WebView2 runtime, which ships
 with Windows 11 and current Windows 10 — on an older machine the installer offers to
@@ -44,6 +44,17 @@ fetch it.
 
 The binaries are unsigned, so SmartScreen warns on first launch. Building from source
 takes about five minutes if you would rather not trust a stranger's exe.
+
+### Updating
+
+From 0.2.0 on, an installed copy updates itself. **Settings → About → Check** asks
+GitHub for the latest release, shows what changed, and **Install** closes Kehai,
+runs the new installer and opens it again. Turn on **Check automatically** to have
+it look once a day; it is off until you do.
+
+Every update is signed, and Kehai refuses one whose signature does not match the key
+built into it. The portable build cannot replace itself, so it links to the release
+page instead.
 
 ## Using it
 
@@ -109,10 +120,15 @@ write hardware registers. That is a poor trade for one number on a dashboard.
 
 ## Privacy
 
-Kehai reads local sources and publishes them to its own in-process bus. **It makes no
-network requests at all** beyond the web font the renderer loads, and its
-content-security policy forbids everything else. Nothing is uploaded, logged to disk
-or phoned home.
+Kehai reads local sources and publishes them to its own in-process bus. Nothing it
+reads is uploaded, logged to disk or phoned home. It makes two kinds of network
+request, and the renderer's content-security policy forbids anything else:
+
+- **The web font**, which the renderer loads from Google Fonts.
+- **The update check**, and only when you press Check or turn on Check
+  automatically. It fetches `latest.json` from this repository's latest GitHub
+  release, which tells GitHub your IP address and that some copy of Kehai asked —
+  nothing more. Installing downloads the installer from the same release.
 
 Two sources are worth stating plainly:
 
@@ -181,6 +197,7 @@ against a release build.
 | `bun run typecheck` | Typecheck only |
 | `bun run tauri:dev` | Desktop shell against the dev server |
 | `bun run tauri:build` | Release build and installers |
+| `bun run release <patch\|minor\|major\|x.y.z>` | Bump the version, roll the changelog, commit and tag — see [Releasing](CONTRIBUTING.md#releasing) |
 
 ## Architecture
 
@@ -188,7 +205,7 @@ against a release build.
 flowchart LR
     subgraph engine["Integration engine — Rust"]
         direction TB
-        P["cpu · mem · net · disk<br/>quota · media · notify<br/><i>one thread each</i>"]
+        P["cpu · mem · net · disk<br/>quota · media · notify · update<br/><i>one thread each</i>"]
     end
 
     BUS[["Envelope bus<br/><i>last value retained per topic</i>"]]
@@ -200,7 +217,7 @@ flowchart LR
 
     P --> BUS
     BUS -- "Tauri event, replayed on attach" --> W
-    W -. "media:command · notify:command" .-> P
+    W -. "media · notify · quota · update :command" .-> P
 ```
 
 Everything on the bus is one shape:
@@ -216,10 +233,11 @@ because Tauri events are fire-and-forget, so a publish-on-change source would ot
 stay silent forever after one missed send. The renderer emits `ui:hello` once
 subscribed and the engine replays every retained topic in reply.
 
-Each poller owns one thread, so a stalled source can only stall itself. Widgets are
-read-only except for `media:command` and `notify:command`: the widget states an intent,
-the engine owns the side effect and runs it off the event thread, so a wedged media
-player cannot freeze the panel.
+Each poller owns one thread, so a stalled source can only stall itself. The renderer is
+read-only except for four command topics — `media:command`, `notify:command`,
+`quota:command` and `update:command`: the UI states an intent, the engine owns the side
+effect and runs it off the event thread, so a wedged media player cannot freeze the
+panel and a slow download cannot either.
 
 ### Where things are
 
@@ -239,6 +257,8 @@ player cannot freeze the panel.
 | `src/styles/tokens.css` | Thirteen custom properties per theme |
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
 | `src-tauri/src/pollers/` | One thread per source |
+| `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
+| `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |
 
 [Design notes](docs/design.md) covers the reasoning behind the presets, the theme
 system and the "UI only consumes" rule. [CONTRIBUTING.md](CONTRIBUTING.md) covers

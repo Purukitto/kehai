@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
+import { bus } from '../core/bus';
+import type { UpdateCommand, UpdatePayload } from '../core/payloads';
 import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
 import { useTopic } from '../core/useTopic';
 import type { Layout, ThemeId } from '../core/types';
 import { registry, widgetNames } from '../widgets/registry';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'ABOUT'] as const;
-type Section = (typeof NAV)[number];
+export type Section = (typeof NAV)[number];
 
 const NAV_ICON: Record<Section, string> = {
   LAYOUT: 'M2 2h5v5H2ZM9 2h5v5H9ZM2 9h5v5H2ZM9 9h5v5H9Z',
@@ -65,7 +67,7 @@ function Row({
   children,
 }: {
   label: string;
-  desc?: string;
+  desc?: React.ReactNode;
   children?: React.ReactNode;
 }) {
   return (
@@ -298,7 +300,180 @@ function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit
   );
 }
 
-export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; onArrange: () => void }) {
+function sendUpdate(command: UpdateCommand) {
+  bus.publish<UpdateCommand>('update:command', 'settings', command);
+}
+
+function ago(ms: number): string {
+  const mins = Math.round((Date.now() - ms) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+
+/**
+ * The engine runs every step of an update; this row only says where it has got
+ * to and offers the one action that makes sense next.
+ */
+function UpdateRow({ update }: { update: UpdatePayload | undefined }) {
+  let desc: string;
+  let control: React.ReactNode = null;
+  const check = (
+    <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => sendUpdate({ action: 'check' })}>
+      CHECK
+    </button>
+  );
+
+  if (!update) {
+    desc = 'Awaiting the engine.';
+  } else {
+    switch (update.state) {
+      case 'idle':
+        desc = update.auto ? 'Checks GitHub for a new release once a day.' : 'Not checked yet.';
+        control = check;
+        break;
+      case 'checking':
+        desc = 'Asking GitHub for the latest release.';
+        control = <span className="cc-mini" style={{ flex: 'none' }}>CHECKING</span>;
+        break;
+      case 'current':
+        desc = `Up to date. Checked ${update.checkedAtMs ? ago(update.checkedAtMs) : 'just now'}.`;
+        control = check;
+        break;
+      case 'available':
+        if (update.installable) {
+          desc = `Version ${update.latest} is ready. Installing closes Kehai, updates it and opens it again.`;
+          control = (
+            <button
+              className="cc-chip cc-chip-on"
+              style={{ padding: '8px 16px' }}
+              onClick={() => sendUpdate({ action: 'install' })}
+            >
+              INSTALL
+            </button>
+          );
+        } else {
+          desc = `Version ${update.latest} is out. ${update.reason ?? ''}`.trim();
+          control = (
+            <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => sendUpdate({ action: 'open_release' })}>
+              RELEASE PAGE
+            </button>
+          );
+        }
+        break;
+      case 'downloading':
+        desc = `Downloading ${update.latest}.`;
+        control = (
+          <span className="cc-mini" style={{ flex: 'none' }}>
+            {update.progress === null ? 'DOWNLOADING' : `${Math.round(update.progress * 100)}%`}
+          </span>
+        );
+        break;
+      case 'installing':
+        desc = 'Handing over to the installer. Kehai closes now and opens again when it is done.';
+        control = <span className="cc-mini" style={{ flex: 'none' }}>INSTALLING</span>;
+        break;
+      case 'failed':
+        desc = 'The last check did not finish.';
+        control = check;
+        break;
+    }
+  }
+
+  return (
+    <Row
+      label="Updates"
+      desc={
+        <>
+          {desc}
+          {update?.error && <span style={{ display: 'block', color: 'var(--cc-danger)' }}>{update.error}</span>}
+        </>
+      }
+    >
+      {control}
+    </Row>
+  );
+}
+
+/** Inline Markdown down to its words: the notes have no room for links or code spans. */
+function plain(text: string): string {
+  return text
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[*_`]+/g, '')
+    .trim();
+}
+
+interface NoteBlock {
+  kind: 'heading' | 'item' | 'text';
+  text: string;
+}
+
+/**
+ * Release notes come from the version's CHANGELOG.md section, which is only
+ * ever `###` headings, bullets and the odd sentence. Rendering those is
+ * enough, and keeps a Markdown parser out of the bundle.
+ */
+function ReleaseNotes({ text }: { text: string }) {
+  const blocks: NoteBlock[] = [];
+  // The changelog wraps long bullets onto indented lines; join them back.
+  let joinable = false;
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    const last = blocks[blocks.length - 1];
+    if (line === '') {
+      joinable = false;
+    } else if (line.startsWith('#')) {
+      blocks.push({ kind: 'heading', text: line.replace(/^#+/, '') });
+      joinable = false;
+    } else if (/^[-*]\s/.test(line)) {
+      blocks.push({ kind: 'item', text: line.replace(/^[-*]\s+/, '') });
+      joinable = true;
+    } else if (joinable && last) {
+      last.text += ' ' + line;
+    } else {
+      blocks.push({ kind: 'text', text: line });
+      joinable = true;
+    }
+  }
+
+  return (
+    <div style={{ padding: '12px 14px', background: 'var(--cc-inset)', borderBottom: '1px solid var(--cc-line)' }}>
+      {blocks.map((block, i) =>
+        block.kind === 'heading' ? (
+          <div key={i} className="cc-mini" style={{ letterSpacing: '0.14em', marginTop: i === 0 ? 0 : 12 }}>
+            {plain(block.text).toUpperCase()}
+          </div>
+        ) : (
+          <div
+            key={i}
+            style={{
+              fontSize: 11,
+              lineHeight: 1.6,
+              marginTop: 4,
+              paddingLeft: block.kind === 'item' ? 12 : 0,
+              textIndent: block.kind === 'item' ? -12 : 0,
+            }}
+          >
+            {block.kind === 'item' ? '· ' : ''}
+            {plain(block.text)}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+export function SettingsScreen({
+  initialSection,
+  onClose,
+  onArrange,
+}: {
+  initialSection?: Section;
+  onClose: () => void;
+  onArrange: () => void;
+}) {
   const {
     settings,
     usePreset,
@@ -306,6 +481,7 @@ export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; on
     setBudget,
     setAutoHideBar,
     setTranscriptRoot,
+    setAutoCheckUpdates,
     setGrid,
     toggleWidget,
     setTileProp,
@@ -313,7 +489,8 @@ export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; on
     importLayout,
   } = useSettings();
   const [autostart, setAutostart] = useAutostart();
-  const [section, setSection] = useState<Section>('LAYOUT');
+  const [section, setSection] = useState<Section>(initialSection ?? 'LAYOUT');
+  const update = useTopic<UpdatePayload>('app:update');
   const [note, setNote] = useState<string | null>(null);
 
   const layout = settings.layout;
@@ -586,8 +763,22 @@ export function SettingsScreen({ onClose, onArrange }: { onClose: () => void; on
 
           {section === 'ABOUT' && (
             <div style={{ marginTop: 18 }}>
-              <Row label="Version" desc="Nightly build.">
-                <span style={{ fontSize: 12, color: 'var(--cc-muted)' }}>0.1.0</span>
+              <Row label="Version" desc={update && !update.installable ? (update.reason ?? undefined) : undefined}>
+                <span style={{ fontSize: 12, color: 'var(--cc-muted)' }}>{update?.current ?? '--'}</span>
+              </Row>
+              <UpdateRow update={update} />
+              {update?.notes && (update.state === 'available' || update.state === 'downloading') && (
+                <ReleaseNotes text={update.notes} />
+              )}
+              <Row
+                label="Check automatically"
+                desc="Once a day, starting a minute after launch. Asks github.com for the latest release and sends nothing else."
+              >
+                <Seg
+                  options={['OFF', 'ON']}
+                  value={settings.autoCheckUpdates ? 'ON' : 'OFF'}
+                  onPick={(v) => setAutoCheckUpdates(v === 'ON')}
+                />
               </Row>
               <Row
                 label="Token budget"

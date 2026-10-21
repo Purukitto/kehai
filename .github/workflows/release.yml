@@ -27,10 +27,15 @@ jobs:
 
       # The tag is the single source of truth for a release, so a mismatch with
       # the manifests would ship a binary whose About screen lies. Fail here
-      # rather than after a twenty-minute build.
+      # rather than after a twenty-minute build — and for the same reason check
+      # everything else a release needs before compiling anything.
       - name: Resolve and verify version
         id: version
         shell: pwsh
+        env:
+          # Whether the secret exists, never its value: this step runs before
+          # anything needs the key.
+          HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: |
           $tag = if ('${{ inputs.tag }}') { '${{ inputs.tag }}' } else { '${{ github.ref_name }}' }
           $version = $tag -replace '^v', ''
@@ -46,6 +51,30 @@ jobs:
           if ($cargo -ne $version) { $bad += "Cargo.toml: $cargo" }
           if ($bad.Count -gt 0) {
             throw "Tag says $version but " + ($bad -join ', ')
+          }
+
+          # The version's changelog section is the release notes, and the text
+          # installed copies show beside their Install button. A release
+          # without one would update people with nothing to say what changed.
+          $changelog = Get-Content CHANGELOG.md -Raw
+          $heading = '^## \[' + [regex]::Escape($version) + '\][^\r\n]*\r?\n'
+          $match = [regex]::Match($changelog, "(?ms)$heading(.*?)(?=^## \[|^\[[^\]]+\]: |\z)")
+          if (-not $match.Success) {
+            throw "CHANGELOG.md has no '## [$version]' section. 'bun run release' writes it from Unreleased."
+          }
+          $notes = $match.Groups[1].Value.Trim()
+          if (-not $notes) { throw "CHANGELOG.md has a '## [$version]' section with nothing in it." }
+          $notes | Set-Content "$env:RUNNER_TEMP/notes.md" -Encoding utf8NoBOM
+
+          # A build trusting the wrong key, or none, could never install an
+          # update. Nothing downstream would notice until the next release.
+          $pubkey = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).plugins.updater.pubkey
+          try { $decoded = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($pubkey)) } catch { $decoded = '' }
+          if ($decoded -notmatch 'minisign public key') {
+            throw "plugins.updater.pubkey in tauri.conf.json is not a public key. See 'Releasing' in CONTRIBUTING.md."
+          }
+          if ($env:HAS_SIGNING_KEY -ne 'true') {
+            throw "The TAURI_SIGNING_PRIVATE_KEY secret is not set, so installed copies could not verify this release."
           }
 
           "version=$version" >> $env:GITHUB_OUTPUT
@@ -69,9 +98,14 @@ jobs:
         run: bun install --frozen-lockfile
 
       # Runs the frontend build via beforeBuildCommand, embeds dist/ in the
-      # binary, then produces the MSI and NSIS installers.
+      # binary, then produces the MSI and NSIS installers. The release overlay
+      # adds a .sig beside each, signed with the release key; it lives outside
+      # tauri.conf.json so a local `tauri build` still works without the key.
       - name: Build installers
-        run: bunx tauri build
+        run: bunx tauri build --config src-tauri/tauri.release.conf.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
       # `tauri build` exits 0 when it refuses to start — a Rust/npm version
       # mismatch between the tauri crate and @tauri-apps/api stops it before
@@ -83,7 +117,9 @@ jobs:
           $expected = @(
             'src-tauri/target/release/kehai.exe',
             'src-tauri/target/release/bundle/msi/*.msi',
-            'src-tauri/target/release/bundle/nsis/*-setup.exe'
+            'src-tauri/target/release/bundle/msi/*.msi.sig',
+            'src-tauri/target/release/bundle/nsis/*-setup.exe',
+            'src-tauri/target/release/bundle/nsis/*-setup.exe.sig'
           )
           $missing = $expected | Where-Object { -not (Get-ChildItem $_ -ErrorAction SilentlyContinue) }
           if ($missing) { throw "tauri build produced nothing for: $($missing -join ', ')" }
@@ -91,7 +127,9 @@ jobs:
             Select-Object Name, Length
 
       # The installers are the normal path; this is for people who would rather
-      # not run one. It is the same GUI-subsystem binary the installers carry.
+      # not run one. It is the same GUI-subsystem binary the installers carry,
+      # unstamped with an installer type, which is how it knows to point at the
+      # release page rather than try to update itself.
       - name: Package portable build
         shell: pwsh
         run: |
@@ -104,9 +142,111 @@ jobs:
       - name: Collect installers
         shell: pwsh
         run: |
-          Copy-Item src-tauri/target/release/bundle/msi/*.msi  artifacts/
-          Copy-Item src-tauri/target/release/bundle/nsis/*.exe artifacts/
+          Copy-Item src-tauri/target/release/bundle/msi/*.msi      artifacts/
+          Copy-Item src-tauri/target/release/bundle/msi/*.msi.sig  artifacts/
+          Copy-Item src-tauri/target/release/bundle/nsis/*.exe     artifacts/
+          Copy-Item src-tauri/target/release/bundle/nsis/*.exe.sig artifacts/
           Get-ChildItem artifacts -File | Select-Object Name, Length
+
+      # A signing secret that is not the key tauri.conf.json trusts would
+      # otherwise surface as every installed copy refusing the update, after
+      # it shipped. The same goes for a signature that does not name the
+      # version, which requireSignedVersion rejects.
+      - name: Verify update signatures
+        shell: pwsh
+        run: |
+          # Tauri stores minisign's text format base64-encoded: a comment, the
+          # key or signature line, then for a signature the trusted comment.
+          function Read-Minisign([string] $encoded) {
+            [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded.Trim())) -split "`r?`n"
+          }
+          # Bytes 2–9 of a decoded key or signature line are the key ID.
+          function Get-KeyId([string] $line) {
+            [BitConverter]::ToString([byte[]] ([Convert]::FromBase64String($line)[2..9]))
+          }
+
+          $version = '${{ steps.version.outputs.version }}'
+          $pubkey = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).plugins.updater.pubkey
+          $trusted = Get-KeyId (Read-Minisign $pubkey)[1]
+
+          $sigs = @(Get-ChildItem artifacts/*.sig)
+          if ($sigs.Count -ne 2) { throw "Expected two signatures, found $($sigs.Count)" }
+          foreach ($sig in $sigs) {
+            $lines = Read-Minisign (Get-Content $sig.FullName -Raw)
+            $id = Get-KeyId $lines[1]
+            if ($id -ne $trusted) {
+              throw "$($sig.Name) is signed by key $id but tauri.conf.json trusts $trusted. TAURI_SIGNING_PRIVATE_KEY is not the release key."
+            }
+            $comment = $lines[2] -replace '^trusted comment: ', ''
+            if (($comment -split "`t") -notcontains "version:$version") {
+              throw "$($sig.Name) does not name version $version in its signature: $comment"
+            }
+            Write-Host "ok  $($sig.Name)  key $id  $comment"
+          }
+
+      # What installed copies read, from /releases/latest/download/, to find
+      # out there is something newer. That URL only resolves to a published,
+      # non-prerelease release, so a draft stays invisible to them until it is
+      # published and an -rc tag never reaches anyone.
+      - name: Write update manifest
+        shell: pwsh
+        run: |
+          $base = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}"
+          function Get-Entry($file) {
+            [ordered]@{
+              signature = (Get-Content "$($file.FullName).sig" -Raw).Trim()
+              url       = "$base/$($file.Name)"
+            }
+          }
+          $nsis = Get-Item artifacts/*-setup.exe
+          $msi  = Get-Item artifacts/*.msi
+
+          $manifest = [ordered]@{
+            version   = '${{ steps.version.outputs.version }}'
+            notes     = (Get-Content "$env:RUNNER_TEMP/notes.md" -Raw).Trim()
+            pub_date  = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd'T'HH:mm:ss'Z'")
+            platforms = [ordered]@{
+              'windows-x86_64-nsis' = Get-Entry $nsis
+              'windows-x86_64-msi'  = Get-Entry $msi
+              # For a binary with no installer type stamped in: the portable
+              # build. It reads the version and notes from here and never
+              # installs from it.
+              'windows-x86_64'      = Get-Entry $nsis
+            }
+          }
+
+          # The updater's JSON parser rejects a byte-order mark.
+          $manifest | ConvertTo-Json -Depth 5 | Set-Content artifacts/latest.json -Encoding utf8NoBOM
+          Get-Content artifacts/latest.json
+
+      - name: Write release notes
+        shell: pwsh
+        run: |
+          $version = '${{ steps.version.outputs.version }}'
+          $tag = '${{ steps.version.outputs.tag }}'
+          $notes = (Get-Content "$env:RUNNER_TEMP/notes.md" -Raw).Trim()
+          $install = @"
+          ## Install
+
+          Installed copies from 0.2.0 on update themselves from **Settings → About**.
+
+          | File | What it is |
+          | --- | --- |
+          | ``Kehai_${version}_x64-setup.exe`` | NSIS installer. The usual choice. |
+          | ``Kehai_${version}_x64_en-US.msi`` | MSI, for policy-managed or scripted installs. |
+          | ``kehai-$version-windows-x64-portable.zip`` | A single ``kehai.exe``. No install, no uninstaller, no self-update. |
+
+          Windows 10 1803 or newer, x64. Needs the WebView2 runtime, which ships with
+          Windows 11 and current Windows 10 — the installer offers to fetch it otherwise.
+
+          The binaries are unsigned, so SmartScreen will warn on first launch.
+          ``SHA256SUMS.txt`` has the checksums. ``latest.json`` and the ``.sig`` files are
+          what installed copies read to update themselves.
+
+          [Full changelog](https://github.com/${{ github.repository }}/blob/$tag/CHANGELOG.md)
+          "@
+          "$notes`n`n$install" | Set-Content "$env:RUNNER_TEMP/body.md" -Encoding utf8NoBOM
+          Get-Content "$env:RUNNER_TEMP/body.md"
 
       - name: Checksums
         shell: pwsh
@@ -124,7 +264,8 @@ jobs:
           if-no-files-found: error
 
       # Draft, so the release notes can be read over before anyone can download
-      # the binaries. Publishing it is one click in the Releases tab.
+      # the binaries — or be offered them by an installed copy. Publishing it
+      # is one click in the Releases tab.
       - name: Draft release
         uses: softprops/action-gh-release@v3
         with:
@@ -132,27 +273,12 @@ jobs:
           name: Kehai ${{ steps.version.outputs.tag }}
           draft: true
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
-          generate_release_notes: true
           fail_on_unmatched_files: true
+          body_path: ${{ runner.temp }}/body.md
           files: |
             artifacts/*.msi
             artifacts/*.exe
+            artifacts/*.sig
             artifacts/*.zip
+            artifacts/latest.json
             artifacts/SHA256SUMS.txt
-          body: |
-            ## Install
-
-            | File | What it is |
-            | --- | --- |
-            | `Kehai_${{ steps.version.outputs.version }}_x64-setup.exe` | NSIS installer. The usual choice. |
-            | `Kehai_${{ steps.version.outputs.version }}_x64_en-US.msi` | MSI, for policy-managed or scripted installs. |
-            | `kehai-${{ steps.version.outputs.version }}-windows-x64-portable.zip` | A single `kehai.exe`. No install, no uninstaller. |
-
-            Windows 10 1803 or newer, x64. Needs the WebView2 runtime, which ships with
-            Windows 11 and current Windows 10 — the installer offers to fetch it otherwise.
-
-            The binaries are unsigned, so SmartScreen will warn on first launch.
-            `SHA256SUMS.txt` has the checksums.
-
-            See [CHANGELOG.md](https://github.com/Purukitto/kehai/blob/${{ steps.version.outputs.tag }}/CHANGELOG.md)
-            for what changed.

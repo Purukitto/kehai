@@ -10,6 +10,8 @@ import type {
   NotifyPayload,
   QuotaPayload,
   SprintPayload,
+  UpdateCommand,
+  UpdatePayload,
 } from './payloads';
 
 /**
@@ -143,7 +145,78 @@ export function startMockSource(options: MockOptions = {}): () => void {
     pub<MediaPayload>('media:now_playing', 'mock.media', { ...media });
   });
 
+  // Walks the same states the engine does, so Settings → About can be built
+  // and reviewed without a release to update to.
+  const update: UpdatePayload = {
+    current: '0.1.0',
+    state: 'idle',
+    latest: null,
+    notes: null,
+    installable: true,
+    reason: null,
+    progress: null,
+    checkedAtMs: null,
+    error: null,
+    auto: false,
+  };
+  const pubUpdate = () => pub<UpdatePayload>('app:update', 'mock.update', { ...update });
+  const unsubUpdate = bus.subscribe('update:command', (e) => {
+    const command = e.data as UpdateCommand;
+    if (command.action === 'set_auto') {
+      update.auto = command.on;
+      pubUpdate();
+    }
+    if (command.action === 'check') {
+      update.state = 'checking';
+      pubUpdate();
+      timers.push(
+        window.setTimeout(() => {
+          Object.assign(update, {
+            state: 'available',
+            latest: '0.2.0',
+            // Shaped like a real CHANGELOG.md section, wrapped bullet included.
+            notes: [
+              '### Added',
+              '',
+              '- Kehai can update itself. **Settings → About** checks for a new version and installs',
+              '  it: Kehai closes, updates and opens again.',
+              '',
+              '### Fixed',
+              '',
+              '- Settings → About shows the version you are actually running.',
+            ].join('\n'),
+            checkedAtMs: Date.now(),
+          });
+          pubUpdate();
+        }, 700)
+      );
+    }
+    if (command.action === 'install' && update.state === 'available') {
+      update.state = 'downloading';
+      update.progress = 0;
+      pubUpdate();
+      const id = window.setInterval(() => {
+        update.progress = Math.min(1, (update.progress ?? 0) + 0.1);
+        if (update.progress >= 1) {
+          window.clearInterval(id);
+          // The real engine exits here and the installer reopens the new
+          // version. The mock just becomes it.
+          Object.assign(update, {
+            state: 'current',
+            current: update.latest ?? update.current,
+            latest: null,
+            notes: null,
+            progress: null,
+          });
+        }
+        pubUpdate();
+      }, 250);
+      timers.push(id);
+    }
+  });
+
   pub<ArtPayload>('media:art', 'mock.media', { dataUrl: null });
+  pubUpdate();
 
   tick();
   slowTick();
@@ -152,6 +225,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   return () => {
     unsub();
+    unsubUpdate();
     timers.forEach((id) => window.clearInterval(id));
   };
 }

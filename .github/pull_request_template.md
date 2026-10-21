@@ -12,6 +12,7 @@
 - [ ] `cargo fmt --manifest-path src-tauri/Cargo.toml --check`
 - [ ] `cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings`
 - [ ] `bun run build`
+- [ ] A change people will notice has a line under `## [Unreleased]` in `CHANGELOG.md`
 
 ## If this touches a poller
 

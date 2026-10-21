@@ -35,11 +35,18 @@ surface is what it reads and what it exposes:
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
-  `notify:command` and `quota:command`, the last of which only changes the folder the
-  quota poller reads — it still reads nothing but usage counters. A path that lets
-  renderer content reach anything else in the engine is in scope.
-- **The content-security policy.** Kehai makes no network requests other than the web
-  font. A way to make it egress data is in scope.
+  `notify:command`, `quota:command` and `update:command`. `quota:command` only changes
+  the folder the quota poller reads — it still reads nothing but usage counters.
+  `update:command` can ask for a check, an install, or the release page, but names no
+  URL: the update feed and the key updates must be signed with are compiled in. A path
+  that lets renderer content reach anything else in the engine is in scope.
+- **Network requests.** Kehai makes none other than the web font and, when you ask for
+  it, the update check and download. A way to make it egress data is in scope.
+- **Updates.** An installer is only run if its minisign signature verifies against the
+  public key in the build, and the signature names the version it was made for, so a
+  tampered `latest.json` cannot pair a new version number with an older installer.
+  Older versions are never offered. A way to get an installed copy to run anything
+  else is in scope.
 - **Installer and build integrity.** Anything that lets a build or an installer run
   code you did not intend.
 

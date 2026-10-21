@@ -114,7 +114,84 @@ widened.
 
 Conventional-ish prefixes, lowercase, imperative: `feat:`, `fix:`, `docs:`, `refactor:`,
 `chore:`. The subject line says what changed; the body says why, if that is not obvious.
-Neither is a changelog entry — that gets written at release.
+Neither is a changelog entry — those are written for a different reader.
+
+## Changelog
+
+A change someone using Kehai would notice gets a line under `## [Unreleased]` in
+[CHANGELOG.md](CHANGELOG.md), in the same pull request. That section becomes the
+release notes, and it is what Kehai shows beside its Install button, so write it for
+them:
+
+- Say what changed for them, not how: "Notifications can be dismissed from the
+  widget", not "add `notify:command`".
+- One line where one line will do, under `### Added`, `### Changed`, `### Fixed` or
+  `### Removed`.
+- Leave out refactors, CI, docs and dependency bumps nobody can see.
+- If an exported layout stops importing, say so.
+
+## Releasing
+
+1. Read `## [Unreleased]` over. It is about to become the release notes.
+2. On an up-to-date `main` with a clean tree:
+
+   ```bash
+   bun run release minor
+   ```
+
+   `patch`, `minor`, `major` or an exact version; `--dry-run` shows what it would do.
+   It sets the version in `package.json`, `tauri.conf.json`, `Cargo.toml` and
+   `Cargo.lock`, moves Unreleased under the new version, commits
+   `chore: release vX.Y.Z` and tags it.
+3. Push the commit and the tag — the script prints the command. The tag starts the
+   release workflow, which builds, signs, and drafts a GitHub release with the
+   changelog section as its notes.
+4. Read the draft over and publish it. Publishing is what installed copies see:
+   `latest.json` is served from the latest *published* release, so a draft reaches
+   no one.
+
+A prerelease (`bun run release 0.3.0-rc.1`) can be cut from any branch. GitHub marks
+it as one, installed copies never update to it, and its changelog section is folded
+into the real one when the release is cut.
+
+To pull a bad release, turn it back into a draft. `latest` falls back to the release
+before it, so nobody else gets it; anyone who already updated stays on it until a fix
+ships.
+
+### The signing key
+
+Installed copies trust one public key, `plugins.updater.pubkey` in
+`src-tauri/tauri.conf.json`. The matching private key is in two repository secrets,
+`TAURI_SIGNING_PRIVATE_KEY` and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. The release
+workflow will not build without them, and stops if they do not match the public key.
+
+**If the private key is lost, no installed copy can be updated again** — everyone
+would have to reinstall by hand. Keep a copy somewhere other than GitHub.
+
+To make one:
+
+```bash
+bunx tauri signer generate -w ~/.tauri/kehai.key
+```
+
+The contents of `kehai.key.pub` go in `pubkey`; the contents of `kehai.key` and its
+password go in the two secrets.
+
+### Trying an update before it ships
+
+In a browser, `bun run dev` and **Settings → About → Check** walks the mock through
+every state the engine reports, install included.
+
+For the real thing, cut two prereleases and publish both. Install the first, then
+start it from a terminal with the update feed pointed at the second:
+
+```powershell
+$env:KEHAI_UPDATE_ENDPOINT = 'https://github.com/Purukitto/kehai/releases/download/v0.3.0-rc.2/latest.json'
+```
+
+Then **Check** and **Install**. The variable only changes where the check looks. What
+it finds must still be signed by the release key, for the version it claims, and be
+newer than what is running.
 
 ## Reporting things
 
