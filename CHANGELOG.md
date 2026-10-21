@@ -15,6 +15,12 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
   Stage's sprint tab. **Settings → Sources** sets how long focus blocks and breaks
   are, and today's focused time survives a restart.
 
+### Changed
+
+- Agent token usage counts the current 5-hour block instead of the last five hours,
+  and shows when the block resets. The reset time is an estimate: the provider does
+  not publish how its window works.
+
 ### Fixed
 
 - The focus timer showed a made-up countdown in the desktop app. It now runs for real,
@@ -22,6 +28,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 - Stage's main tile reaches the bottom of its space instead of stopping short.
 - The font is built in. Kehai no longer fetches it from Google Fonts, and looks right
   on a machine that has never been online.
+- Agent token usage counted most replies two or three times, because the transcript
+  repeats a reply's usage on every line of it. Each reply now counts once.
+- Agent token usage includes sub-agents, whose transcripts sit in folders the count
+  never looked in.
 
 ## [0.1.0] - 2026-10-21
 

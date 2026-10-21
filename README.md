@@ -80,7 +80,7 @@ write the layout as JSON if you want to commit or share one.
 | `stage` | Hero readout with a tab strip | tokens, CPU, memory, timer |
 | `telemetry` | CPU history, memory, network, volumes | all four telemetry topics |
 | `vitals` | Compact CPU / memory / network strip | CPU, memory, network |
-| `quota` | Agent token usage over a rolling window | `dev:llm_tokens` |
+| `quota` | Agent token usage in the current 5-hour block | `dev:llm_tokens` |
 | `media` | Now playing, transport and cover art | `media:now_playing`, `media:art` |
 | `notify` | System notification feed, dismissable | `sys:notify` |
 | `clock` | Time and date | `os:clock` |
@@ -141,11 +141,16 @@ Two sources are worth stating plainly:
   empty feed.
 - **Agent token usage.** The quota widget tallies token counts by tailing local coding
   agent session transcripts — under `~/.claude/projects` unless you point
-  Settings → Sources at another folder — reading file modification times and the usage
-  counters on assistant turns. No prompt or response text is read, retained or
-  displayed. There is no API call and no account involved; if the folder does not exist
-  or holds no transcripts, the source reports itself unavailable and the rest of the
-  panel is unaffected.
+  Settings → Sources at another folder — reading file modification times, and the usage
+  counters and reply ids on assistant turns so each reply counts once. No prompt or
+  response text is read, retained or displayed. There is no API call and no account
+  involved; if the folder does not exist or holds no transcripts, the source reports
+  itself unavailable and the rest of the panel is unaffected.
+
+  Usage is counted per 5-hour block: one opens with the first request after the last
+  one closed, on the hour before it, and the widget shows when it resets. The provider
+  does not publish how its window works, so that time is an estimate worked out from
+  the transcripts, the same way other local usage tools do it.
 
 ## Building from source
 

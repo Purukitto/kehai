@@ -1,5 +1,6 @@
+use std::collections::{HashMap, HashSet};
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::thread;
@@ -14,7 +15,17 @@ const INTERVAL: Duration = Duration::from_millis(30_000);
 /// How long the first read waits for the renderer to say which folder to use.
 /// See `spawn`.
 const FIRST_ROOT_GRACE: Duration = Duration::from_millis(5_000);
-const WINDOW_HOURS: i64 = 5;
+/// The length of a usage block, and of the history the sparkline covers.
+const BLOCK_HOURS: i64 = 5;
+const HOUR_MS: i64 = 60 * 60 * 1000;
+/// How far back the reader looks to find where the current block began. A block
+/// starts with the first request after the previous one ended, so finding it
+/// means walking forward from a quiet spell; this is enough history for any
+/// day that has one.
+const LOOKBACK_HOURS: i64 = 24;
+/// `<root>/<project>/<session>/subagents/<agent>.jsonl` is three folders down.
+/// Sub-agents draw on the same limit as the session that started them.
+const MAX_DEPTH: usize = 3;
 const BUCKETS: usize = 56;
 const PROVIDER: &str = "Coding agent";
 
@@ -27,15 +38,22 @@ pub struct QuotaPayload {
     pub available: bool,
     pub reason: Option<String>,
     pub provider: String,
+    /// Counted inside the current block. All zero when there is none.
     pub tokens_in: u64,
     pub tokens_out: u64,
     pub cache_read: u64,
     pub cache_write: u64,
     pub requests: u64,
     pub window_hours: i64,
+    /// When the current block began, or `None` when the last one has ended and
+    /// the next request will start another.
+    pub block_start_ms: Option<i64>,
+    /// Until the current block ends. Zero when there is none.
     pub resets_in_ms: i64,
+    /// Tokens per minute over the last quarter of the block length.
     pub burn_per_min: u64,
     pub models: Vec<ModelUsage>,
+    /// The last `window_hours`, rolling, whatever block it fell in.
     pub history: Vec<u64>,
     /// No local source exposes the real plan limit, so this stays `None` until
     /// the user sets a budget. The widget shows counts rather than inventing a
@@ -57,7 +75,8 @@ impl QuotaPayload {
             cache_read: 0,
             cache_write: 0,
             requests: 0,
-            window_hours: WINDOW_HOURS,
+            window_hours: BLOCK_HOURS,
+            block_start_ms: None,
             resets_in_ms: 0,
             burn_per_min: 0,
             models: Vec::new(),
@@ -76,11 +95,30 @@ pub struct ModelUsage {
 
 struct Event {
     at_ms: i64,
+    /// Message and request ids together. The agent writes one transcript line
+    /// per content block of a reply, and every one of them repeats the reply's
+    /// usage, so counting lines counts most replies two or three times.
+    key: Option<String>,
     model: String,
     input: u64,
     output: u64,
     cache_read: u64,
     cache_write: u64,
+}
+
+/// What has been read of one transcript. They only ever grow, so each pass
+/// reads on from where the last one stopped instead of from the top.
+#[derive(Default)]
+struct Tail {
+    read_to: u64,
+    events: Vec<Event>,
+}
+
+/// Every transcript being followed, for one folder.
+#[derive(Default)]
+struct Tails {
+    root: PathBuf,
+    files: HashMap<PathBuf, Tail>,
 }
 
 /// Mirrors `QuotaCommand` in `src/core/payloads.ts`. The folder is kept in the
@@ -115,12 +153,13 @@ pub fn spawn(app: AppHandle) {
         // folder's figures, or its absence, which drops the quota tab from
         // Stage, only to replace them a second later.
         let mut chosen = chosen_rx.recv_timeout(FIRST_ROOT_GRACE).ok().flatten();
+        let mut tails = Tails::default();
         let mut last_said = String::new();
 
         loop {
             // Resolved every pass rather than once at start, so a changed
             // setting, or a folder that appears after launch, is picked up.
-            let (payload, said) = match read(chosen.as_deref()) {
+            let (payload, said) = match read(chosen.as_deref(), &mut tails) {
                 Ok((root, payload)) => (
                     payload,
                     format!("reading local transcripts from {}", root.display()),
@@ -132,8 +171,12 @@ pub fn spawn(app: AppHandle) {
                 eprintln!("poller.quota: {said}");
                 if payload.available {
                     eprintln!(
-                        "poller.quota: {}h window, {} requests, {} in / {} out tokens, {} models",
-                        payload.window_hours,
+                        "poller.quota: {} block, {} requests, {} in / {} out tokens, {} models",
+                        if payload.block_start_ms.is_some() {
+                            "in a"
+                        } else {
+                            "no active"
+                        },
                         payload.requests,
                         payload.tokens_in,
                         payload.tokens_out,
@@ -161,70 +204,102 @@ pub fn spawn(app: AppHandle) {
 /// One pass over the chosen folder, or the default. A folder with no
 /// transcripts in it at all is reported as such: counting it as a quiet window
 /// would show zeroes for a source that is not there.
-fn read(chosen: Option<&Path>) -> Result<(PathBuf, QuotaPayload), String> {
+fn read(chosen: Option<&Path>, tails: &mut Tails) -> Result<(PathBuf, QuotaPayload), String> {
     let root = transcript_root(chosen)?;
+    if tails.root != root {
+        *tails = Tails {
+            root: root.clone(),
+            files: HashMap::new(),
+        };
+    }
 
-    let window_ms = WINDOW_HOURS * 60 * 60 * 1000;
     let now = now_ms();
-    let since = now - window_ms;
+    let since = now - LOOKBACK_HOURS * HOUR_MS;
 
-    let Some(events) = collect(&root, since) else {
+    if !collect(&root, since, &mut tails.files) {
         return Err(format!(
             "no agent session transcripts at {}",
             root.display()
         ));
-    };
+    }
 
-    let payload = summarise(events, now, since);
+    // Once per reply, however many lines carried it. Keyed across files too:
+    // nothing guarantees a reply is only ever written to one transcript.
+    let mut seen = HashSet::new();
+    let mut events: Vec<&Event> = tails
+        .files
+        .values()
+        .flat_map(|tail| &tail.events)
+        .filter(|e| e.key.as_ref().is_none_or(|k| seen.insert(k)))
+        .collect();
+    events.sort_by_key(|e| e.at_ms);
+
+    let payload = summarise(&events, now);
     Ok((root, payload))
 }
 
-fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
-    let window_ms = now - since;
+/// The block `now` falls in, as `(start, end)`, if one is running.
+///
+/// A block opens with the first request after the previous block ended, on
+/// the hour before it, in UTC, and lasts `BLOCK_HOURS`. That is how local usage
+/// tools reconstruct the provider's limit window; the provider does not
+/// document it, so the reset time shown is an estimate.
+fn active_block(events: &[&Event], now: i64) -> Option<(i64, i64)> {
+    let mut block: Option<(i64, i64)> = None;
+    for e in events {
+        if block.is_none_or(|(_, end)| e.at_ms >= end) {
+            let start = e.at_ms - e.at_ms.rem_euclid(HOUR_MS);
+            block = Some((start, start + BLOCK_HOURS * HOUR_MS));
+        }
+    }
+    block.filter(|&(_, end)| now < end)
+}
+
+fn summarise(events: &[&Event], now: i64) -> QuotaPayload {
+    let block = active_block(events, now);
+    let span_ms = BLOCK_HOURS * HOUR_MS;
+    let history_from = now - span_ms;
+    let recent_from = now - span_ms / 4;
 
     let mut tokens_in = 0u64;
     let mut tokens_out = 0u64;
     let mut cache_read = 0u64;
     let mut cache_write = 0u64;
+    let mut requests = 0u64;
     let mut per_model: Vec<(String, u64)> = Vec::new();
     let mut history = vec![0u64; BUCKETS];
-    let mut oldest = now;
     let mut recent = 0u64;
 
-    let recent_from = now - window_ms / 4;
-
-    for e in &events {
-        tokens_in += e.input;
-        tokens_out += e.output;
-        cache_read += e.cache_read;
-        cache_write += e.cache_write;
-
+    for e in events {
         let billed = e.input + e.output;
-        if e.at_ms < oldest {
-            oldest = e.at_ms;
+
+        if block.is_some_and(|(start, _)| e.at_ms >= start) {
+            tokens_in += e.input;
+            tokens_out += e.output;
+            cache_read += e.cache_read;
+            cache_write += e.cache_write;
+            requests += 1;
+            match per_model.iter_mut().find(|(m, _)| *m == e.model) {
+                Some((_, total)) => *total += billed,
+                None => per_model.push((e.model.clone(), billed)),
+            }
         }
+
         if e.at_ms >= recent_from {
             recent += billed;
         }
 
-        match per_model.iter_mut().find(|(m, _)| *m == e.model) {
-            Some((_, total)) => *total += billed,
-            None => per_model.push((e.model.clone(), billed)),
+        if e.at_ms >= history_from {
+            let offset = (e.at_ms - history_from) as f64 / span_ms as f64;
+            let idx = ((offset * BUCKETS as f64) as usize).min(BUCKETS - 1);
+            history[idx] += billed;
         }
-
-        let offset = (e.at_ms - since).max(0) as f64 / window_ms.max(1) as f64;
-        let idx = ((offset * BUCKETS as f64) as usize).min(BUCKETS - 1);
-        history[idx] += billed;
     }
 
     per_model.sort_by_key(|(_, total)| std::cmp::Reverse(*total));
 
-    let quarter_min = (window_ms / 4) as f64 / 60_000.0;
-    let burn_per_min = if quarter_min > 0.0 {
-        (recent as f64 / quarter_min).round() as u64
-    } else {
-        0
-    };
+    let quarter_min = (span_ms / 4) as f64 / 60_000.0;
+    let burn_per_min = (recent as f64 / quarter_min).round() as u64;
 
     QuotaPayload {
         available: true,
@@ -234,10 +309,10 @@ fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
         tokens_out,
         cache_read,
         cache_write,
-        requests: events.len() as u64,
-        window_hours: WINDOW_HOURS,
-        // When the oldest counted event falls out of the window.
-        resets_in_ms: (oldest + window_ms - now).max(0),
+        requests,
+        window_hours: BLOCK_HOURS,
+        block_start_ms: block.map(|(start, _)| start),
+        resets_in_ms: block.map_or(0, |(_, end)| end - now),
         burn_per_min,
         models: per_model
             .into_iter()
@@ -248,82 +323,121 @@ fn summarise(events: Vec<Event>, now: i64, since: i64) -> QuotaPayload {
     }
 }
 
-/// Walks `<root>/<project>/*.jsonl`, skipping files untouched since the window
-/// opened. `None` when there is not a single transcript, however old.
-fn collect(root: &Path, since: i64) -> Option<Vec<Event>> {
-    let mut events = Vec::new();
-    let mut found = false;
-
-    let projects = fs::read_dir(root).ok()?;
-
-    for project in projects.flatten() {
-        let Ok(files) = fs::read_dir(project.path()) else {
-            continue;
-        };
-
-        for entry in files.flatten() {
-            let path = entry.path();
-            if path.extension().and_then(|e| e.to_str()) != Some("jsonl") {
-                continue;
-            }
-            found = true;
-            if modified_ms(&entry) < since {
-                continue;
-            }
-            read_file(&path, since, &mut events);
-        }
+/// Brings every transcript touched since `since` up to date, and forgets the
+/// rest. False when there is not a single transcript, however old.
+fn collect(root: &Path, since: i64, files: &mut HashMap<PathBuf, Tail>) -> bool {
+    let mut found = Vec::new();
+    walk(root, 0, &mut found);
+    if found.is_empty() {
+        files.clear();
+        return false;
     }
 
-    found.then_some(events)
+    let mut live = HashSet::new();
+    for (path, modified, len) in found {
+        if modified < since {
+            continue;
+        }
+        let tail = files.entry(path.clone()).or_default();
+        follow(&path, len, tail);
+        tail.events.retain(|e| e.at_ms >= since);
+        live.insert(path);
+    }
+    files.retain(|path, _| live.contains(path));
+    true
 }
 
-fn read_file(path: &Path, since: i64, out: &mut Vec<Event>) {
-    let Ok(file) = File::open(path) else { return };
-
-    for line in BufReader::new(file).lines().map_while(Result::ok) {
-        // Most lines are not assistant turns. A substring test is far cheaper
-        // than parsing every record in a transcript thousands of lines long.
-        if !line.contains("\"usage\"") {
+/// Every `.jsonl` under `dir`, with when it last changed and how long it is.
+fn walk(dir: &Path, depth: usize, out: &mut Vec<(PathBuf, i64, u64)>) {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else {
             continue;
+        };
+        let path = entry.path();
+        if meta.is_dir() {
+            if depth < MAX_DEPTH {
+                walk(&path, depth + 1, out);
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+            out.push((path, modified_ms(&meta), meta.len()));
         }
-
-        let Ok(record) = serde_json::from_str::<serde_json::Value>(&line) else {
-            continue;
-        };
-
-        let Some(at_ms) = record
-            .get("timestamp")
-            .and_then(|t| t.as_str())
-            .and_then(parse_iso)
-        else {
-            continue;
-        };
-        if at_ms < since {
-            continue;
-        }
-
-        let Some(message) = record.get("message") else {
-            continue;
-        };
-        let Some(usage) = message.get("usage") else {
-            continue;
-        };
-
-        let num = |key: &str| usage.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
-
-        out.push(Event {
-            at_ms,
-            model: message
-                .get("model")
-                .and_then(|m| m.as_str())
-                .unwrap_or("unknown")
-                .to_string(),
-            input: num("input_tokens"),
-            output: num("output_tokens"),
-            cache_read: num("cache_read_input_tokens"),
-            cache_write: num("cache_creation_input_tokens"),
-        });
     }
+}
+
+/// Reads whatever has been appended since the last pass. A line still being
+/// written has no newline yet and is left for next time, rather than parsed
+/// half-finished and then skipped as already read.
+fn follow(path: &Path, len: u64, tail: &mut Tail) {
+    if len < tail.read_to {
+        // Shorter than what was read: rewritten, not appended to.
+        *tail = Tail::default();
+    }
+    if len == tail.read_to {
+        return;
+    }
+
+    let Ok(mut file) = File::open(path) else {
+        return;
+    };
+    if file.seek(SeekFrom::Start(tail.read_to)).is_err() {
+        return;
+    }
+
+    let mut reader = BufReader::new(file);
+    let mut line = Vec::new();
+    loop {
+        line.clear();
+        let Ok(n) = reader.read_until(b'\n', &mut line) else {
+            return;
+        };
+        if n == 0 || line.last() != Some(&b'\n') {
+            return;
+        }
+        tail.read_to += n as u64;
+        if let Some(event) = parse(&String::from_utf8_lossy(&line)) {
+            tail.events.push(event);
+        }
+    }
+}
+
+fn parse(line: &str) -> Option<Event> {
+    // Most lines are not assistant turns. A substring test is far cheaper
+    // than parsing every record in a transcript thousands of lines long.
+    if !line.contains("\"usage\"") {
+        return None;
+    }
+
+    let record = serde_json::from_str::<serde_json::Value>(line).ok()?;
+    let at_ms = record
+        .get("timestamp")
+        .and_then(|t| t.as_str())
+        .and_then(parse_iso)?;
+    let message = record.get("message")?;
+    let usage = message.get("usage")?;
+
+    let num = |key: &str| usage.get(key).and_then(|v| v.as_u64()).unwrap_or(0);
+    fn id(v: Option<&serde_json::Value>) -> &str {
+        v.and_then(|v| v.as_str()).unwrap_or("")
+    }
+    let message_id = id(message.get("id"));
+
+    Some(Event {
+        at_ms,
+        key: (!message_id.is_empty())
+            .then(|| format!("{message_id}:{}", id(record.get("requestId")))),
+        model: message
+            .get("model")
+            .and_then(|m| m.as_str())
+            .unwrap_or("unknown")
+            .to_string(),
+        input: num("input_tokens"),
+        output: num("output_tokens"),
+        cache_read: num("cache_read_input_tokens"),
+        cache_write: num("cache_creation_input_tokens"),
+    })
 }
 
 /// Minimal RFC 3339 reader for the shape these transcripts use, so the poller
@@ -365,10 +479,8 @@ fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-fn modified_ms(entry: &fs::DirEntry) -> i64 {
-    entry
-        .metadata()
-        .and_then(|m| m.modified())
+fn modified_ms(meta: &fs::Metadata) -> i64 {
+    meta.modified()
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_millis() as i64)

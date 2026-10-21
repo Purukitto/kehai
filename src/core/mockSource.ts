@@ -153,6 +153,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
       cacheWrite: 96_000,
       requests: 312,
       windowHours: 5,
+      blockStartMs: Date.now() - 11_520_000,
       resetsInMs: 6_480_000,
       burnPerMin: 24_600,
       models: [

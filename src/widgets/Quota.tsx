@@ -32,6 +32,16 @@ export function budgetPct(quota: QuotaPayload, budget?: number | null): number |
   return Math.round((totalTokens(quota) / limit) * 100);
 }
 
+/**
+ * When the limit window resets. Approximate, because the window is worked out
+ * from transcripts rather than read from the provider, and said so.
+ */
+export function blockEnds(quota: QuotaPayload): string {
+  return quota.blockStartMs === null
+    ? 'The next request starts a block'
+    : 'Resets in ~' + humanDuration(quota.resetsInMs);
+}
+
 /** The single-row layout the Ambient preset uses, with or without data. */
 const LINE: CSSProperties = {
   background: 'var(--cc-pane)',
@@ -117,7 +127,7 @@ function Quota({ props }: WidgetProps) {
   return (
     <Pane label="LLM QUOTA" topic="dev:llm_tokens">
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span className="cc-label">{quota.windowHours}H ROLLING</span>
+        <span className="cc-label">{quota.windowHours}H BLOCK</span>
         <span
           style={{
             fontSize: 9,
@@ -144,12 +154,16 @@ function Quota({ props }: WidgetProps) {
         {hero}
       </span>
       <span style={{ fontSize: 14, color: 'var(--cc-muted)', marginTop: 12 }}>
-        {pct === null ? 'TOKENS THIS WINDOW' : compact(used) + ' TOKENS'}
+        {quota.blockStartMs === null
+          ? 'NO ACTIVE BLOCK'
+          : pct === null
+            ? 'TOKENS THIS BLOCK'
+            : compact(used) + ' TOKENS'}
       </span>
       {size.h > 240 && (
         <span className="cc-mini" style={{ marginTop: 6 }}>
-          {compact(quota.burnPerMin)}/MIN · {quota.requests} REQUESTS · OLDEST FALLS OUT IN{' '}
-          {humanDuration(quota.resetsInMs)}
+          {compact(quota.burnPerMin)}/MIN · {quota.requests} REQUESTS ·{' '}
+          {quota.blockStartMs === null ? 'NEXT REQUEST STARTS A BLOCK' : 'RESETS IN ~' + humanDuration(quota.resetsInMs)}
         </span>
       )}
       <div style={{ flex: 1 }} />

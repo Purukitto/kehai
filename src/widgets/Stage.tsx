@@ -6,7 +6,7 @@ import { useTopic } from '../core/useTopic';
 import type { CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
 import type { WidgetProps, WidgetSpec } from '../core/types';
 import { Meter } from './chrome';
-import { budgetPct, budgetStatus, totalTokens } from './Quota';
+import { blockEnds, budgetPct, budgetStatus, totalTokens } from './Quota';
 import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } from './Sprint';
 
 interface Hero {
@@ -49,7 +49,7 @@ function Stage({ props }: WidgetProps) {
     const pct = budgetPct(quota, settings.budgetTokens);
     const status = budgetStatus(pct);
     hero = {
-      label: quota.provider.toUpperCase() + ' / ' + quota.windowHours + 'H ROLLING',
+      label: quota.provider.toUpperCase() + ' / ' + quota.windowHours + 'H BLOCK',
       value: pct === null ? compact(totalTokens(quota)) : pct + '%',
       status: status.label,
       sub:
@@ -60,7 +60,9 @@ function Stage({ props }: WidgetProps) {
         compact(quota.tokensOut) +
         ' out across ' +
         quota.requests +
-        ' requests.',
+        ' requests. ' +
+        blockEnds(quota) +
+        '.',
       meter: pct ?? Math.min(100, quota.burnPerMin / 500),
       color: status.color,
       series: quota.history,

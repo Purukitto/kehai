@@ -46,18 +46,26 @@ export interface QuotaPayload {
   available: boolean;
   reason: string | null;
   provider: string;
-  /** Tokens counted inside the rolling window. */
+  /** Counted inside the current block, once per reply. All zero when there is none. */
   tokensIn: number;
   tokensOut: number;
   cacheRead: number;
   cacheWrite: number;
   requests: number;
-  /** Window length in hours, and when the oldest counted event falls out. */
+  /** Block length in hours. */
   windowHours: number;
+  /**
+   * When the current block began, or null when the last one has ended and the
+   * next request starts another. Reconstructed from transcripts: the provider
+   * does not publish its window, so treat the reset time as an estimate.
+   */
+  blockStartMs: number | null;
+  /** Until the current block ends. Zero when there is none. */
   resetsInMs: number;
-  /** Tokens per minute over the last quarter of the window. */
+  /** Tokens per minute over the last quarter of the block length. */
   burnPerMin: number;
   models: ModelUsage[];
+  /** The last `windowHours`, rolling, whatever block each request fell in. */
   history: number[];
   /**
    * The budget the user configured, not a limit read from a provider — no local
