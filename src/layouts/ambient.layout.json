@@ -6,7 +6,7 @@
       "grid": { "cols": 12, "rows": 8, "gap": 1 },
       "tiles": [
         { "widget": "clock", "area": [1, 1, 5, 13], "props": { "seconds": false, "size": "hero" } },
-        { "widget": "agents", "area": [5, 1, 7, 7], "props": {} },
+        { "widget": "agents", "area": [5, 1, 7, 7], "props": { "density": "line" } },
         { "widget": "quota", "area": [5, 7, 7, 13], "props": { "density": "line" } },
         { "widget": "media", "area": [7, 1, 9, 8], "props": { "art": false, "equaliser": "bar" } },
         { "widget": "vitals", "area": [7, 8, 9, 13], "props": { "show": ["cpu", "mem"] } }
@@ -16,7 +16,7 @@
       "grid": { "cols": 16, "rows": 4, "gap": 1 },
       "tiles": [
         { "widget": "clock", "area": [1, 1, 5, 7], "props": { "seconds": false, "size": "hero" } },
-        { "widget": "agents", "area": [1, 7, 3, 12], "props": {} },
+        { "widget": "agents", "area": [1, 7, 3, 12], "props": { "density": "line" } },
         { "widget": "quota", "area": [3, 7, 5, 12], "props": { "density": "line" } },
         { "widget": "media", "area": [1, 12, 3, 17], "props": { "art": false, "equaliser": "bar" } },
         { "widget": "vitals", "area": [3, 12, 5, 17], "props": { "show": ["cpu", "mem"] } }
@@ -26,7 +26,7 @@
       "grid": { "cols": 8, "rows": 12, "gap": 1 },
       "tiles": [
         { "widget": "clock", "area": [1, 1, 7, 9], "props": { "seconds": false, "size": "hero" } },
-        { "widget": "agents", "area": [7, 1, 8, 9], "props": {} },
+        { "widget": "agents", "area": [7, 1, 8, 9], "props": { "density": "line" } },
         { "widget": "quota", "area": [8, 1, 10, 9], "props": { "density": "line" } },
         { "widget": "media", "area": [10, 1, 12, 9], "props": { "art": false, "equaliser": "bar" } },
         { "widget": "vitals", "area": [12, 1, 13, 9], "props": { "show": ["cpu", "mem"] } }

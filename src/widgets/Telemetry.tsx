@@ -51,7 +51,7 @@ function Telemetry(_: WidgetProps) {
   const showGraph = size.h > 270;
 
   return (
-    <Pane label="SYSTEM TELEMETRY" topic="telemetry:*" padded={false}>
+    <Pane label="MACHINE" padded={false}>
       <div style={{ padding: '12px 14px', flex: 'none' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
           <span className="cc-label" style={{ fontSize: 9 }}>
@@ -173,6 +173,8 @@ function Telemetry(_: WidgetProps) {
 }
 
 export const telemetrySpec: WidgetSpec = {
+  title: 'Machine',
+  about: 'Processor history, memory, network and disks.',
   min: [2, 2],
   topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'telemetry:disk'],
   component: Telemetry,

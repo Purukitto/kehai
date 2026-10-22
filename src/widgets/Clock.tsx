@@ -16,7 +16,16 @@ function Clock({ props }: WidgetProps) {
   const pad = hero ? 40 : 20;
   const [floor, byHeight, ceiling] = hero ? [48, size.h * 0.42, 208] : [24, size.h * 0.34, 72];
   const byWidth = size.w > 0 ? (size.w - pad * 2) / (time.length * 0.6) : Infinity;
-  const fontSize = Math.max(12, Math.round(Math.min(Math.max(floor, byHeight), ceiling, byWidth)));
+  const inline = Math.max(12, Math.round(Math.min(Math.max(floor, byHeight), ceiling, byWidth)));
+
+  // A tall hero tile, as on a portrait display, fits much bigger digits with
+  // the hours over the minutes. Only when that is clearly bigger: a stacked
+  // clock reads slower, and is worth it for size alone.
+  const room = size.h - pad * 2 - 42;
+  const stacked = !seconds && size.w > 0 ? Math.round(Math.min(room / 1.84, (size.w - pad * 2) / 1.2, 420)) : 0;
+  const stack = hero && stacked >= inline * 1.25;
+  const fontSize = stack ? stacked : inline;
+  const [hours, minutes] = time.split(':');
 
   return (
     <div
@@ -38,9 +47,19 @@ function Clock({ props }: WidgetProps) {
           lineHeight: 0.92,
           letterSpacing: '-0.04em',
           whiteSpace: 'nowrap',
+          display: 'block',
         }}
+        aria-label={time}
       >
-        {time}
+        {stack ? (
+          <>
+            {hours}
+            <br />
+            {minutes}
+          </>
+        ) : (
+          time
+        )}
       </span>
       <span
         style={{
@@ -61,6 +80,8 @@ function Clock({ props }: WidgetProps) {
 }
 
 export const clockSpec: WidgetSpec = {
+  title: 'Clock',
+  about: 'The time and date.',
   min: [2, 2],
   topics: ['os:clock'],
   component: Clock,

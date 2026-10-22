@@ -1,15 +1,17 @@
 import type { ReactNode } from 'react';
 
-/** The shell every tile shares: pane background, optional header, no radius. */
+/**
+ * The shell every tile shares: pane background, optional header, no radius.
+ * The header names what the tile shows; which bus topic feeds it is for the
+ * code, not for the panel.
+ */
 export function Pane({
   label,
-  topic,
   right,
   children,
   padded = true,
 }: {
   label?: string;
-  topic?: string;
   right?: ReactNode;
   children: ReactNode;
   padded?: boolean;
@@ -42,7 +44,6 @@ export function Pane({
           }}
         >
           <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.15em' }}>{label}</span>
-          {topic && <span className="cc-mini" style={{ fontSize: 9 }}>{topic}</span>}
           <div style={{ flex: 1 }} />
           {right}
         </div>

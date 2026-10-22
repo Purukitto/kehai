@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { compact, humanDuration, sparkPath } from '../core/format';
+import { useNav } from '../core/nav';
 import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
@@ -58,11 +59,12 @@ function Quota({ props }: WidgetProps) {
   const quota = useTopic<QuotaPayload>('dev:llm_tokens');
   const size = useTileSize();
   const { settings } = useSettings();
+  const { openSettings } = useNav();
   const line = props.density === 'line';
 
   if (!quota) {
     return (
-      <Pane label="LLM QUOTA" topic="dev:llm_tokens">
+      <Pane label="TOKEN USAGE">
         <Awaiting label="SESSION USAGE" />
       </Pane>
     );
@@ -84,7 +86,7 @@ function Quota({ props }: WidgetProps) {
       );
     }
     return (
-      <Pane label="LLM QUOTA" topic="dev:llm_tokens">
+      <Pane label="TOKEN USAGE">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NO AGENT TRANSCRIPTS</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
@@ -125,21 +127,32 @@ function Quota({ props }: WidgetProps) {
   const path = sparkPath(quota.history, 400, 52);
 
   return (
-    <Pane label="LLM QUOTA" topic="dev:llm_tokens">
+    <Pane label="TOKEN USAGE">
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
         <span className="cc-label">{quota.windowHours}H BLOCK</span>
-        <span
-          style={{
-            fontSize: 9,
-            letterSpacing: '0.1em',
-            padding: '1px 5px',
-            border: '1px solid currentColor',
-            color: status.color,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {status.label}
-        </span>
+        {pct === null ? (
+          // No budget is a choice not yet made, not an alarm: a way to make it.
+          <button
+            className="cc-chip"
+            style={{ fontSize: 9, padding: '3px 8px', color: 'var(--cc-muted)' }}
+            onClick={() => openSettings('SOURCES')}
+          >
+            SET A BUDGET
+          </button>
+        ) : (
+          <span
+            style={{
+              fontSize: 9,
+              letterSpacing: '0.1em',
+              padding: '1px 5px',
+              border: '1px solid currentColor',
+              color: status.color,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {status.label}
+          </span>
+        )}
       </div>
       <div style={{ flex: 1 }} />
       <span
@@ -178,6 +191,8 @@ function Quota({ props }: WidgetProps) {
 }
 
 export const quotaSpec: WidgetSpec = {
+  title: 'Token usage',
+  about: 'Agent tokens in the current 5-hour block, and when it resets.',
   min: [3, 2],
   topics: ['dev:llm_tokens'],
   component: Quota,

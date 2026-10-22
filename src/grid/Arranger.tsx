@@ -242,7 +242,7 @@ export function Arranger({
         <div style={{ flex: 1 }} />
         {current && (
           <span className="cc-mini">
-            {current.widget.toUpperCase()} · {current.area[3] - current.area[1]}x
+            {(registry[current.widget]?.title ?? current.widget).toUpperCase()} · {current.area[3] - current.area[1]}x
             {current.area[2] - current.area[0]}
             {spec ? ` · MIN ${spec.min[0]}x${spec.min[1]}` : ''}
           </span>
@@ -350,7 +350,7 @@ export function Arranger({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {tile.widget.toUpperCase()}
+                    {(registry[tile.widget]?.title ?? tile.widget).toUpperCase()}
                   </span>
                   <span className="cc-mini" style={{ fontSize: 9 }}>
                     {c2 - c1}x{r2 - r1}

@@ -93,17 +93,17 @@ a layout as JSON if you want to commit or share one.
 
 ### Widgets
 
-| Key | Widget | Reads |
-| --- | --- | --- |
-| `stage` | Hero readout with a tab strip | tokens, agents, CPU, memory, timer |
-| `telemetry` | CPU history, memory, network, volumes | all four telemetry topics |
-| `vitals` | Compact strip of CPU, memory, network, unread and agents | CPU, memory, network, notifications, agents |
-| `agents` | Which agent sessions are working and which are waiting on you | `dev:agents` |
-| `quota` | Agent token usage in the current 5-hour block | `dev:llm_tokens` |
-| `media` | Now playing, transport and cover art | `media:now_playing`, `media:art` |
-| `notify` | System notification feed, dismissable | `sys:notify` |
-| `clock` | Time and date | `os:clock` |
-| `sprint` | Focus timer — start, pause, skip, reset | `flow:pomodoro` |
+| Key | Called | Shows | Reads |
+| --- | --- | --- | --- |
+| `stage` | Main readout | One large reading with tabs for tokens, agents, machine and focus. Moves to Agents while one waits on you | tokens, agents, CPU, memory, timer |
+| `telemetry` | Machine | CPU history, memory, network, volumes | all four telemetry topics |
+| `vitals` | Status strip | CPU, memory, network, unread and agents in a line | CPU, memory, network, notifications, agents |
+| `agents` | Agents | Which agent sessions are working and which are waiting on you | `dev:agents` |
+| `quota` | Token usage | Agent tokens in the current 5-hour block, and when it resets | `dev:llm_tokens` |
+| `media` | Now playing | Track, transport and cover art | `media:now_playing`, `media:art` |
+| `notify` | Notifications | System notification feed, dismissable | `sys:notify` |
+| `clock` | Clock | Time and date; hours over minutes in a tall tile | `os:clock` |
+| `sprint` | Focus timer | Start, pause, skip, reset | `flow:pomodoro` |
 
 ### Sources
 

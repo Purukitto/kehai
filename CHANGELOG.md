@@ -9,6 +9,31 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- The main readout moves to Agents while an agent waits on you, and goes back to your
+  tab once none does. Picking a tab yourself keeps it until another agent starts
+  waiting. **Settings → Widgets** turns this off.
+- The Agents tab shows how many are waiting, whichever tab is open.
+- In a tall tile, as on a portrait display, the clock puts the hours over the minutes
+  when that makes the digits much bigger.
+
+### Changed
+
+- Tiles are named for what they show, such as Token usage, Focus timer and
+  Notifications, and no longer print internal topic names.
+- Every bar under the main readout says what it measures. Without a budget, the
+  Tokens bar shows how much of the 5-hour block has gone, rather than a burn-rate
+  scale that meant nothing.
+- "No budget set" is a quiet **Set a budget** button that opens the setting, which now
+  lives under **Settings → Sources** beside agent tokens.
+- The main readout's tabs are Tokens, Agents, Machine and Focus, and it remembers the
+  one you picked across restarts.
+- The Machine tab draws one bar per thread, and says which figure is processor and
+  which is memory.
+- Ambient shows waiting agents as a single large line.
+- **Settings → Widgets** lists widgets by name, with a line on what each shows.
+
 ## [0.4.0] - 2026-10-21
 
 ### Added

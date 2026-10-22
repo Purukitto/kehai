@@ -721,6 +721,7 @@ export function SettingsScreen({
     setTheme,
     setBudget,
     setAutoHideBar,
+    setFollowAttention,
     setTranscriptRoot,
     setAutoCheckUpdates,
     setFocus,
@@ -751,7 +752,7 @@ export function SettingsScreen({
     setRenaming(null);
   };
 
-  const label = (name: string) => name.replace(/^\w/, (c) => c.toUpperCase());
+  const label = (name: string) => registry[name]?.title ?? name;
   const here = layout.shapes[shape];
   const mediaIndex = here.tiles.findIndex((t) => t.widget === 'media');
   const mediaTile = mediaIndex >= 0 ? here.tiles[mediaIndex] : undefined;
@@ -1056,10 +1057,10 @@ export function SettingsScreen({
                 For the {shape} arrangement of {layout.name}, the one on screen.
                 {isPreset(settings.layoutId) ? ' It is a preset, so a change saves a copy under Yours.' : ''}
               </div>
-              {widgetNames.map((name) => {
+              {[...widgetNames].sort((a, b) => label(a).localeCompare(label(b))).map((name) => {
                 const on = here.tiles.some((t) => t.widget === name);
                 return (
-                  <Row key={name} label={label(name)} desc={registry[name].topics.join(' · ')}>
+                  <Row key={name} label={label(name)} desc={registry[name].about}>
                     <Seg
                       options={['OFF', 'ON']}
                       value={on ? 'ON' : 'OFF'}
@@ -1070,6 +1071,19 @@ export function SettingsScreen({
                   </Row>
                 );
               })}
+
+              {here.tiles.some((t) => t.widget === 'stage') && (
+                <Row
+                  label="Main readout follows attention"
+                  desc="Shows Agents while one waits on you, and goes back to your tab once none does. Picking a tab yourself keeps it until another agent starts waiting."
+                >
+                  <Seg
+                    options={['OFF', 'ON']}
+                    value={settings.followAttention ? 'ON' : 'OFF'}
+                    onPick={(v) => setFollowAttention(v === 'ON')}
+                  />
+                </Row>
+              )}
 
               {mediaTile && (
                 <>
@@ -1183,6 +1197,17 @@ export function SettingsScreen({
               />
               {!REMOTE_PANEL && <FocusRows focus={settings.focus} onChange={setFocus} />}
               <SourceRow label="Agent tokens" topic="dev:llm_tokens" desc="Tallied from local session transcripts. Never leaves the machine." />
+              <SubRow
+                label="Token budget"
+                desc="No local source exposes your real plan limit, so a percentage only means something once you pick a number to measure against."
+              >
+                <Seg
+                  options={[0, 1, 5, 10, 20]}
+                  value={settings.budgetTokens ? settings.budgetTokens / 1_000_000 : 0}
+                  format={(v) => (v === 0 ? 'NONE' : `${v}M`)}
+                  onPick={(v) => setBudget(v === 0 ? null : v * 1_000_000)}
+                />
+              </SubRow>
               <SourceRow
                 label="Agent sessions"
                 topic="dev:agents"
@@ -1228,17 +1253,6 @@ export function SettingsScreen({
                   </Row>
                 </>
               )}
-              <Row
-                label="Token budget"
-                desc="No local source exposes your real plan limit, so a percentage only means something once you pick a number to measure against."
-              >
-                <Seg
-                  options={[0, 1, 5, 10, 20]}
-                  value={settings.budgetTokens ? settings.budgetTokens / 1_000_000 : 0}
-                  format={(v) => (v === 0 ? 'NONE' : `${v}M`)}
-                  onPick={(v) => setBudget(v === 0 ? null : v * 1_000_000)}
-                />
-              </Row>
               <Row
                 label="Reset everything"
                 desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no layouts of your own, no remote panel."

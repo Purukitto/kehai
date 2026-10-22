@@ -66,8 +66,10 @@ topics on a bus, and consumed by widgets that subscribe to topics. Nothing else 
 
 ### Adding a widget
 
-1. Write `src/widgets/YourWidget.tsx`. Export the component and a `WidgetSpec` naming
-   its minimum size in grid cells and the topics it reads.
+1. Write `src/widgets/YourWidget.tsx`. Export the component and a `WidgetSpec` giving
+   its `title` and a one-line `about` (what Settings and the arranger show), its
+   minimum size in grid cells and the topics it reads. Its `Pane` label names what it
+   shows, never the topic.
 2. Add it to the map in `src/widgets/registry.ts`. That is the only place a widget is
    reachable from, so nothing in the grid changes.
 3. Reference it by key from a layout in `src/layouts/`, or add it from

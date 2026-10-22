@@ -132,15 +132,17 @@ export function agentSummary(agents: AgentsPayload): { text: string; color: stri
   return { text: 'IDLE', color: 'var(--cc-dim)' };
 }
 
-function Agents(_: WidgetProps) {
+function Agents({ props }: WidgetProps) {
   const agents = useTopic<AgentsPayload>('dev:agents');
   const size = useTileSize();
   const now = useNow();
-  const line = useBreakpoint(size.h, LINE_BELOW);
+  // Ambient asks for the line whatever the height: one fact, stated large.
+  const short = useBreakpoint(size.h, LINE_BELOW);
+  const line = props.density === 'line' || short;
 
   if (!agents) {
     return (
-      <Pane label="AGENTS" topic="dev:agents">
+      <Pane label="AGENTS">
         <Awaiting label="AGENT SESSIONS" />
       </Pane>
     );
@@ -149,7 +151,7 @@ function Agents(_: WidgetProps) {
   // Optional, as the quota widget's source is: out of the danger colour.
   if (!agents.available) {
     return (
-      <Pane label="AGENTS" topic="dev:agents">
+      <Pane label="AGENTS">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NO AGENT TRANSCRIPTS</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
@@ -172,7 +174,7 @@ function Agents(_: WidgetProps) {
         style={{
           flex: 1,
           background: 'var(--cc-pane)',
-          padding: '0 20px',
+          padding: props.density === 'line' ? '0 40px' : '0 20px',
           display: 'flex',
           alignItems: 'center',
           gap: 16,
@@ -200,7 +202,6 @@ function Agents(_: WidgetProps) {
   return (
     <Pane
       label="AGENTS"
-      topic="dev:agents"
       padded={false}
       right={
         <span className="cc-mini" style={{ color: head.color }}>
@@ -239,6 +240,8 @@ function Agents(_: WidgetProps) {
 }
 
 export const agentsSpec: WidgetSpec = {
+  title: 'Agents',
+  about: 'Which coding-agent sessions are working and which are waiting on you.',
   min: [3, 1],
   topics: ['dev:agents'],
   component: Agents,
