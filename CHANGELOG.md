@@ -9,6 +9,24 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- The layout's name in the header is a button: tap it for a list of every layout, or
+  **Manage layouts** for Settings. On a touchscreen, swipe sideways along the header
+  for the next or previous layout.
+
+### Changed
+
+- Nothing you can press is smaller than 28px, so the panel works by touch as well as
+  with a mouse. The tile arranger's buttons and resize corners are bigger still.
+- On a touchscreen, a notification's dismiss button stays in view instead of waiting
+  for a hover that never comes, and the edge that brings back a hidden header is
+  taller.
+
+### Fixed
+
+- Tapping a tile in the arranger to select it no longer saves a copy of a preset.
+
 ## [0.5.0] - 2026-10-22
 
 ### Added

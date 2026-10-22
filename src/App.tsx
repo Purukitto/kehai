@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { PairPrompt } from './components/PairPrompt';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
@@ -34,6 +35,7 @@ async function toggleFullscreen(): Promise<void> {
 export default function App() {
   const { settings, layout } = useSettings();
   const { shape } = useWindowShape();
+  const swipe = useLayoutSwipe();
   const autoHide = settings.autoHideBar;
   const [mode, setMode] = useState<Mode>('dashboard');
   const [settingsAt, setSettingsAt] = useState<Section | undefined>(undefined);
@@ -193,7 +195,11 @@ export default function App() {
       <div
         data-tauri-drag-region
         className="cc-topbar"
+        {...swipe}
         style={{
+          // The header takes horizontal swipes itself, so a browser does not
+          // read one as back or forward.
+          touchAction: 'pan-y',
           height: 32,
           flex: autoHide ? undefined : 'none',
           width: autoHide ? '100%' : undefined,
@@ -232,14 +238,18 @@ export default function App() {
         <span className="cc-mini" style={{ fontSize: 10 }} title={source.title}>
           {source.label}
         </span>
-        <span className="cc-mini" style={{ fontSize: 10 }}>
-          {layout.name.toUpperCase()}
-        </span>
+        <LayoutSwitcher
+          onManage={() => {
+            setSettingsAt('LAYOUT');
+            setMode('settings');
+          }}
+        />
         <button
           className="cc-chip"
-          style={{ padding: '5px 10px', marginLeft: 4 }}
+          style={{ height: 32, width: 40, border: 0, borderLeft: '1px solid var(--cc-line)' }}
           onClick={() => setMode('settings')}
           title="Settings (S)"
+          aria-label="Settings"
         >
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
             <circle cx="8" cy="8" r="2.4" />

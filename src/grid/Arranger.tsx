@@ -16,6 +16,9 @@ interface Drag {
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+/** Toolbar buttons, sized for a finger as much as a pointer. */
+const TOOL: React.CSSProperties = { height: 36, padding: '0 16px' };
+
 function hitList(area: Area, tiles: Tile[], ignore: number): number[] {
   const hits: number[] = [];
   tiles.forEach((t, i) => {
@@ -155,12 +158,15 @@ export function Arranger({
     }
 
     const next = tiles.map((t) => ({ ...t }));
+    // A tap to select, or a drag that came back where it started, changes
+    // nothing and must save nothing: on a preset, saving makes a copy.
+    const moved = preview.some((edge, k) => edge !== drag.startArea[k]);
 
     if (drag.mode === 'move' && swapTarget !== null) {
       next[drag.index].area = tiles[swapTarget].area;
       next[swapTarget].area = drag.startArea;
       setTiles(next);
-    } else if (!hits.length) {
+    } else if (moved && !hits.length) {
       next[drag.index].area = preview;
       setTiles(next);
     }
@@ -198,11 +204,11 @@ export function Arranger({
   const stepper = (label: string, value: number, change: (v: number) => void) => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
       <span className="cc-mini">{label}</span>
-      <button className="cc-chip" style={{ width: 30 }} onClick={() => change(Math.max(2, value - 1))}>
+      <button className="cc-chip" style={{ width: 40, height: 36 }} onClick={() => change(Math.max(2, value - 1))}>
         −
       </button>
       <span style={{ fontSize: 12, width: 22, textAlign: 'center' }}>{value}</span>
-      <button className="cc-chip" style={{ width: 30 }} onClick={() => change(Math.min(24, value + 1))}>
+      <button className="cc-chip" style={{ width: 40, height: 36 }} onClick={() => change(Math.min(24, value + 1))}>
         +
       </button>
     </div>
@@ -212,7 +218,7 @@ export function Arranger({
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
       <div
         style={{
-          height: 34,
+          height: 48,
           flex: 'none',
           display: 'flex',
           alignItems: 'center',
@@ -252,6 +258,7 @@ export function Arranger({
           // removing by kind took both.
           <button
             className="cc-chip"
+            style={TOOL}
             onClick={() => {
               edit((a) => withoutTile(a, selected));
               setSelected(0);
@@ -262,12 +269,13 @@ export function Arranger({
         )}
         <button
           className="cc-chip"
+          style={TOOL}
           onClick={() => setTiles(tidy(tiles, arrangement.grid.cols, arrangement.grid.rows))}
           title="Pack tiles into free space, keeping their sizes"
         >
           TIDY
         </button>
-        <button className="cc-chip cc-chip-on" onClick={onDone}>
+        <button className="cc-chip cc-chip-on" style={TOOL} onClick={onDone}>
           DONE
         </button>
       </div>
@@ -377,20 +385,34 @@ export function Arranger({
                   </div>
                 )}
 
+                {/* A fingertip-sized corner around a small mark: the mark shows where
+                    to grab, the corner is what takes the grab. */}
                 <div
                   onPointerDown={(e) => begin(e, i, 'resize')}
                   title="Resize"
+                  aria-label="Resize"
                   style={{
                     position: 'absolute',
                     right: -1,
                     bottom: -1,
-                    width: 18,
-                    height: 18,
-                    background: active ? 'var(--cc-accent)' : 'var(--cc-line-2)',
+                    width: 40,
+                    height: 40,
+                    display: 'flex',
+                    alignItems: 'flex-end',
+                    justifyContent: 'flex-end',
                     cursor: 'nwse-resize',
                     touchAction: 'none',
                   }}
-                />
+                >
+                  <div
+                    style={{
+                      width: 20,
+                      height: 20,
+                      background: active ? 'var(--cc-accent)' : 'var(--cc-line-2)',
+                      clipPath: 'polygon(100% 0, 100% 100%, 0 100%)',
+                    }}
+                  />
+                </div>
               </div>
             );
           })}
@@ -399,7 +421,7 @@ export function Arranger({
 
       <div
         style={{
-          height: 44,
+          height: 52,
           flex: 'none',
           display: 'flex',
           alignItems: 'center',
@@ -414,7 +436,7 @@ export function Arranger({
             <button
               key={s}
               className={s === shape ? 'cc-chip cc-chip-on' : 'cc-chip'}
-              style={{ padding: '7px 13px', marginLeft: -1 }}
+              style={{ height: 36, padding: '0 14px', marginLeft: -1 }}
               onClick={() => setShape(s)}
               title={s === initialShape ? 'The shape this window shows' : undefined}
             >
@@ -433,7 +455,7 @@ export function Arranger({
               <button
                 key={gap}
                 className={gap === arrangement.grid.gap ? 'cc-chip cc-chip-on' : 'cc-chip'}
-                style={{ width: 30, marginLeft: -1 }}
+                style={{ width: 40, height: 36, marginLeft: -1 }}
                 onClick={() => edit((a) => withGrid(a, { gap }))}
               >
                 {gap}
