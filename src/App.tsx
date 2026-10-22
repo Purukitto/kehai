@@ -3,6 +3,7 @@ import { PairPrompt } from './components/PairPrompt';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
+import { NavProvider } from './core/nav';
 import type { FlowCommand, QuotaCommand, RemoteCommand, UpdateCommand, UpdatePayload } from './core/payloads';
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
@@ -263,7 +264,16 @@ export default function App() {
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {/* Keyed by shape: a tile that moves to another shape starts afresh, rather
             than keeping a breakpoint its old size decided. */}
-        <Grid key={shape} arrangement={layout.shapes[shape]} />
+        <NavProvider
+          value={{
+            openSettings: (section) => {
+              setSettingsAt(section);
+              setMode('settings');
+            },
+          }}
+        >
+          <Grid key={shape} arrangement={layout.shapes[shape]} />
+        </NavProvider>
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
       </div>
     </div>

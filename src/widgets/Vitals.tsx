@@ -90,6 +90,8 @@ function Vitals({ props }: WidgetProps) {
 }
 
 export const vitalsSpec: WidgetSpec = {
+  title: 'Status strip',
+  about: 'A line of small readings: processor, memory, network, unread, agents.',
   min: [2, 1],
   topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'sys:notify', 'dev:agents'],
   component: Vitals,

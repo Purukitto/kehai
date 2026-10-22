@@ -184,7 +184,6 @@ function NowPlaying({ props }: WidgetProps) {
     inner = (
       <Pane
         label="NOW PLAYING"
-        topic="media:now_playing"
         right={<span className="cc-mini" style={{ fontSize: 9 }}>{media.player.toUpperCase()}</span>}
       >
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
@@ -230,6 +229,8 @@ function NowPlaying({ props }: WidgetProps) {
 }
 
 export const mediaSpec: WidgetSpec = {
+  title: 'Now playing',
+  about: 'The track playing anywhere on this machine, with play, pause and skip.',
   min: [3, 2],
   topics: ['media:now_playing', 'media:art'],
   component: NowPlaying,

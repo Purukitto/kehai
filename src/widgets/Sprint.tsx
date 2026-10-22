@@ -90,7 +90,7 @@ function Sprint(_: WidgetProps) {
 
   if (!sprint) {
     return (
-      <Pane label="SPRINT" topic="flow:pomodoro">
+      <Pane label="FOCUS TIMER">
         <Awaiting label="FOCUS SPRINT" />
       </Pane>
     );
@@ -106,8 +106,7 @@ function Sprint(_: WidgetProps) {
 
   return (
     <Pane
-      label="SPRINT"
-      topic="flow:pomodoro"
+      label="FOCUS TIMER"
       right={
         <span className="cc-mini" style={{ fontSize: 9, color: running ? sprintColor(sprint) : undefined }}>
           {sprintStatus(sprint)}
@@ -155,6 +154,8 @@ function Sprint(_: WidgetProps) {
 }
 
 export const sprintSpec: WidgetSpec = {
+  title: 'Focus timer',
+  about: "A countdown of focus blocks and breaks, with today's total.",
   min: [2, 2],
   topics: ['flow:pomodoro'],
   component: Sprint,

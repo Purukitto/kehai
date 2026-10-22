@@ -35,6 +35,14 @@ export interface Settings {
   budgetTokens: number | null;
   /** Hide the header until the pointer reaches the top edge. */
   autoHideBar: boolean;
+  /** The main readout's tab you last picked, kept across restarts. Null before any. */
+  stageTab: string | null;
+  /**
+   * Whether the main readout moves to Agents while one waits on you, and back
+   * to stageTab once none does. On unless turned off: it is the one thing on
+   * the panel worth turning your head for.
+   */
+  followAttention: boolean;
   /**
    * Where the quota poller reads agent session transcripts. Null means the
    * engine's default. Kept here because this is the only settings store; the
@@ -92,6 +100,8 @@ function defaults(): Settings {
     theme: 'amber',
     budgetTokens: null,
     autoHideBar: false,
+    stageTab: null,
+    followAttention: true,
     transcriptRoot: null,
     autoCheckUpdates: false,
     focus: FOCUS_DEFAULTS,
@@ -194,6 +204,8 @@ function load(): Settings {
       ...(v2 ? fromV2(parsed) : fromV1(parsed)),
       budgetTokens: typeof parsed.budgetTokens === 'number' ? parsed.budgetTokens : null,
       autoHideBar: parsed.autoHideBar === true,
+      stageTab: typeof parsed.stageTab === 'string' ? parsed.stageTab : null,
+      followAttention: parsed.followAttention !== false,
       transcriptRoot: folder(parsed.transcriptRoot),
       autoCheckUpdates: parsed.autoCheckUpdates === true,
       focus: focus(parsed.focus),
@@ -227,6 +239,8 @@ interface Store {
   setTheme: (theme: ThemeId) => void;
   setBudget: (tokens: number | null) => void;
   setAutoHideBar: (on: boolean) => void;
+  setStageTab: (tab: string) => void;
+  setFollowAttention: (on: boolean) => void;
   setTranscriptRoot: (path: string | null) => void;
   setAutoCheckUpdates: (on: boolean) => void;
   setFocus: (focus: Partial<FocusSettings>) => void;
@@ -339,6 +353,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setBudget: (budgetTokens) => setSettings((prev) => ({ ...prev, budgetTokens })),
 
       setAutoHideBar: (autoHideBar) => setSettings((prev) => ({ ...prev, autoHideBar })),
+
+      setStageTab: (stageTab) => setSettings((prev) => ({ ...prev, stageTab })),
+
+      setFollowAttention: (followAttention) => setSettings((prev) => ({ ...prev, followAttention })),
 
       setTranscriptRoot: (path) => setSettings((prev) => ({ ...prev, transcriptRoot: folder(path) })),
 

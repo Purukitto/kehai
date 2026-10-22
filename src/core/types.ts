@@ -55,6 +55,10 @@ export interface WidgetProps {
 
 /** What a widget module declares about itself. */
 export interface WidgetSpec {
+  /** What it is called anywhere a person reads it: Settings, the arranger. */
+  title: string;
+  /** One line on what it shows, for Settings → Widgets. */
+  about: string;
   /** Minimum size in grid cells, [cols, rows]. */
   min: [number, number];
   /** Topics it reads. Declared so the engine need not poll for nothing. */

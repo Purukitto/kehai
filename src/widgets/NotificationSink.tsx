@@ -115,7 +115,7 @@ function NotificationSink(_: WidgetProps) {
 
   if (!feed) {
     return (
-      <Pane label="NOTIFICATION SINK" topic="sys:notify">
+      <Pane label="NOTIFICATIONS">
         <span className="cc-mini">AWAITING FIRST EVENT</span>
       </Pane>
     );
@@ -124,7 +124,7 @@ function NotificationSink(_: WidgetProps) {
   // A refused listener must not look like a quiet day.
   if (!feed.available) {
     return (
-      <Pane label="NOTIFICATION SINK" topic="sys:notify">
+      <Pane label="NOTIFICATIONS">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--cc-danger)' }}>LISTENER UNAVAILABLE</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>{feed.reason}</div>
@@ -137,7 +137,7 @@ function NotificationSink(_: WidgetProps) {
   const dense = size.h < 320;
 
   return (
-    <Pane label="NOTIFICATION SINK" topic="sys:notify" padded={false}>
+    <Pane label="NOTIFICATIONS" padded={false}>
       {size.h > 220 && sources.length > 1 && (
         <div
           style={{
@@ -204,6 +204,8 @@ function NotificationSink(_: WidgetProps) {
 }
 
 export const notifySpec: WidgetSpec = {
+  title: 'Notifications',
+  about: 'Notifications from your apps, filterable, dismissed with a tap.',
   min: [2, 3],
   topics: ['sys:notify'],
   component: NotificationSink,
