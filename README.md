@@ -68,6 +68,10 @@ page instead.
 | `Esc` | Back to the dashboard |
 | `F11` | Fullscreen |
 
+The layout's name in the header switches layout: tap it for a list, or on a
+touchscreen swipe sideways along the header for the next or previous one. Nothing on
+the panel you can press is smaller than 28px, so a touchscreen needs no mode of its own.
+
 The window is undecorated and draws its own title bar; drag it by the top strip.
 **Settings → Window** turns on autostart and the auto-hiding top bar, and position and
 size are restored per display, so the panel reopens where you left it.
