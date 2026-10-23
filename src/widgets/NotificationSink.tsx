@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { bus } from '../core/bus';
 import { p2 } from '../core/format';
+import { REMOTE_PANEL } from '../core/remoteSource';
+import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { NotifyItem, NotifyPayload } from '../core/payloads';
@@ -104,6 +106,7 @@ function Row({ item, dense }: { item: NotifyItem; dense: boolean }) {
 }
 
 function NotificationSink(_: WidgetProps) {
+  const { allowNotifications } = useSettings();
   const feed = useTopic<NotifyPayload>('sys:notify');
   const size = useTileSize();
   const [filter, setFilter] = useState('ALL');
@@ -117,6 +120,26 @@ function NotificationSink(_: WidgetProps) {
     return (
       <Pane label="NOTIFICATIONS">
         <span className="cc-mini">AWAITING FIRST EVENT</span>
+      </Pane>
+    );
+  }
+
+  // Not refused, just not asked: a quiet tile with the one button that asks.
+  // A remote panel cannot give the host's go-ahead, so it only says so.
+  if (feed.pending) {
+    return (
+      <Pane label="NOTIFICATIONS">
+        <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NOT ALLOWED YET</div>
+          <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
+            {REMOTE_PANEL ? 'Allow it on the machine Kehai runs on.' : 'Kehai reads none of them until you allow it.'}
+          </div>
+          {!REMOTE_PANEL && (
+            <button className="cc-chip cc-chip-on" style={{ marginTop: 12, padding: '7px 16px' }} onClick={allowNotifications}>
+              ALLOW
+            </button>
+          )}
+        </div>
       </Pane>
     );
   }

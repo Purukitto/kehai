@@ -5,10 +5,13 @@ import type {
   ClockPayload,
   CpuPayload,
   DiskPayload,
+  DisplayCommand,
+  DisplaysPayload,
   FlowCommand,
   MediaPayload,
   MemPayload,
   NetPayload,
+  NotifyCommand,
   NotifyPayload,
   QuotaPayload,
   RemoteCommand,
@@ -136,15 +139,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
       ],
     });
 
-    pub<NotifyPayload>('sys:notify', 'mock.notify', {
-      available: true,
-      reason: null,
-      items: [
-        { id: 1, source: 'Continuous Integration', title: 'build #2841 passed', body: 'windows-msvc, 3m 12s', atMs: Date.now() - 60_000 },
-        { id: 2, source: 'Git', title: 'pushed 4 commits', body: 'origin/feat/event-bus', atMs: Date.now() - 240_000 },
-        { id: 3, source: 'Chat', title: 'standup moved to 15:30', body: '', atMs: Date.now() - 900_000 },
-      ],
-    });
+    pubNotify();
 
     pub<QuotaPayload>('dev:llm_tokens', 'mock.quota', {
       available: true,
@@ -167,6 +162,65 @@ export function startMockSource(options: MockOptions = {}): () => void {
       budgetTokens: null,
     });
   };
+
+  // Nothing until the go-ahead, as the engine does, so setup's Allow can be
+  // tried in a browser.
+  let listening = false;
+  const pubNotify = () =>
+    pub<NotifyPayload>(
+      'sys:notify',
+      'mock.notify',
+      listening
+        ? {
+            available: true,
+            pending: false,
+            reason: null,
+            items: [
+              { id: 1, source: 'Continuous Integration', title: 'build #2841 passed', body: 'windows-msvc, 3m 12s', atMs: Date.now() - 60_000 },
+              { id: 2, source: 'Git', title: 'pushed 4 commits', body: 'origin/feat/event-bus', atMs: Date.now() - 240_000 },
+              { id: 3, source: 'Chat', title: 'standup moved to 15:30', body: '', atMs: Date.now() - 900_000 },
+            ],
+          }
+        : { available: false, pending: true, reason: 'not allowed yet', items: [] }
+    );
+  const unsubNotify = bus.subscribe('notify:command', (e) => {
+    if ((e.data as NotifyCommand).action === 'listen' && !listening) {
+      listening = true;
+      pubNotify();
+    }
+  });
+
+  // A desk of three, arranged as the system would: the main monitor, a laptop
+  // to its left and the small panel to its right. Choosing one moves the
+  // pretend window there at once.
+  const displays: DisplaysPayload = {
+    displays: [
+      { id: 'mock-main', number: 1, name: 'U27 MONITOR', x: 0, y: 0, width: 2560, height: 1440, scale: 1, primary: true },
+      { id: 'mock-panel', number: 2, name: 'T10 PANEL', x: 2560, y: 640, width: 1280, height: 800, scale: 1, primary: false },
+      { id: 'mock-laptop', number: 3, name: 'Built-in display', x: -1920, y: 240, width: 1920, height: 1200, scale: 1.5, primary: false },
+    ],
+    current: 'mock-main',
+    chosen: 'mock-main',
+    chosenName: 'U27 MONITOR',
+    chosenNumber: 1,
+    missing: false,
+    fill: false,
+  };
+  const pubDisplays = () => pub<DisplaysPayload>('app:displays', 'mock.display', { ...displays });
+  const unsubDisplay = bus.subscribe('display:command', (e) => {
+    const command = e.data as DisplayCommand;
+    const found = displays.displays.find((d) => d.id === command.id);
+    if (command.action !== 'show' || !found) return;
+    Object.assign(displays, {
+      current: found.id,
+      chosen: found.id,
+      chosenName: found.name,
+      chosenNumber: found.number,
+      missing: false,
+      fill: command.fill,
+    });
+    pubDisplays();
+  });
 
   // One session per state, in the order the engine sorts them. The last one
   // goes back and forth between working and a tool call, so both can be seen
@@ -327,6 +381,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   pub<ArtPayload>('media:art', 'mock.media', { dataUrl: null });
   pubUpdate();
+  pubDisplays();
 
   tick();
   slowTick();
@@ -335,6 +390,8 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   return () => {
     unsub();
+    unsubNotify();
+    unsubDisplay();
     unsubFlow();
     unsubRemote();
     unsubUpdate();

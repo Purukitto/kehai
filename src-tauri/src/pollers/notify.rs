@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicU8, Ordering};
 use std::thread;
 use std::time::Duration;
 
@@ -15,6 +16,9 @@ pub struct NotifyPayload {
     /// False when the platform refused access. The widget says so plainly
     /// rather than showing an empty feed that looks like a quiet day.
     pub available: bool,
+    /// True until Kehai has been told it may read notifications. Nothing is
+    /// read, and nothing is asked of the platform, before that.
+    pub pending: bool,
     pub reason: Option<String>,
     pub items: Vec<Item>,
 }
@@ -31,10 +35,35 @@ pub struct Item {
 
 /// What the sink asks for. Dismissing removes the toast from the system tray,
 /// not just from this feed — the widget is a view onto the real thing.
+/// `listen` is the go-ahead to ask for access and start reading.
 #[derive(Deserialize)]
 struct Command {
     action: String,
     id: Option<u32>,
+}
+
+/// Whether the platform has anything to ask. Where it has nothing, there is no
+/// go-ahead to wait for, and the poller starts at once to say what is missing.
+const ASKS: bool = cfg!(any(windows, target_os = "linux"));
+
+const NOT_ASKED: u8 = 0;
+const ASKING: u8 = 1;
+const REFUSED: u8 = 2;
+/// One listener at most. A refusal can be asked about again, once the person
+/// has had a chance to change the system setting that caused it.
+static ACCESS: AtomicU8 = AtomicU8::new(NOT_ASKED);
+
+/// Asks for access and reads until the app exits, unless already doing so.
+fn listen(app: &AppHandle) {
+    let claimed = [NOT_ASKED, REFUSED].iter().any(|&from| {
+        ACCESS
+            .compare_exchange(from, ASKING, Ordering::SeqCst, Ordering::SeqCst)
+            .is_ok()
+    });
+    if claimed {
+        let app = app.clone();
+        thread::spawn(move || read_forever(app));
+    }
 }
 
 pub fn spawn(app: AppHandle) {
@@ -49,6 +78,10 @@ pub fn spawn(app: AppHandle) {
         // Off the event thread: a tray call can block.
         thread::spawn(move || {
             match cmd.action.as_str() {
+                "listen" => {
+                    listen(&app);
+                    return;
+                }
                 "dismiss" => {
                     if let Some(id) = cmd.id {
                         platform::dismiss(id);
@@ -67,6 +100,7 @@ pub fn spawn(app: AppHandle) {
                 "poller.notify",
                 NotifyPayload {
                     available: true,
+                    pending: false,
                     reason: None,
                     items: platform::read(),
                 },
@@ -74,51 +108,70 @@ pub fn spawn(app: AppHandle) {
         });
     });
 
-    thread::spawn(move || {
-        match platform::request_access() {
-            Ok(()) => eprintln!("poller.notify: listener access granted"),
-            Err(reason) => {
-                eprintln!("poller.notify: unavailable — {reason}");
-                bus::publish(
-                    &app,
-                    "sys:notify",
-                    "poller.notify",
-                    NotifyPayload {
-                        available: false,
-                        reason: Some(reason),
-                        items: Vec::new(),
-                    },
-                );
-                return;
-            }
+    if ASKS {
+        bus::publish(
+            &app,
+            "sys:notify",
+            "poller.notify",
+            NotifyPayload {
+                available: false,
+                pending: true,
+                reason: Some("not allowed yet".to_string()),
+                items: Vec::new(),
+            },
+        );
+    } else {
+        listen(&app);
+    }
+}
+
+fn read_forever(app: AppHandle) {
+    match platform::request_access() {
+        Ok(()) => eprintln!("poller.notify: listener access granted"),
+        Err(reason) => {
+            eprintln!("poller.notify: unavailable — {reason}");
+            ACCESS.store(REFUSED, Ordering::SeqCst);
+            bus::publish(
+                &app,
+                "sys:notify",
+                "poller.notify",
+                NotifyPayload {
+                    available: false,
+                    pending: false,
+                    reason: Some(reason),
+                    items: Vec::new(),
+                },
+            );
+            return;
+        }
+    }
+
+    let mut last: Option<NotifyPayload> = None;
+    let mut announced = false;
+
+    loop {
+        let payload = NotifyPayload {
+            available: true,
+            pending: false,
+            reason: None,
+            items: platform::read(),
+        };
+
+        if !announced {
+            announced = true;
+            eprintln!(
+                "poller.notify: first read returned {} items",
+                payload.items.len()
+            );
         }
 
-        let mut last: Option<NotifyPayload> = None;
-        let mut announced = false;
-
-        loop {
-            let payload = NotifyPayload {
-                available: true,
-                reason: None,
-                items: platform::read(),
-            };
-
-            if !announced {
-                announced = true;
-                eprintln!(
-                    "poller.notify: first read returned {} items",
-                    payload.items.len()
-                );
-            }
-
-            if last.as_ref() != Some(&payload) {
-                bus::publish(&app, "sys:notify", "poller.notify", payload.clone());
-                last = Some(payload);
-            }
-
-            thread::sleep(INTERVAL);
+        if last.as_ref() != Some(&payload) {
+            bus::publish(&app, "sys:notify", "poller.notify", payload.clone());
+            last = Some(payload);
         }
-    });
+
+        thread::sleep(INTERVAL);
+    }
 }
 
 #[cfg(windows)]

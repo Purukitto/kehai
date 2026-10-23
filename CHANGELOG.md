@@ -9,6 +9,26 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- A short setup the first time Kehai opens. Choose the display it is for and it moves
+  there straight away; see what it can read on this machine; pick a layout and colours
+  drawn for that display; and decide whether it starts with Windows. **Settings →
+  About → Run setup again** brings it back. A copy updated from 0.6 skips it.
+- **Settings → Window** shows your displays as Windows arranges them. Tap one and Kehai
+  moves there, filling it or in a window.
+- When the display Kehai is for is not connected, it opens in a window on the main
+  display, says so in the header, and moves back by itself once the display returns.
+
+### Changed
+
+- Notifications are read only once you press **Allow**, in setup, on the tile or under
+  **Settings → Sources**, so Windows no longer asks the moment Kehai first opens. A copy
+  that already reads them carries on.
+- Dragging Kehai onto another display, or pressing F11, is remembered: it reopens there,
+  the same way.
+- **Reset everything** also runs setup again.
+
 ## [0.6.0] - 2026-10-22
 
 ### Added

@@ -73,14 +73,37 @@ grid size carries every tile to the same proportion of the new grid.
 Export and Import exist so a layout can be committed to a repository or shared, and
 that is the only time anyone sees the JSON.
 
+## First run
+
+A fresh install used to open a frameless window wherever the system put it, usually on
+top of your work, and leave you to find out how to get it onto the small display.
+Setup starts with that question. Choosing a display moves Kehai there at once, so you
+see which one it is, and the rest of setup happens on the panel itself, where every
+preview is drawn at the size and shape it will be. Setup lays itself out for landscape,
+bar and portrait like the panel does, with touch-sized buttons, because the display it
+lands on may be any of them.
+
+The display Kehai is for belongs to the engine, in `display.json`, not to the
+renderer's settings. It has to act before the window is first shown: a panel that is
+unplugged must not see Kehai reopen filling the main display. So the engine places the
+window before showing it, opens in a window on the main display when the chosen one is
+missing, and moves back when it returns. A display that drops out for a moment, as a
+sleeping monitor does, is waited for. Dragging the window to another display, or
+pressing F11, is taken as your choice once Kehai's own moves have settled.
+
+Nothing reads notifications until you press Allow. The system's own prompt asks for
+something the panel has not explained yet, so setup explains it first and the prompt
+comes after.
+
 ## The UI only consumes
 
 Every widget subscribes to bus topics and renders what arrives. It cannot poll, it
 cannot call an API, and it holds no state that another widget needs.
 
-The single exception is commands — media transport, notification dismissal, the
-focus timer's buttons and block lengths, the folder the token poller reads, whether
-to serve remote panels, and checking for or installing an update — which
+The single exception is commands — media transport, notification dismissal and the
+go-ahead to read them, the focus timer's buttons and block lengths, the folder the
+token poller reads, whether to serve remote panels, which display to show on, and
+checking for or installing an update — which
 *publish* an intent onto the bus. The engine owns
 the side effect and runs it off the event thread, so a wedged media player can never
 freeze the panel.

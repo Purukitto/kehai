@@ -1,11 +1,20 @@
 import { useEffect, useState } from 'react';
+import { displayLabel } from './components/DisplayMap';
 import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { PairPrompt } from './components/PairPrompt';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
 import { NavProvider } from './core/nav';
-import type { FlowCommand, QuotaCommand, RemoteCommand, UpdateCommand, UpdatePayload } from './core/payloads';
+import type {
+  DisplaysPayload,
+  FlowCommand,
+  NotifyCommand,
+  QuotaCommand,
+  RemoteCommand,
+  UpdateCommand,
+  UpdatePayload,
+} from './core/payloads';
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
 import { useSettings } from './core/settings';
@@ -16,6 +25,7 @@ import { Arranger } from './grid/Arranger';
 import { Grid } from './grid/Grid';
 import { SettingsScreen } from './settings/SettingsScreen';
 import type { Section } from './settings/SettingsScreen';
+import { Setup } from './setup/Setup';
 
 type Mode = 'dashboard' | 'settings' | 'arrange';
 
@@ -45,6 +55,7 @@ export default function App() {
   const [engine, setEngine] = useState(false);
   const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting' });
   const update = useTopic<UpdatePayload>('app:update');
+  const displays = useTopic<DisplaysPayload>('app:displays');
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
   // mock fills the rest until each poller lands. A remote panel gets the same
@@ -119,6 +130,14 @@ export default function App() {
     bus.publish<FlowCommand>('flow:command', 'settings', { action: 'configure', focusMin, breakMin, sprints });
   }, [focusMin, breakMin, sprints]);
 
+  // And the go-ahead to read notifications. Until it is given the engine asks
+  // the platform nothing, so its prompt never arrives unexplained.
+  const { notificationsAsked } = settings;
+  useEffect(() => {
+    if (REMOTE || !notificationsAsked) return;
+    bus.publish<NotifyCommand>('notify:command', 'settings', { action: 'listen' });
+  }, [notificationsAsked]);
+
   // And whether to serve remote panels at all.
   const { on: serveOn, port: servePort, control: serveControl } = settings.remote;
   useEffect(() => {
@@ -175,6 +194,20 @@ export default function App() {
     return <Arranger layoutId={arranging} initialShape={shape} onDone={() => setMode('settings')} />;
   }
 
+  // A remote panel pairs first, as it always has: until then it has nothing
+  // of the host's to show a choice of layout with.
+  if (!settings.setupDone && (!REMOTE || remote.state === 'live')) {
+    return (
+      <Setup
+        onDone={(then) => {
+          if (!then) return;
+          setSettingsAt(then);
+          setMode('settings');
+        }}
+      />
+    );
+  }
+
   // What the header says the panel is reading. A remote panel says more,
   // because it can be up and still not be showing anything real.
   const source = REMOTE
@@ -216,6 +249,21 @@ export default function App() {
         </svg>
         <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.24em' }}>KEHAI</span>
         <div style={{ flex: 1 }} />
+        {displays?.missing && (
+          // In the second accent: the first is kept for an agent waiting on you.
+          <button
+            className="cc-chip"
+            style={{ padding: '5px 10px', marginRight: 4, gap: 8, color: 'var(--cc-accent-2)', borderColor: 'var(--cc-accent-2)' }}
+            onClick={() => {
+              setSettingsAt('WINDOW');
+              setMode('settings');
+            }}
+            title="Kehai moves back by itself once it is connected again"
+          >
+            <span style={{ width: 5, height: 5, background: 'var(--cc-accent-2)' }} />
+            {displayLabel({ name: displays.chosenName, number: displays.chosenNumber })} IS NOT CONNECTED · SHOWING HERE
+          </button>
+        )}
         {update?.state === 'available' && (
           // Waits to be noticed rather than asking: a panel read sideways has no
           // business flashing for attention.
