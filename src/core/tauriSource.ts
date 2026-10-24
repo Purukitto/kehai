@@ -32,6 +32,7 @@ export const ENGINE_TOPICS = [
   'sys:notify',
   'app:update',
   'app:remote',
+  'app:displays',
 ];
 
 /** Topics that travel renderer → engine. The only write path in the app. */
@@ -42,6 +43,7 @@ export const COMMAND_TOPICS = [
   'quota:command',
   'update:command',
   'remote:command',
+  'display:command',
 ];
 
 export async function startTauriSource(): Promise<() => void> {

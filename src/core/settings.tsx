@@ -65,6 +65,18 @@ export interface Settings {
    * `remote:command`; the key it hands out is the engine's, not stored here.
    */
   remote: RemoteSettings;
+  /**
+   * Whether first-run setup has been finished or skipped. A copy with settings
+   * from before setup existed has done without it, and is not shown it.
+   */
+  setupDone: boolean;
+  /**
+   * Whether the engine may ask for notification access and read them. Off on
+   * a fresh install until you press Allow, so the platform's prompt never
+   * arrives unexplained. A copy from before this was asked at every launch,
+   * and keeps that.
+   */
+  notificationsAsked: boolean;
 }
 
 export interface RemoteSettings {
@@ -106,6 +118,8 @@ function defaults(): Settings {
     autoCheckUpdates: false,
     focus: FOCUS_DEFAULTS,
     remote: REMOTE_DEFAULTS,
+    setupDone: false,
+    notificationsAsked: false,
   };
 }
 
@@ -210,6 +224,8 @@ function load(): Settings {
       autoCheckUpdates: parsed.autoCheckUpdates === true,
       focus: focus(parsed.focus),
       remote: remote(parsed.remote),
+      setupDone: parsed.setupDone !== false,
+      notificationsAsked: parsed.notificationsAsked !== false,
     };
   } catch {
     return defaults();
@@ -245,6 +261,10 @@ interface Store {
   setAutoCheckUpdates: (on: boolean) => void;
   setFocus: (focus: Partial<FocusSettings>) => void;
   setRemote: (remote: Partial<RemoteSettings>) => void;
+  setSetupDone: (done: boolean) => void;
+  /** The go-ahead to ask for notification access. There is no taking it back here. */
+  allowNotifications: () => void;
+  /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
 
@@ -365,6 +385,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setFocus: (next) => setSettings((prev) => ({ ...prev, focus: { ...prev.focus, ...next } })),
 
       setRemote: (next) => setSettings((prev) => ({ ...prev, remote: { ...prev.remote, ...next } })),
+
+      setSetupDone: (setupDone) => setSettings((prev) => ({ ...prev, setupDone })),
+
+      allowNotifications: () => setSettings((prev) => ({ ...prev, notificationsAsked: true })),
 
       reset: () => setSettings(defaults()),
     };

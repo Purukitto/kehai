@@ -44,9 +44,10 @@ const SILENT_FOR: Duration = Duration::from_secs(60);
 /// How often an idle connection looks for something to send. The sockets are
 /// blocking, so this is a read timeout, not a sleep.
 const POLL: Duration = Duration::from_millis(100);
-/// Not for remote eyes: this server's own settings, key included, and an
-/// update a remote panel could not install anyway.
-const PRIVATE_TOPICS: [&str; 2] = [TOPIC, "app:update"];
+/// Not for remote eyes: this server's own settings, key included, an update a
+/// remote panel could not install anyway, and the host's monitors, which a
+/// browser has no window on.
+const PRIVATE_TOPICS: [&str; 3] = [TOPIC, "app:update", "app:displays"];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;
 const CLOSE_FULL: u16 = 4429;

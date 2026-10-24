@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
+import { DisplayMap, displayLabel } from '../components/DisplayMap';
 import { bus } from '../core/bus';
-import type { RemoteCommand, RemotePayload, UpdateCommand, UpdatePayload } from '../core/payloads';
+import type {
+  DisplayCommand,
+  DisplaysPayload,
+  NotifyCommand,
+  NotifyPayload,
+  RemoteCommand,
+  RemotePayload,
+  UpdateCommand,
+  UpdatePayload,
+} from '../core/payloads';
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
 import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTileProp, withTiles } from '../core/layout';
 import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
@@ -29,7 +39,7 @@ const NAV_ICON: Record<Section, string> = {
  * Autostart lives behind the OS, not in our settings file, so the toggle has to
  * read the real state rather than assume it. Unavailable outside Tauri.
  */
-function useAutostart(): [boolean | null, (on: boolean) => void] {
+export function useAutostart(): [boolean | null, (on: boolean) => void] {
   const [enabled, setEnabled] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -60,7 +70,7 @@ function useAutostart(): [boolean | null, (on: boolean) => void] {
   return [enabled, set];
 }
 
-const THEMES: { id: ThemeId; name: string; swatch: string[] }[] = [
+export const THEMES: { id: ThemeId; name: string; swatch: string[] }[] = [
   { id: 'amber', name: 'AMBER', swatch: ['#161512', '#f0a83c', '#3fc6dc', '#e9e5dc'] },
   { id: 'phosphor', name: 'PHOSPHOR', swatch: ['#0a100b', '#6cf58a', '#c8ff8f', '#a9f5b4'] },
   { id: 'ice', name: 'ICE', swatch: ['#121820', '#56cfe1', '#9d8cff', '#dce6f2'] },
@@ -252,11 +262,112 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
 }
 
 /**
+ * Notifications are the one source that waits for a go-ahead, so its row can
+ * give one, or ask again once a refusal has been put right in the system.
+ */
+function NotifyRow() {
+  const { allowNotifications } = useSettings();
+  const value = useTopic<NotifyPayload>('sys:notify');
+  const pending = value?.pending === true;
+  const refused = value?.available === false && !pending;
+  const live = value?.available === true;
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--cc-line)',
+      }}
+    >
+      <span style={{ width: 6, height: 6, flex: 'none', background: live ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12 }}>Notifications</div>
+        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+          {pending
+            ? 'Not read until you allow it. Kehai then reads the title and text of each one, and keeps none of them.'
+            : refused && value?.reason
+              ? value.reason
+              : 'Intercepted from the system tray.'}
+        </div>
+      </div>
+      {pending && !REMOTE_PANEL ? (
+        <button className="cc-chip cc-chip-on" style={{ padding: '7px 16px' }} onClick={allowNotifications}>
+          ALLOW
+        </button>
+      ) : refused && !REMOTE_PANEL ? (
+        <button
+          className="cc-chip"
+          style={{ padding: '7px 13px' }}
+          onClick={() => bus.publish<NotifyCommand>('notify:command', 'settings', { action: 'listen' })}
+        >
+          CHECK AGAIN
+        </button>
+      ) : (
+        <span className="cc-mini" style={{ flex: 'none' }}>
+          {live ? 'REPORTING' : pending ? 'NOT ALLOWED YET' : refused ? 'UNAVAILABLE' : 'SILENT'}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The display Kehai is for, chosen on a map of them. Tapping one moves Kehai
+ * there at once, as setup does.
+ */
+function DisplayRows({ state }: { state: DisplaysPayload }) {
+  const show = (id: string, fill: boolean) =>
+    bus.publish<DisplayCommand>('display:command', 'settings', { action: 'show', id, fill });
+  const chosen = state.displays.find((d) => d.id === state.chosen);
+  const target = state.chosen ?? state.current;
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+        <span className="cc-label">DISPLAY</span>
+        <span className="cc-mini">
+          {state.missing
+            ? `${displayLabel({ name: state.chosenName, number: state.chosenNumber })} is not connected, so Kehai is in a window on the main display until it is.`
+            : chosen
+              ? `Kehai is on ${chosen.number} · ${displayLabel(chosen)}. Choose another and it moves there.`
+              : 'Choose a display and Kehai moves there.'}
+        </span>
+      </div>
+      <DisplayMap
+        displays={state.displays}
+        chosen={state.chosen}
+        current={state.current}
+        filled={state.fill && !state.missing}
+        height={250}
+        onPick={(id) => show(id, state.fill)}
+      />
+      <div style={{ height: 14 }} />
+      <Row label="Fill the display" desc="Fullscreen, with no window edge. F11 switches it at any time.">
+        <Seg
+          options={['OFF', 'ON']}
+          value={state.fill ? 'ON' : 'OFF'}
+          onPick={(v) => {
+            if (target) show(target, v === 'ON');
+          }}
+        />
+      </Row>
+      <Row
+        label="When the display is missing"
+        desc="Kehai opens in a window on the main display, says so in the header, and moves back once the display returns."
+      >
+        <span className="cc-mini" style={{ flex: 'none' }}>ALWAYS</span>
+      </Row>
+    </>
+  );
+}
+
+/**
  * Committed on Enter or when focus leaves, not per keystroke: each commit makes
  * the engine re-read the folder, and a half-typed path is a folder that does
  * not exist. Whether the folder worked shows on the two agent rows above.
  */
-function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit: (path: string | null) => void }) {
+export function TranscriptRootRow({ value, onCommit }: { value: string | null; onCommit: (path: string | null) => void }) {
   const [draft, setDraft] = useState(value ?? '');
 
   useEffect(() => setDraft(value ?? ''), [value]);
@@ -726,6 +837,7 @@ export function SettingsScreen({
     setAutoCheckUpdates,
     setFocus,
     setRemote,
+    setSetupDone,
     reset,
   } = useSettings();
   const display = useWindowShape();
@@ -733,6 +845,7 @@ export function SettingsScreen({
   const [autostart, setAutostart] = useAutostart();
   const [section, setSection] = useState<Section>(initialSection ?? 'LAYOUT');
   const update = useTopic<UpdatePayload>('app:update');
+  const displays = useTopic<DisplaysPayload>('app:displays');
   const [note, setNote] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useConfirm();
   const [confirmDelete, setConfirmDelete] = useConfirm();
@@ -1143,6 +1256,7 @@ export function SettingsScreen({
 
           {section === 'WINDOW' && (
             <div style={{ marginTop: 18 }}>
+              {!REMOTE_PANEL && displays && displays.displays.length > 0 && <DisplayRows state={displays} />}
               {/* A remote panel is a browser tab: it starts with nothing and has no window to remember. */}
               {!REMOTE_PANEL && (
                 <Row
@@ -1170,17 +1284,11 @@ export function SettingsScreen({
                   onPick={(v) => setAutoHideBar(v === 'ON')}
                 />
               </Row>
-              {!REMOTE_PANEL && (
-                <Row
-                  label="Remember where it was"
-                  desc="Position and size are saved on exit and restored on launch, so it reopens on the display you left it on."
-                >
-                  <span className="cc-mini" style={{ flex: 'none' }}>ALWAYS ON</span>
+              {REMOTE_PANEL && (
+                <Row label="Fullscreen" desc="F11 toggles it at any time.">
+                  <span className="cc-mini" style={{ flex: 'none' }}>F11</span>
                 </Row>
               )}
-              <Row label="Fullscreen" desc="F11 toggles it at any time.">
-                <span className="cc-mini" style={{ flex: 'none' }}>F11</span>
-              </Row>
             </div>
           )}
 
@@ -1215,7 +1323,7 @@ export function SettingsScreen({
               />
               {!REMOTE_PANEL && <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />}
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />
-              <SourceRow label="Notifications" topic="sys:notify" desc="Intercepted from the system tray." />
+              <NotifyRow />
             </div>
           )}
 
@@ -1253,9 +1361,21 @@ export function SettingsScreen({
                   </Row>
                 </>
               )}
+              <Row label="Run setup again" desc="Display, sources, layout and colours, as on the first launch. Nothing changes until you choose.">
+                <button
+                  className="cc-chip"
+                  style={{ padding: '8px 16px' }}
+                  onClick={() => {
+                    setSetupDone(false);
+                    onClose();
+                  }}
+                >
+                  SETUP
+                </button>
+              </Row>
               <Row
                 label="Reset everything"
-                desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no layouts of your own, no remote panel."
+                desc="Every setting back to how Kehai ships: Stage in Amber, no budget, no layouts of your own, no remote panel. Setup runs again."
               >
                 <button
                   className="cc-chip"

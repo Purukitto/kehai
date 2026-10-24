@@ -62,6 +62,13 @@ page instead.
 
 ## Using it
 
+The first time it opens, Kehai runs a short setup. It asks which display it is for and
+moves there as soon as you choose, so the rest of setup happens on the panel itself:
+what it can read on this machine, notifications included, then the layout and colours,
+drawn for that display. **Skip setup** opens the panel as it is, and
+**Settings → About → Run setup again** brings setup back. A copy updated from 0.6 or
+earlier skips it.
+
 | Key | Does |
 | --- | --- |
 | `S` | Open and close settings |
@@ -73,8 +80,12 @@ touchscreen swipe sideways along the header for the next or previous one. Nothin
 the panel you can press is smaller than 28px, so a touchscreen needs no mode of its own.
 
 The window is undecorated and draws its own title bar; drag it by the top strip.
-**Settings → Window** turns on autostart and the auto-hiding top bar, and position and
-size are restored per display, so the panel reopens where you left it.
+**Settings → Window** shows your displays as the system arranges them: tap one and
+Kehai moves there, filling it or in a window. It reopens on that display, and if the
+display is not connected it opens in a window on the main one instead, says so in the
+header, and moves back by itself once the display returns. Dragging it onto another
+display makes that the one it is for. The same page turns on autostart and the
+auto-hiding top bar.
 
 Three presets ship — **Stage** (default), **Panel** and **Ambient** — each arranged
 three ways: for a landscape panel, a bar display and a portrait screen. Kehai shows
@@ -183,8 +194,8 @@ cross your network unencrypted. Use it on a network you trust.
 Kehai reads local sources and publishes them to its own in-process bus. Nothing it
 reads is uploaded, logged to disk or phoned home. The one thing it writes is how long
 the focus timer has run today, to `flow.json` in its own app-data folder, so the total
-survives a restart — and, once you turn on the remote panel, the key for it, beside it
-in `remote.json`.
+survives a restart; which display it is for, beside it in `display.json`; and, once you
+turn on the remote panel, the key for it, in `remote.json`.
 
 The font is built in, so Kehai makes one kind of network request, and the renderer's
 content-security policy forbids anything else: **the update check**, and only when you
@@ -199,10 +210,11 @@ device holding the key.
 
 Three sources are worth stating plainly:
 
-- **Notifications.** On Windows the app registers as a notification listener, which
-  means it can read the title and body of toasts from any app. Windows prompts for this
-  the first time. Deny it and the widget reports the refusal rather than showing an
-  empty feed. On Linux nothing prompts: Kehai asks the session bus to copy it every
+- **Notifications.** Kehai reads none until you press **Allow**, in setup, on the tile
+  or under Settings → Sources. On Windows the app then registers as a notification
+  listener, which means it can read the title and body of toasts from any app, and
+  Windows asks you to confirm. Deny it and the widget reports the refusal rather than
+  showing an empty feed. On Linux nothing more prompts: Kehai asks the session bus to copy it every
   notification on its way to the notification server, the id the server gives it and
   word of it closing, and nothing else — the same access `dbus-monitor` uses, which
   any program running as you already has.
@@ -291,7 +303,7 @@ against a release build.
 flowchart LR
     subgraph engine["Integration engine — Rust"]
         direction TB
-        P["cpu · mem · net · disk · flow<br/>quota · agents · media · notify · update<br/><i>one thread each</i>"]
+        P["cpu · mem · net · disk · flow · display<br/>quota · agents · media · notify · update<br/><i>one thread each</i>"]
     end
 
     BUS[["Envelope bus<br/><i>last value retained per topic</i>"]]
@@ -303,7 +315,7 @@ flowchart LR
 
     P --> BUS
     BUS -- "Tauri event, replayed on attach" --> W
-    W -. "media · notify · flow · quota · update · remote :command" .-> P
+    W -. "media · notify · flow · quota · update · remote · display :command" .-> P
     BUS -- "WebSocket, key required" --> RP["Remote panel<br/><i>same renderer, another machine</i>"]
 ```
 
@@ -321,8 +333,9 @@ stay silent forever after one missed send. The renderer emits `ui:hello` once
 subscribed and the engine replays every retained topic in reply.
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for six command topics — `media:command`, `notify:command`,
-`flow:command`, `quota:command`, `update:command` and `remote:command`: the UI states
+read-only except for seven command topics — `media:command`, `notify:command`,
+`flow:command`, `quota:command`, `update:command`, `remote:command` and
+`display:command`: the UI states
 an intent, the engine owns the side effect and runs it off the event thread, so a
 wedged media player cannot freeze the panel and a slow download cannot either.
 
@@ -342,6 +355,8 @@ only while the host allows control; the engine checks every one again.
 | `src/core/layout.ts` | Validates a stored or imported layout, in either format |
 | `src/core/useWindowShape.ts` | Picks landscape, bar or portrait from the window |
 | `src/core/settings.tsx` | The settings store and everything that persists |
+| `src/setup/Setup.tsx` | First-run setup: display, sources, layout, the last few choices |
+| `src/components/DisplayMap.tsx` | The displays as the system arranges them, for setup and Settings |
 | `src/grid/Grid.tsx` | Renders a layout onto a CSS grid |
 | `src/grid/Arranger.tsx` | The tile arranger |
 | `src/widgets/` | One module per widget, each declaring its topics and minimum size |
@@ -352,6 +367,7 @@ only while the host allows control; the engine checks every one again.
 | `src-tauri/src/pollers/` | One thread per source |
 | `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
+| `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
 | `src-tauri/src/remote.rs` | Serves the panel, the bus and the API to other machines |
 | `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |
 

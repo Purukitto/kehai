@@ -173,14 +173,64 @@ export interface NotifyItem {
 export interface NotifyPayload {
   /** False when the platform refused access — not the same as an empty tray. */
   available: boolean;
+  /**
+   * True until Kehai has been told it may read notifications. Nothing is read,
+   * and the platform is asked nothing, before that.
+   */
+  pending: boolean;
   reason: string | null;
   items: NotifyItem[];
 }
+
+/**
+ * Renderer → engine on `notify:command`. Mirrors `Command` in `notify.rs`.
+ * `listen` is the go-ahead to ask for access and start reading; sent again, it
+ * asks again after a refusal.
+ */
+export type NotifyCommand = { action: 'listen' } | { action: 'dismiss'; id: number } | { action: 'clear' };
 
 export interface ArtPayload {
   /** Data URL of the current cover, or null when the player exposes none. */
   dataUrl: string | null;
 }
+
+/** One connected display. Mirrors `Display` in `display.rs`. */
+export interface DisplayInfo {
+  /** Stable across restarts where the platform has a device path for it. */
+  id: string;
+  /** As the system numbers it, so 2 here is 2 in its own display settings. */
+  number: number;
+  /** What the monitor calls itself, when it says. */
+  name: string | null;
+  /** Physical pixels, in the system's arrangement of all the displays. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+  primary: boolean;
+}
+
+/**
+ * Engine → local renderer on `app:displays`. Mirrors `DisplaysPayload` in
+ * `display.rs`. Never sent to a remote panel, which has no window to place.
+ */
+export interface DisplaysPayload {
+  displays: DisplayInfo[];
+  /** The display the window is on now. */
+  current: string | null;
+  /** The display Kehai is for, which is not `current` while it is missing. */
+  chosen: string | null;
+  /** Kept from when it was chosen, so a missing display can still be named. */
+  chosenName: string | null;
+  chosenNumber: number | null;
+  /** The chosen display is not connected, so Kehai is in a window on the main one. */
+  missing: boolean;
+  fill: boolean;
+}
+
+/** Renderer → engine on `display:command`. Mirrors `Command` in `display.rs`. */
+export type DisplayCommand = { action: 'show'; id: string; fill: boolean };
 
 /** Engine → renderer on `app:update`. Mirrors `UpdatePayload` in `update.rs`. */
 export interface UpdatePayload {
