@@ -87,6 +87,16 @@ header, and moves back by itself once the display returns. Dragging it onto anot
 display makes that the one it is for. The same page turns on autostart and the
 auto-hiding top bar.
 
+**Settings → Appearance** turns everything Kehai draws down at night, between two
+times you set, and decides what the panel shows while nobody is at the computer. After
+a while with no keyboard, mouse or touch it goes quiet: the time, dim, and only what
+is running or waiting on you, with notifications as a count and never their text. It
+can stay as it is instead, dimmed with notification text hidden, or go dark until an
+agent waits. A touch or a nudge of the mouse brings it back, and the first tap only
+wakes it, so it never presses a button you could not see. While Windows is locked its
+lock screen covers every display, and Kehai stops drawing. Setup turns both on; a copy
+that already had settings keeps both off until you turn them on.
+
 Three presets ship — **Stage** (default), **Panel** and **Ambient** — each arranged
 three ways: for a landscape panel, a bar display and a portrait screen. Kehai shows
 the arrangement that fits its window, so the same layout works on a 16:10 panel, a
@@ -131,6 +141,7 @@ a layout as JSON if you want to commit or share one.
 | Agent token usage | optional — needs local agent transcripts | same | same |
 | Agent sessions | optional — the same transcripts | same | same |
 | Focus timer | kept by the engine | same | same |
+| Whether you are at the computer | time since the last input, and the lock | not wired | not wired |
 
 Where a source is unavailable the widget says so, and Settings → Sources shows it as
 **UNAVAILABLE** with the reason. Nothing shows a zero it does not have — see
@@ -208,7 +219,7 @@ It listens for nothing unless you turn on **Settings → Remote**. Then it accep
 connections on one port from your network, and shows the panel's data only to a
 device holding the key.
 
-Three sources are worth stating plainly:
+Four sources are worth stating plainly:
 
 - **Notifications.** Kehai reads none until you press **Allow**, in setup, on the tile
   or under Settings → Sources. On Windows the app then registers as a notification
@@ -230,6 +241,10 @@ Three sources are worth stating plainly:
   one closed, on the hour before it, and the widget shows when it resets. The provider
   does not publish how its window works, so that time is an estimate worked out from
   the transcripts, the same way other local usage tools do it.
+- **Whether you are at the computer.** For the quiet panel, the engine asks Windows
+  once a second how long it has been since the last keyboard, mouse, pen or touch
+  input, and whether the session is locked: a duration and a yes or no, never what was
+  pressed or where. Neither is kept, and neither reaches a remote panel.
 - **Agent sessions.** The agents widget reads the same transcripts for how each one
   ends: whether the last reply finished, which tool calls are still open, when, and the
   folder the session works in. It does not parse or keep what you or the model wrote.
@@ -303,7 +318,7 @@ against a release build.
 flowchart LR
     subgraph engine["Integration engine — Rust"]
         direction TB
-        P["cpu · mem · net · disk · flow · display<br/>quota · agents · media · notify · update<br/><i>one thread each</i>"]
+        P["cpu · mem · net · disk · flow · display<br/>quota · agents · media · notify · update · presence<br/><i>one thread each</i>"]
     end
 
     BUS[["Envelope bus<br/><i>last value retained per topic</i>"]]
@@ -315,7 +330,7 @@ flowchart LR
 
     P --> BUS
     BUS -- "Tauri event, replayed on attach" --> W
-    W -. "media · notify · flow · quota · update · remote · display :command" .-> P
+    W -. "media · notify · flow · quota · update · remote · display · presence :command" .-> P
     BUS -- "WebSocket, key required" --> RP["Remote panel<br/><i>same renderer, another machine</i>"]
 ```
 
@@ -333,9 +348,9 @@ stay silent forever after one missed send. The renderer emits `ui:hello` once
 subscribed and the engine replays every retained topic in reply.
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for seven command topics — `media:command`, `notify:command`,
-`flow:command`, `quota:command`, `update:command`, `remote:command` and
-`display:command`: the UI states
+read-only except for eight command topics — `media:command`, `notify:command`,
+`flow:command`, `quota:command`, `update:command`, `remote:command`,
+`display:command` and `presence:command`: the UI states
 an intent, the engine owns the side effect and runs it off the event thread, so a
 wedged media player cannot freeze the panel and a slow download cannot either.
 
@@ -368,6 +383,7 @@ only while the host allows control; the engine checks every one again.
 | `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
+| `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel |
 | `src-tauri/src/remote.rs` | Serves the panel, the bus and the API to other machines |
 | `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |
 

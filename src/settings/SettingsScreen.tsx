@@ -6,6 +6,7 @@ import type {
   DisplaysPayload,
   NotifyCommand,
   NotifyPayload,
+  PresencePayload,
   RemoteCommand,
   RemotePayload,
   UpdateCommand,
@@ -14,7 +15,8 @@ import type {
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
 import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTileProp, withTiles } from '../core/layout';
 import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
-import type { FocusSettings, RemoteSettings } from '../core/settings';
+import type { DimLevel, FocusSettings, QuietShow, RemoteSettings } from '../core/settings';
+import { DIM_NAME, hhmm, previewDim } from '../core/night';
 import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
 import type { Layout, Shape, ThemeId } from '../core/types';
@@ -464,6 +466,113 @@ function FocusRows({ focus, onChange }: { focus: FocusSettings; onChange: (next:
       <SubRow label="Sprints per round" desc="How many blocks the track shows before it starts again.">
         <Seg options={[2, 3, 4, 6, 8]} value={focus.sprints} onPick={(sprints) => onChange({ sprints })} />
       </SubRow>
+    </>
+  );
+}
+
+const WINDOWS = typeof navigator !== 'undefined' && /Windows/.test(navigator.userAgent);
+
+function Group({ label, note }: { label: string; note: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 22, marginBottom: 8 }}>
+      <span className="cc-label">{label}</span>
+      <span className="cc-mini">{note}</span>
+    </div>
+  );
+}
+
+/** Half an hour a tap, round the clock. */
+function TimeStep({ value, onChange, label }: { value: number; onChange: (min: number) => void; label: string }) {
+  const step = (by: number) => onChange((value + by + 24 * 60) % (24 * 60));
+  const button = { width: 32, height: 32, padding: 0, fontSize: 14 };
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 'none' }}>
+      <button className="cc-chip" style={button} onClick={() => step(-30)} aria-label={`${label} earlier`}>
+        −
+      </button>
+      <span style={{ fontSize: 15, width: 62, textAlign: 'center' }}>{hhmm(value)}</span>
+      <button className="cc-chip" style={button} onClick={() => step(30)} aria-label={`${label} later`}>
+        +
+      </button>
+    </div>
+  );
+}
+
+const SHOW_NAME: Record<QuietShow, string> = { clock: 'CLOCK', panel: 'DIMMED PANEL', nothing: 'NOTHING' };
+const SHOW_DESC: Record<QuietShow, string> = {
+  clock: 'The time, and only what is running or waiting on you. Notifications as a count.',
+  panel: 'The whole panel, dimmed to half, with what notifications say hidden.',
+  nothing: 'Dark, until an agent waits on you.',
+};
+
+/**
+ * What the panel does while it is not being read: at night, and while nobody
+ * is at the desk. Away belongs to the machine Kehai runs on, so a remote panel
+ * only has the night, by its own clock.
+ */
+function QuietRows() {
+  const { settings, setNight, setAway } = useSettings();
+  const presence = useTopic<PresencePayload>('os:presence');
+  const { night, away } = settings;
+  // Never is stored as null; Seg wants a value it can compare.
+  const after = [...new Set([0, 5, 10, 30, away.afterMin ?? 0])].sort((a, b) => a - b);
+
+  return (
+    <>
+      <Group label="AT NIGHT" note={REMOTE_PANEL ? 'By this device’s clock.' : 'By this panel’s clock.'} />
+      <Row label="Dim at night" desc="Everything Kehai draws turns down between these times.">
+        <Seg options={['OFF', 'ON']} value={night.on ? 'ON' : 'OFF'} onPick={(v) => setNight({ on: v === 'ON' })} />
+      </Row>
+      <Row label="Between" desc="Fixed hours. Sunset would need your location, and Kehai asks for none.">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
+          <TimeStep label="Start" value={night.fromMin} onChange={(fromMin) => setNight({ fromMin })} />
+          <span className="cc-mini">TO</span>
+          <TimeStep label="End" value={night.toMin} onChange={(toMin) => setNight({ toMin })} />
+        </div>
+      </Row>
+      <Row label="How dim" desc="Shown for a few seconds as you pick. A backlit panel only goes so far: black stays as bright as its backlight.">
+        <Seg
+          options={['little', 'half', 'lot'] as DimLevel[]}
+          value={night.level}
+          format={(v) => DIM_NAME[v]}
+          onPick={(level) => {
+            setNight({ level });
+            previewDim(level);
+          }}
+        />
+      </Row>
+
+      {!REMOTE_PANEL && (
+        <>
+          <Group label="WHEN YOU’RE AWAY" note="No keyboard, mouse or touch on this computer." />
+          {presence && !presence.available ? (
+            <Row label="Not available here" desc={presence.reason ?? 'This system does not say when you are away.'} />
+          ) : (
+            <>
+              <Row label="Quiet the panel after" desc="A touch or a nudge of the mouse brings it back. The first tap only wakes it.">
+                <Seg
+                  options={after}
+                  value={away.afterMin ?? 0}
+                  format={(v) => (v === 0 ? 'NEVER' : `${v} MIN`)}
+                  onPick={(v) => setAway({ afterMin: v === 0 ? null : v })}
+                />
+              </Row>
+              <Row label="While it’s quiet, show" desc={SHOW_DESC[away.show]}>
+                <Seg
+                  options={['clock', 'panel', 'nothing'] as QuietShow[]}
+                  value={away.show}
+                  format={(v) => SHOW_NAME[v]}
+                  onPick={(show) => setAway({ show })}
+                />
+              </Row>
+            </>
+          )}
+          <div className="cc-mini" style={{ marginTop: 12, lineHeight: 1.6 }}>
+            While {WINDOWS ? 'Windows' : 'the system'} is locked, its lock screen covers every display, so nothing of Kehai shows. Kehai
+            stops drawing until you are back.
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -1220,38 +1329,42 @@ export function SettingsScreen({
           )}
 
           {section === 'APPEARANCE' && (
-            <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
-              {THEMES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setTheme(t.id)}
-                  style={{
-                    flex: 1,
-                    background: 'var(--cc-pane)',
-                    border: `1px solid ${settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
-                    padding: 10,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 9,
-                  }}
-                >
-                  <div style={{ height: 74, background: t.swatch[0], display: 'flex', alignItems: 'flex-end', gap: 6, padding: 8 }}>
-                    <div style={{ flex: 1, height: 10, background: t.swatch[1] }} />
-                    <div style={{ flex: 1, height: 10, background: t.swatch[2] }} />
-                    <div style={{ flex: 2, height: 10, background: t.swatch[3] }} />
-                  </div>
-                  <span
+            <>
+              <Group label="COLOURS" note="Any layout takes any colours." />
+              <div style={{ display: 'flex', gap: 12 }}>
+                {THEMES.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => setTheme(t.id)}
                     style={{
-                      fontSize: 10,
-                      letterSpacing: '0.14em',
-                      color: settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-muted)',
+                      flex: 1,
+                      background: 'var(--cc-pane)',
+                      border: `1px solid ${settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
+                      padding: 10,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 9,
                     }}
                   >
-                    {t.name}
-                  </span>
-                </button>
-              ))}
-            </div>
+                    <div style={{ height: 74, background: t.swatch[0], display: 'flex', alignItems: 'flex-end', gap: 6, padding: 8 }}>
+                      <div style={{ flex: 1, height: 10, background: t.swatch[1] }} />
+                      <div style={{ flex: 1, height: 10, background: t.swatch[2] }} />
+                      <div style={{ flex: 2, height: 10, background: t.swatch[3] }} />
+                    </div>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        letterSpacing: '0.14em',
+                        color: settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-muted)',
+                      }}
+                    >
+                      {t.name}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <QuietRows />
+            </>
           )}
 
           {section === 'WINDOW' && (

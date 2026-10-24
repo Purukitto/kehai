@@ -1,15 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import { displayLabel } from './components/DisplayMap';
 import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { PairPrompt } from './components/PairPrompt';
+import { Quiet } from './components/Quiet';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
 import { NavProvider } from './core/nav';
+import { DIM, useDimPreview, useNight } from './core/night';
 import type {
   DisplaysPayload,
   FlowCommand,
   NotifyCommand,
+  PresenceCommand,
+  PresencePayload,
   QuotaCommand,
   RemoteCommand,
   UpdateCommand,
@@ -17,7 +22,9 @@ import type {
 } from './core/payloads';
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
+import { HideText } from './core/quiet';
 import { useSettings } from './core/settings';
+import type { QuietShow } from './core/settings';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { useTopic } from './core/useTopic';
 import { useWindowShape } from './core/useWindowShape';
@@ -28,6 +35,9 @@ import type { Section } from './settings/SettingsScreen';
 import { Setup } from './setup/Setup';
 
 type Mode = 'dashboard' | 'settings' | 'arrange';
+
+/** How bright the whole panel stays when it is left showing while you are away. */
+const QUIET_PANEL = 0.5;
 
 async function toggleFullscreen(): Promise<void> {
   // A remote panel is a browser tab, often on a tablet: the page's own
@@ -56,6 +66,9 @@ export default function App() {
   const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting' });
   const update = useTopic<UpdatePayload>('app:update');
   const displays = useTopic<DisplaysPayload>('app:displays');
+  const presence = useTopic<PresencePayload>('os:presence');
+  const night = useNight(settings.night);
+  const dimPreview = useDimPreview();
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
   // mock fills the rest until each poller lands. A remote panel gets the same
@@ -150,6 +163,41 @@ export default function App() {
     });
   }, [serveOn, servePort, serveControl]);
 
+  // And how long without input counts as away. Until this arrives nobody is.
+  const awayAfterMin = settings.away.afterMin;
+  useEffect(() => {
+    if (REMOTE) return;
+    bus.publish<PresenceCommand>('presence:command', 'settings', {
+      action: 'configure',
+      awayAfterSec: awayAfterMin === null ? null : awayAfterMin * 60,
+    });
+  }, [awayAfterMin]);
+
+  // Night turns down everything Kehai draws, setup and settings included, so
+  // opening them late does not light up the room.
+  const dim = dimPreview ? DIM[dimPreview] : night ? DIM[settings.night.level] : 1;
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (root) root.style.filter = dim < 1 ? `brightness(${dim})` : '';
+  }, [dim]);
+
+  // A tap on a quiet panel wakes it at once, ahead of the engine noticing the
+  // same tap. The next time nobody is here needs a tap of its own. A locked
+  // session is not drawn: its lock screen covers every display anyway.
+  const presenceState = REMOTE ? 'here' : (presence?.state ?? 'here');
+  const [woken, setWoken] = useState(false);
+  useEffect(() => {
+    setWoken(false);
+  }, [presenceState]);
+  const quiet: QuietShow | 'blank' | null =
+    presenceState === 'locked'
+      ? 'blank'
+      : presenceState === 'away' && awayAfterMin !== null && !woken
+        ? settings.away.show
+        : null;
+  const quietRef = useRef(quiet);
+  quietRef.current = quiet;
+
   // Opening settings from the update badge lands on About. Every other way in,
   // including back from the arranger, starts where it always has.
   useEffect(() => {
@@ -164,6 +212,11 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       const typing = (e.target as HTMLElement | null)?.tagName === 'INPUT';
       if (typing) return;
+      // A key on a quiet panel only wakes it, like a tap.
+      if (quietRef.current) {
+        setWoken(true);
+        return;
+      }
 
       if (e.key === 'Escape') setMode('dashboard');
       if (e.key === 's' || e.key === 'S') setMode((m) => (m === 'settings' ? 'dashboard' : 'settings'));
@@ -177,8 +230,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  // Every screen sits under the quiet panel, kept as it was rather than closed,
+  // so waking it finds the same screen, sparklines and all.
+  const frame = (screen: ReactNode) => (
+    <>
+      <div
+        style={{
+          height: '100%',
+          visibility: quiet && quiet !== 'panel' ? 'hidden' : undefined,
+          filter: quiet === 'panel' ? `brightness(${QUIET_PANEL})` : undefined,
+        }}
+      >
+        <HideText.Provider value={quiet === 'panel'}>{screen}</HideText.Provider>
+      </div>
+      {quiet && <Quiet show={quiet} onWake={() => setWoken(true)} />}
+    </>
+  );
+
   if (mode === 'settings') {
-    return (
+    return frame(
       <SettingsScreen
         initialSection={settingsAt}
         onClose={() => setMode('dashboard')}
@@ -191,13 +261,13 @@ export default function App() {
   }
 
   if (mode === 'arrange') {
-    return <Arranger layoutId={arranging} initialShape={shape} onDone={() => setMode('settings')} />;
+    return frame(<Arranger layoutId={arranging} initialShape={shape} onDone={() => setMode('settings')} />);
   }
 
   // A remote panel pairs first, as it always has: until then it has nothing
   // of the host's to show a choice of layout with.
   if (!settings.setupDone && (!REMOTE || remote.state === 'live')) {
-    return (
+    return frame(
       <Setup
         onDone={(then) => {
           if (!then) return;
@@ -308,7 +378,7 @@ export default function App() {
       </div>
   );
 
-  return (
+  return frame(
     <div
       style={{
         height: '100%',

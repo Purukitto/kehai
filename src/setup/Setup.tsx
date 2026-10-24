@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { DisplayMap, displayLabel } from '../components/DisplayMap';
 import { WindowControls } from '../components/WindowControls';
 import { bus } from '../core/bus';
+import { hhmm } from '../core/night';
 import type {
   AgentsPayload,
   CpuPayload,
@@ -540,7 +541,7 @@ function Key({ k, what }: { k: string; what: string }) {
  * shape of the display it is on, because choosing a display moves it there.
  */
 export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
-  const { settings, setSetupDone, setAutoCheckUpdates, setAutoHideBar } = useSettings();
+  const { settings, setSetupDone, setAutoCheckUpdates, setAutoHideBar, setQuiet } = useSettings();
   const { shape, height } = useWindowShape();
   const displays = useTopic<DisplaysPayload>('app:displays');
   const [autostart, setAutostart] = useAutostart();
@@ -552,6 +553,9 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
   const [startWithSystem, setStartWithSystem] = useState(true);
   const [checkUpdates, setCheckUpdates] = useState(settings.autoCheckUpdates);
   const [hideHeader, setHideHeader] = useState(settings.autoHideBar);
+  // On to begin with, like starting with the system: a panel that glows all
+  // night, or shows what came in to whoever walks past, is not what anyone wants.
+  const [quieter, setQuieter] = useState(true);
 
   const step = STEPS[at];
   const bar = shape === 'bar';
@@ -575,6 +579,7 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
       if (autostart !== null && autostart !== startWithSystem) setAutostart(startWithSystem);
       setAutoCheckUpdates(checkUpdates);
       setAutoHideBar(hideHeader);
+      setQuiet(quieter);
       finish(single && choice.single === 'remote' ? 'REMOTE' : undefined);
       return;
     }
@@ -592,6 +597,15 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
   if (step === 'SOURCES') hint = 'All of this stays under Settings → Sources.';
   if (step === 'LAYOUT') hint = 'Later, the layout’s name in the header switches it.';
   if (step === 'FINISH') nextLabel = 'OPEN THE PANEL';
+
+  // In numbers, so nobody is surprised when the panel turns down at ten.
+  const { fromMin, toMin } = settings.night;
+  const awayMin = settings.away.afterMin ?? 10;
+  const quietDesc = REMOTE_PANEL
+    ? `Dims from ${hhmm(fromMin)} to ${hhmm(toMin)}, by this device’s clock. Settings → Appearance sets it.`
+    : `Dims from ${hhmm(fromMin)} to ${hhmm(toMin)}, and after ${awayMin} minutes with nobody here ${
+        settings.away.show === 'clock' ? 'shows only the time and what waits on you' : 'goes quiet'
+      }. Settings → Appearance sets either.`;
 
   // What the display map gets: whatever the frame and the step's other parts leave.
   const mapHeight = bar ? Math.max(180, height - 128) : Math.max(220, Math.min(360, height - 420));
@@ -643,6 +657,9 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
                 <OnOff on={startWithSystem} onPick={setStartWithSystem} />
               </Choice>
             )}
+            <Choice label={REMOTE_PANEL ? 'Dim at night' : 'Quieter at night and when you’re away'} desc={quietDesc}>
+              <OnOff on={quieter} onPick={setQuieter} />
+            </Choice>
             {!REMOTE_PANEL && (
               <Choice label="Check for updates once a day" desc="Asks GitHub for the latest release, the only request Kehai makes. Off unless you turn it on.">
                 <OnOff on={checkUpdates} onPick={setCheckUpdates} />

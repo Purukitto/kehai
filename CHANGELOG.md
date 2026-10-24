@@ -19,6 +19,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
   moves there, filling it or in a window.
 - When the display Kehai is for is not connected, it opens in a window on the main
   display, says so in the header, and moves back by itself once the display returns.
+- The panel turns down at night, from 22:00 to 07:00 to start with. **Settings →
+  Appearance** sets the hours and how dim: a little, half or a lot.
+- After ten minutes with nobody at the computer, the panel goes quiet: the time, dim,
+  and only what is running or waiting on you, with notifications as a count and never
+  their text. A touch or a nudge of the mouse brings it back, and the first tap only
+  wakes it. **Settings → Appearance** sets the delay, or keeps the whole panel showing,
+  dimmed, or keeps it dark until an agent waits. Not on Linux yet.
+- While Windows is locked, Kehai stops drawing. Its lock screen covers every display
+  anyway.
+- Setup's last step turns night and away on together. A copy that already had
+  settings keeps both off until you turn them on.
 
 ### Changed
 

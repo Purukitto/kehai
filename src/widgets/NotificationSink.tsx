@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { bus } from '../core/bus';
 import { p2 } from '../core/format';
+import { useHideText } from '../core/quiet';
 import { REMOTE_PANEL } from '../core/remoteSource';
 import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
@@ -109,6 +110,7 @@ function NotificationSink(_: WidgetProps) {
   const { allowNotifications } = useSettings();
   const feed = useTopic<NotifyPayload>('sys:notify');
   const size = useTileSize();
+  const hideText = useHideText();
   const [filter, setFilter] = useState('ALL');
 
   const sources = useMemo(() => {
@@ -151,6 +153,24 @@ function NotificationSink(_: WidgetProps) {
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
           <div style={{ fontSize: 12, color: 'var(--cc-danger)' }}>LISTENER UNAVAILABLE</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>{feed.reason}</div>
+        </div>
+      </Pane>
+    );
+  }
+
+  // Nobody is at the desk: how many, not who from or what they say.
+  if (hideText) {
+    return (
+      <Pane label="NOTIFICATIONS">
+        <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
+          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>
+            {feed.items.length === 0 ? 'NOTHING WAITING' : `${feed.items.length} IN TRAY`}
+          </div>
+          {feed.items.length > 0 && (
+            <div className="cc-mini" style={{ marginTop: 8 }}>
+              HIDDEN WHILE YOU ARE AWAY
+            </div>
+          )}
         </div>
       </Pane>
     );

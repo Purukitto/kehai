@@ -95,6 +95,32 @@ Nothing reads notifications until you press Allow. The system's own prompt asks 
 something the panel has not explained yet, so setup explains it first and the prompt
 comes after.
 
+## Away and night
+
+The panel is on all day, and a panel that looks the same with nobody at the desk, or
+at midnight, shows notification text to whoever walks past and lights the room. So it
+has two quieter states.
+
+Away is decided by the engine, from how long the computer has gone without input,
+against a delay the renderer sends it. The quiet panel then shows the time in the
+muted colour and only what is worth seeing from across the room: an agent waiting, in
+the accent and at full size, then a timer counting down, since a break is when you
+are away, then how many notifications came. Never what they say. It lies over the
+whole window, so the first tap lands on it and only wakes the panel; a tap that also
+pressed whatever was underneath would press something nobody could see. The screen
+underneath is hidden, not closed, so waking finds it as it was, sparklines and all.
+
+A locked session needs nothing hidden: the system's lock screen already covers every
+display. Kehai only stops drawing until you are back. When you are at your desk is
+nobody else's business, so the topic stays with the local panel, and a remote panel
+never goes quiet.
+
+Night is the renderer's alone, by the panel's own clock, between fixed hours: sunset
+would need a location, and Kehai asks for none. It is a brightness filter over the
+whole page, so every theme dims the same way and none needs a night version. A
+backlit panel only goes so far that way, since black stays as bright as the backlight.
+Turning the backlight itself down, where a display takes the command, is not done yet.
+
 ## The UI only consumes
 
 Every widget subscribes to bus topics and renders what arrives. It cannot poll, it
@@ -102,8 +128,8 @@ cannot call an API, and it holds no state that another widget needs.
 
 The single exception is commands — media transport, notification dismissal and the
 go-ahead to read them, the focus timer's buttons and block lengths, the folder the
-token poller reads, whether to serve remote panels, which display to show on, and
-checking for or installing an update — which
+token poller reads, whether to serve remote panels, which display to show on, how
+long without input counts as away, and checking for or installing an update — which
 *publish* an intent onto the bus. The engine owns
 the side effect and runs it off the event thread, so a wedged media player can never
 freeze the panel.

@@ -13,6 +13,8 @@ import type {
   NetPayload,
   NotifyCommand,
   NotifyPayload,
+  PresenceCommand,
+  PresencePayload,
   QuotaPayload,
   RemoteCommand,
   RemotePayload,
@@ -129,6 +131,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
     pubSprint();
 
     pub<ClockPayload>('os:clock', 'clock', { iso: new Date().toISOString() });
+    lookPresence();
   };
 
   const slowTick = () => {
@@ -220,6 +223,36 @@ export function startMockSource(options: MockOptions = {}): () => void {
       fill: command.fill,
     });
     pubDisplays();
+  });
+
+  // Away as the engine decides it, from this browser's own input, so the quiet
+  // panel can be tried without the engine. Like the engine it publishes only
+  // changes, so a state published by hand while reviewing stays until the next
+  // input puts it right.
+  let awayAfterMs: number | null = null;
+  let lastInput = Date.now();
+  let decided: PresencePayload['state'] | null = null;
+  let shown: PresencePayload['state'] | null = null;
+  const unsubShown = bus.subscribe('os:presence', (e) => {
+    shown = (e.data as PresencePayload).state;
+  });
+  const lookPresence = (correct = false) => {
+    const state = awayAfterMs !== null && Date.now() - lastInput >= awayAfterMs ? 'away' : 'here';
+    if (state !== decided || (correct && state !== shown)) {
+      pub<PresencePayload>('os:presence', 'mock.presence', { available: true, reason: null, state });
+    }
+    decided = state;
+  };
+  const onInput = () => {
+    lastInput = Date.now();
+    lookPresence(true);
+  };
+  const INPUT = ['pointerdown', 'pointermove', 'keydown', 'wheel'];
+  INPUT.forEach((type) => window.addEventListener(type, onInput, { capture: true, passive: true }));
+  const unsubPresence = bus.subscribe('presence:command', (e) => {
+    const { awayAfterSec } = e.data as PresenceCommand;
+    awayAfterMs = awayAfterSec === null ? null : awayAfterSec * 1000;
+    lookPresence();
   });
 
   // One session per state, in the order the engine sorts them. The last one
@@ -382,6 +415,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
   pub<ArtPayload>('media:art', 'mock.media', { dataUrl: null });
   pubUpdate();
   pubDisplays();
+  lookPresence();
 
   tick();
   slowTick();
@@ -395,6 +429,9 @@ export function startMockSource(options: MockOptions = {}): () => void {
     unsubFlow();
     unsubRemote();
     unsubUpdate();
+    unsubPresence();
+    unsubShown();
+    INPUT.forEach((type) => window.removeEventListener(type, onInput, { capture: true }));
     timers.forEach((id) => window.clearInterval(id));
   };
 }

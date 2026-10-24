@@ -7,6 +7,7 @@ pub mod media;
 pub mod mem;
 pub mod net;
 pub mod notify;
+pub mod presence;
 pub mod quota;
 mod transcripts;
 pub mod update;
@@ -28,5 +29,6 @@ pub fn spawn_all(app: AppHandle) {
     agents::spawn(app.clone());
     media::spawn(app.clone());
     update::spawn(app.clone());
+    presence::spawn(app.clone());
     notify::spawn(app);
 }
