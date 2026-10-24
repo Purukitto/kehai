@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-24
+
 ### Added
 
 - Pair a tablet or phone by scanning a code. **Settings → Remote → Show code** shows it
@@ -235,7 +237,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/Purukitto/kehai/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Purukitto/kehai/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Purukitto/kehai/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Purukitto/kehai/compare/v0.4.0...v0.5.0
