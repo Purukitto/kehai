@@ -77,7 +77,46 @@ export interface Settings {
    * and keeps that.
    */
   notificationsAsked: boolean;
+  /** Everything Kehai draws turned down between two times, by this panel's clock. */
+  night: NightSettings;
+  /**
+   * What the panel does while nobody is at this computer. The engine decides
+   * when that is, from the delay here; a remote panel never goes quiet.
+   */
+  away: AwaySettings;
 }
+
+export type DimLevel = 'little' | 'half' | 'lot';
+
+export interface NightSettings {
+  on: boolean;
+  /**
+   * Minutes after midnight. From is usually later than to, and the night runs
+   * over midnight. Fixed hours: sunset would need a location, and Kehai asks
+   * for none.
+   */
+  fromMin: number;
+  toMin: number;
+  level: DimLevel;
+}
+
+/**
+ * Clock is the time and only what is running or waiting on you. Panel is the
+ * whole panel, dimmed, with notification text hidden. Nothing is dark until an
+ * agent waits.
+ */
+export type QuietShow = 'clock' | 'panel' | 'nothing';
+
+export interface AwaySettings {
+  /** Minutes without input before the panel goes quiet. Null for never. */
+  afterMin: number | null;
+  show: QuietShow;
+}
+
+// What a fresh install starts with, and what setup offers. A copy updating from
+// before these existed starts with both off, so nothing it does changes unasked.
+const NIGHT_DEFAULTS: NightSettings = { on: true, fromMin: 22 * 60, toMin: 7 * 60, level: 'half' };
+const AWAY_DEFAULTS: AwaySettings = { afterMin: 10, show: 'clock' };
 
 export interface RemoteSettings {
   on: boolean;
@@ -120,6 +159,8 @@ function defaults(): Settings {
     remote: REMOTE_DEFAULTS,
     setupDone: false,
     notificationsAsked: false,
+    night: NIGHT_DEFAULTS,
+    away: AWAY_DEFAULTS,
   };
 }
 
@@ -162,6 +203,32 @@ function focus(raw: unknown): FocusSettings {
     focusMin: pick(r.focusMin, FOCUS_DEFAULTS.focusMin),
     breakMin: pick(r.breakMin, FOCUS_DEFAULTS.breakMin),
     sprints: pick(r.sprints, FOCUS_DEFAULTS.sprints),
+  };
+}
+
+const minuteOfDay = (v: unknown, fallback: number) =>
+  typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 24 * 60 ? v : fallback;
+
+/** Settings stored before night existed have none, and stay off. */
+function night(raw: unknown): NightSettings {
+  if (raw === undefined) return { ...NIGHT_DEFAULTS, on: false };
+  const r = (raw ?? {}) as Partial<Record<keyof NightSettings, unknown>>;
+  return {
+    on: r.on === true,
+    fromMin: minuteOfDay(r.fromMin, NIGHT_DEFAULTS.fromMin),
+    toMin: minuteOfDay(r.toMin, NIGHT_DEFAULTS.toMin),
+    level: r.level === 'little' || r.level === 'lot' ? r.level : 'half',
+  };
+}
+
+/** Likewise: never away, unless this was chosen. */
+function away(raw: unknown): AwaySettings {
+  if (raw === undefined) return { ...AWAY_DEFAULTS, afterMin: null };
+  const r = (raw ?? {}) as Partial<Record<keyof AwaySettings, unknown>>;
+  const after = r.afterMin;
+  return {
+    afterMin: typeof after === 'number' && Number.isInteger(after) && after > 0 ? after : null,
+    show: r.show === 'panel' || r.show === 'nothing' ? r.show : 'clock',
   };
 }
 
@@ -226,6 +293,8 @@ function load(): Settings {
       remote: remote(parsed.remote),
       setupDone: parsed.setupDone !== false,
       notificationsAsked: parsed.notificationsAsked !== false,
+      night: night(parsed.night),
+      away: away(parsed.away),
     };
   } catch {
     return defaults();
@@ -264,6 +333,13 @@ interface Store {
   setSetupDone: (done: boolean) => void;
   /** The go-ahead to ask for notification access. There is no taking it back here. */
   allowNotifications: () => void;
+  setNight: (night: Partial<NightSettings>) => void;
+  setAway: (away: Partial<AwaySettings>) => void;
+  /**
+   * Setup's one row for both: on keeps whatever times and delay were chosen,
+   * and gives a delay where there was none.
+   */
+  setQuiet: (on: boolean) => void;
   /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
@@ -389,6 +465,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setSetupDone: (setupDone) => setSettings((prev) => ({ ...prev, setupDone })),
 
       allowNotifications: () => setSettings((prev) => ({ ...prev, notificationsAsked: true })),
+
+      setNight: (next) => setSettings((prev) => ({ ...prev, night: { ...prev.night, ...next } })),
+
+      setAway: (next) => setSettings((prev) => ({ ...prev, away: { ...prev.away, ...next } })),
+
+      setQuiet: (on) =>
+        setSettings((prev) => ({
+          ...prev,
+          night: { ...prev.night, on },
+          away: { ...prev.away, afterMin: on ? (prev.away.afterMin ?? AWAY_DEFAULTS.afterMin) : null },
+        })),
 
       reset: () => setSettings(defaults()),
     };

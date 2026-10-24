@@ -232,6 +232,28 @@ export interface DisplaysPayload {
 /** Renderer → engine on `display:command`. Mirrors `Command` in `display.rs`. */
 export type DisplayCommand = { action: 'show'; id: string; fill: boolean };
 
+/**
+ * Engine → local renderer on `os:presence`. Mirrors `PresencePayload` in
+ * `presence.rs`. Never sent to a remote panel: when you are at your desk is
+ * nobody else's business.
+ */
+export interface PresencePayload {
+  /** False where the system gives no idle time: not the same as always here. */
+  available: boolean;
+  reason: string | null;
+  /**
+   * Away once nothing has been pressed, moved or touched for the delay the
+   * renderer sent. Locked while the system's lock screen covers every display.
+   */
+  state: 'here' | 'away' | 'locked';
+}
+
+/**
+ * Renderer → engine on `presence:command`. Mirrors `Command` in
+ * `presence.rs`. Null for never; until it arrives, nobody is ever away.
+ */
+export type PresenceCommand = { action: 'configure'; awayAfterSec: number | null };
+
 /** Engine → renderer on `app:update`. Mirrors `UpdatePayload` in `update.rs`. */
 export interface UpdatePayload {
   /** The running version, read from the binary. */

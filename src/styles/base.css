@@ -9,6 +9,11 @@ body,
   height: 100%;
 }
 
+/* Night turns the whole page down here. Eased, so the panel does not blink at ten. */
+#root {
+  transition: filter 0.6s ease;
+}
+
 body {
   margin: 0;
   overflow: hidden;

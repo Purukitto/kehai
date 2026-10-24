@@ -48,7 +48,7 @@ opt-level = "s"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display"] }
+windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display", "Win32_System_RemoteDesktop", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse"] }
 
 # Already in the tree through Tauri. MPRIS players and the notification server
 # are both on the session bus.
