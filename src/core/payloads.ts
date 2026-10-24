@@ -126,7 +126,28 @@ export interface MediaPayload {
   durationSec: number;
   hasArt: boolean;
   player: string;
+  /** The player takes a new position. Some browser tabs don't. */
+  canSeek: boolean;
 }
+
+/**
+ * Engine → renderer on `media:volume`: this computer's main output, as the
+ * volume keys turn it, whatever is playing. Null where Kehai can't reach it.
+ * Mirrors `VolumePayload` in `media.rs`.
+ */
+export interface VolumePayload {
+  /** 0 to 100. */
+  level: number;
+  muted: boolean;
+}
+
+/** Renderer → engine on `media:command`. Mirrors `Command` in `media.rs`. */
+export type MediaCommand =
+  | { action: 'playpause' | 'next' | 'previous' }
+  | { action: 'seek'; positionSec: number }
+  /** Unmutes too, as the volume keys do. */
+  | { action: 'volume'; level: number }
+  | { action: 'mute'; muted: boolean };
 
 /** Engine → renderer on `flow:pomodoro`. Mirrors `SprintPayload` in `flow.rs`. */
 export interface SprintPayload {
@@ -280,6 +301,17 @@ export interface UpdatePayload {
   auto: boolean;
 }
 
+/** One address another device might reach the host on. Mirrors `Address` in `remote.rs`. */
+export interface RemoteAddress {
+  /** The network adapter's own name, such as Ethernet or Wi-Fi. */
+  adapter: string;
+  ip: string;
+  /** Made by software on the host (WSL, Hyper-V, Docker, a VM), so no other device can reach it. */
+  virtual: boolean;
+  /** Opens the panel at this address, key and name included. */
+  link: string;
+}
+
 /**
  * Engine → local renderer on `app:remote`. Mirrors `RemotePayload` in
  * `remote.rs`. Never sent to a remote panel: it carries the key.
@@ -288,8 +320,10 @@ export interface RemotePayload {
   on: boolean;
   listening: boolean;
   port: number;
-  /** Where another machine can open the panel, one per address, key included. */
-  links: string[];
+  /** What this machine calls itself, as the links and the network name it. */
+  name: string;
+  /** Where another machine can open the panel, real adapters first. */
+  addresses: RemoteAddress[];
   key: string | null;
   control: boolean;
   /** Remote panels connected right now. */
@@ -310,4 +344,5 @@ export type UpdateCommand =
   | { action: 'check' }
   | { action: 'install' }
   | { action: 'set_auto'; on: boolean }
-  | { action: 'open_release' };
+  | { action: 'open_release' }
+  | { action: 'open_support' };

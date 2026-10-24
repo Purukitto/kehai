@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DisplayMap, displayLabel } from '../components/DisplayMap';
+import { QrCode } from '../components/QrCode';
 import { bus } from '../core/bus';
 import type {
   DisplayCommand,
@@ -619,13 +620,181 @@ function masked(link: string): string {
   return link.replace(/key=[0-9a-f]+/i, 'key=••••••••');
 }
 
-function remoteStatus(status: RemotePayload | undefined): { text: string; danger: boolean } {
-  if (!status) return { text: 'Awaiting the engine.', danger: false };
-  if (status.error) return { text: status.error, danger: true };
-  if (!status.on) return { text: 'Not serving. Nothing is listening.', danger: false };
-  if (!status.listening) return { text: 'Starting.', danger: false };
+function remoteStatus(status: RemotePayload | undefined): { text: string; color: string } {
+  if (!status) return { text: 'Awaiting the engine.', color: 'var(--cc-line-2)' };
+  if (status.error) return { text: status.error, color: 'var(--cc-danger)' };
+  if (!status.on) return { text: 'Not serving. Nothing is listening.', color: 'var(--cc-line-2)' };
+  if (!status.listening) return { text: 'Starting.', color: 'var(--cc-line-2)' };
   const panels = status.clients === 1 ? '1 remote panel' : `${status.clients} remote panels`;
-  return { text: `Listening on port ${status.port}. ${panels} connected.`, danger: false };
+  return { text: `Listening on port ${status.port}. ${panels} connected.`, color: 'var(--cc-ok)' };
+}
+
+/** The code holds the key, and a desk panel sits in plain view: it shows for this long, then covers itself. */
+const CODE_SHOWS_MS = 2 * 60_000;
+const CODE_SIZE = 236;
+
+/**
+ * The code to scan and the link it carries, for one of this machine's
+ * addresses. Covered until asked for, and again after two minutes or when
+ * Settings closes, which unmounts it.
+ */
+function PairBlock({ status, onNote }: { status: RemotePayload; onNote: (note: string) => void }) {
+  const [until, setUntil] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
+  const [picked, setPicked] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (until === null) return;
+    const id = window.setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t >= until) setUntil(null);
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [until]);
+
+  const address = status.addresses.find((a) => a.ip === picked) ?? status.addresses[0];
+  if (!address) {
+    return <Row label="Address" desc="This machine has no network address another device could reach." />;
+  }
+
+  const left = until === null ? 0 : Math.max(0, Math.ceil((until - now) / 1000));
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(address.link);
+      onNote('Link copied. Open it on the other device.');
+    } catch {
+      onNote('Clipboard refused. Nothing was copied.');
+    }
+  };
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 30,
+        padding: '14px 0 16px',
+        borderTop: '1px solid var(--cc-line)',
+        borderBottom: '1px solid var(--cc-line)',
+      }}
+    >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 'none', width: CODE_SIZE }}>
+        {until !== null ? (
+          <>
+            <QrCode text={address.link} size={CODE_SIZE} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="cc-mini" style={{ color: 'var(--cc-accent-2)' }}>
+                HIDES IN {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}, OR WHEN SETTINGS CLOSES
+              </span>
+              <span style={{ flex: 1 }} />
+              <button className="cc-chip" style={{ padding: '0 12px' }} onClick={() => setUntil(null)}>
+                HIDE
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div
+              style={{
+                width: CODE_SIZE,
+                height: CODE_SIZE,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 14,
+                background: 'var(--cc-inset)',
+                backgroundImage: 'repeating-linear-gradient(135deg, var(--cc-line) 0 1px, transparent 1px 9px)',
+                border: '1px solid var(--cc-line-2)',
+              }}
+            >
+              <span className="cc-mini" style={{ textAlign: 'center', lineHeight: 1.7, color: 'var(--cc-muted)' }}>
+                THE CODE HOLDS THE KEY,
+                <br />
+                SO IT STAYS COVERED
+              </span>
+              <button
+                className="cc-chip cc-chip-on"
+                style={{ height: 40, minWidth: 150, fontSize: 10 }}
+                onClick={() => {
+                  const t = Date.now();
+                  setNow(t);
+                  setUntil(t + CODE_SHOWS_MS);
+                }}
+              >
+                SHOW CODE
+              </button>
+            </div>
+            <span className="cc-mini">SHOWS FOR TWO MINUTES</span>
+          </>
+        )}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 260, display: 'flex', flexDirection: 'column', gap: 9 }}>
+        <span className="cc-label">Address</span>
+        {status.addresses.map((a) => {
+          const on = a.ip === address.ip;
+          return (
+            <button
+              key={a.ip}
+              className="cc-chip"
+              aria-pressed={on}
+              onClick={() => setPicked(a.ip)}
+              style={{
+                height: 40,
+                justifyContent: 'flex-start',
+                gap: 10,
+                padding: '0 14px',
+                borderColor: on ? 'var(--cc-accent)' : 'var(--cc-line-2)',
+                color: on ? 'var(--cc-accent)' : 'var(--cc-dim)',
+              }}
+            >
+              <span style={{ width: 6, height: 6, flex: 'none', background: on ? 'var(--cc-accent)' : 'var(--cc-line-2)' }} />
+              <span style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.adapter.toUpperCase()}
+              </span>
+              <span style={{ flex: 1 }} />
+              <span style={{ fontSize: 12, letterSpacing: 0, color: on ? 'var(--cc-text)' : 'var(--cc-dim)' }}>{a.ip}</span>
+              {a.virtual && (
+                <span style={{ fontSize: 9, padding: '2px 6px', border: '1px solid currentColor' }}>VIRTUAL</span>
+              )}
+            </button>
+          );
+        })}
+        {status.addresses.some((a) => a.virtual) && (
+          <span className="cc-mini" style={{ lineHeight: 1.6 }}>
+            Real network adapters first. A virtual one, like WSL’s, can’t be reached from a tablet.
+          </span>
+        )}
+        <span className="cc-label" style={{ marginTop: 8 }}>
+          Link
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: 12,
+              color: 'var(--cc-muted)',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {masked(address.link)}
+          </span>
+          <button className="cc-chip" style={{ padding: '0 14px', height: 32 }} onClick={() => void copy()}>
+            COPY LINK
+          </button>
+        </div>
+        <span className="cc-mini" style={{ lineHeight: 1.6, marginTop: 'auto' }}>
+          Anyone who scans the code or opens the link can see the panel, notifications included, until you make a new
+          key.
+        </span>
+      </div>
+    </div>
+  );
 }
 
 /** On the machine being watched: whether, where and how far to let others in. */
@@ -641,65 +810,53 @@ function RemoteHostRows({
   const status = useTopic<RemotePayload>('app:remote');
   const state = remoteStatus(status);
 
-  const copy = async (link: string) => {
-    try {
-      await navigator.clipboard.writeText(link);
-      onNote('Link copied. Open it on the other machine.');
-    } catch {
-      onNote('Clipboard refused. Nothing was copied.');
-    }
-  };
-
   return (
     <>
-      <Row
-        label="Serve a remote panel"
-        desc="Lets a browser on another machine on your network show this panel. Windows may ask whether to let Kehai through its firewall the first time."
-      >
-        <Seg options={['OFF', 'ON']} value={remote.on ? 'ON' : 'OFF'} onPick={(v) => onChange({ on: v === 'ON' })} />
-      </Row>
-      <Row label="Port" desc="1024 to 65535. Changing it disconnects every remote panel.">
-        <PortField value={remote.port} onCommit={(port) => onChange({ port })} />
-      </Row>
-      <Row
-        label="Allow control"
-        desc="Remote panels can press the media, notification and focus-timer buttons. Never anything else, whatever this says."
-      >
-        <Seg
-          options={['OFF', 'ON']}
-          value={remote.control ? 'ON' : 'OFF'}
-          onPick={(v) => onChange({ control: v === 'ON' })}
-        />
-      </Row>
-      <Row
-        label="Status"
-        desc={<span style={{ color: state.danger ? 'var(--cc-danger)' : undefined }}>{state.text}</span>}
-      />
-      {status?.listening && status.links.length === 0 && (
-        <Row label="Link" desc="This machine has no network address another one could reach." />
-      )}
-      {status?.listening &&
-        status.links.map((link) => (
-          <Row
-            key={link}
-            label="Link"
-            desc={
-              <>
-                {masked(link)}
-                <span style={{ display: 'block' }}>
-                  Anyone with this link can see the panel, notifications included, until you make a new key.
-                </span>
-              </>
-            }
+      <Group label="This computer" note="Other devices on your network can show this panel." />
+      <div style={{ borderTop: '1px solid var(--cc-line)' }}>
+        <Row
+          label="Serve a remote panel"
+          desc="Lets a browser on a tablet, phone or another computer on your network show this panel. While it serves, Kehai tells the network its name and port, so a paired tablet finds it again. Windows may ask whether to let Kehai through its firewall the first time."
+        >
+          <Seg options={['OFF', 'ON']} value={remote.on ? 'ON' : 'OFF'} onPick={(v) => onChange({ on: v === 'ON' })} />
+        </Row>
+        <Row
+          label="Allow control"
+          desc="Remote panels can press the media, notification and focus-timer buttons. Never anything else, whatever this says."
+        >
+          <Seg
+            options={['OFF', 'ON']}
+            value={remote.control ? 'ON' : 'OFF'}
+            onPick={(v) => onChange({ control: v === 'ON' })}
+          />
+        </Row>
+        <Row
+          label="Status"
+          desc={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: status?.error ? state.color : undefined }}>
+              <span style={{ width: 5, height: 5, flex: 'none', background: state.color }} />
+              {state.text}
+            </span>
+          }
+        >
+          <div
+            style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}
+            title="1024 to 65535. Changing it disconnects every remote panel."
           >
-            <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => void copy(link)}>
-              COPY
-            </button>
-          </Row>
-        ))}
+            <span className="cc-label">Port</span>
+            <PortField value={remote.port} onCommit={(port) => onChange({ port })} />
+          </div>
+        </Row>
+      </div>
+      {status?.listening && (
+        <>
+          <Group label="Pair a tablet or phone" note="Scan the code with its camera, or open the link." />
+          <PairBlock status={status} onNote={onNote} />
+        </>
+      )}
       <Row
         label="New key"
-        desc="Disconnects every remote panel. Each then needs the new link. Use it when a link has gone somewhere it should not."
+        desc="Disconnects every remote panel. Each then needs the new code or link. Use it when a link has gone somewhere it should not."
       >
         <button
           className="cc-chip"
@@ -707,7 +864,7 @@ function RemoteHostRows({
           disabled={!status?.key}
           onClick={() => {
             sendRemote({ action: 'new_key' });
-            onNote('New key made. Remote panels need the new link.');
+            onNote('New key made. Remote panels need the new code or link.');
           }}
         >
           NEW KEY
@@ -1471,6 +1628,19 @@ export function SettingsScreen({
                       value={settings.autoCheckUpdates ? 'ON' : 'OFF'}
                       onPick={(v) => setAutoCheckUpdates(v === 'ON')}
                     />
+                  </Row>
+                  {/* Not on a remote panel either: it may be showing inside another app, whose store decides which links it may carry. */}
+                  <Row
+                    label="Support Kehai"
+                    desc="Kehai is free and stays free. If it earns its place on your desk, you can buy its author a coffee. Opens buymeacoffee.com in your browser."
+                  >
+                    <button
+                      className="cc-chip"
+                      style={{ padding: '8px 16px' }}
+                      onClick={() => sendUpdate({ action: 'open_support' })}
+                    >
+                      BUY A COFFEE
+                    </button>
                   </Row>
                 </>
               )}

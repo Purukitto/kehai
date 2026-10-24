@@ -19,6 +19,19 @@ pub struct MediaPayload {
     pub duration_sec: u64,
     pub has_art: bool,
     pub player: String,
+    /// The player takes a new position. Some browser tabs don't.
+    pub can_seek: bool,
+}
+
+/// Mirrors `VolumePayload` in `src/core/payloads.ts`: this computer's main
+/// output, as the volume keys turn it, whatever is playing. Published as null
+/// where Kehai can't reach it.
+#[derive(Serialize, Clone, Copy, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct VolumePayload {
+    /// 0 to 100.
+    pub level: u8,
+    pub muted: bool,
 }
 
 /// Mirrors `ArtPayload` in `src/core/payloads.ts`.
@@ -30,28 +43,83 @@ pub struct ArtPayload {
 
 /// What the widget asks for. The widget states an intent and the engine owns
 /// the side effect, so a wedged player can never block the panel's render loop.
+/// Mirrors `MediaCommand` in `src/core/payloads.ts`.
 #[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct Command {
     action: String,
+    /// `seek`: where to, in seconds from the start of the track.
+    position_sec: Option<f64>,
+    /// `volume`: 0 to 100.
+    level: Option<f64>,
+    /// `mute`.
+    muted: Option<bool>,
+}
+
+/// A command checked and put in range. Anything else is dropped here.
+pub enum Action {
+    PlayPause,
+    Next,
+    Previous,
+    /// Seconds from the start of the track.
+    Seek(f64),
+    /// 0.0 to 1.0. Changing the volume unmutes, as the volume keys do.
+    Volume(f32),
+    Mute(bool),
+}
+
+impl Command {
+    fn action(&self) -> Option<Action> {
+        let finite = |v: Option<f64>| v.filter(|v| v.is_finite());
+        match self.action.as_str() {
+            "playpause" => Some(Action::PlayPause),
+            "next" => Some(Action::Next),
+            "previous" => Some(Action::Previous),
+            "seek" => finite(self.position_sec).map(|s| Action::Seek(s.max(0.0))),
+            "volume" => {
+                finite(self.level).map(|l| Action::Volume((l.clamp(0.0, 100.0) / 100.0) as f32))
+            }
+            "mute" => self.muted.map(Action::Mute),
+            _ => None,
+        }
+    }
 }
 
 pub fn spawn(app: AppHandle) {
     let commands = app.clone();
+    let publisher = app.clone();
     commands.listen("media:command", move |event| {
-        let Ok(cmd) = serde_json::from_str::<Command>(event.payload()) else {
+        let Some(action) = serde_json::from_str::<Command>(event.payload())
+            .ok()
+            .and_then(|cmd| cmd.action())
+        else {
             return;
         };
         // Off the event thread: a control call can block on a slow player.
-        let action = cmd.action;
-        thread::spawn(move || platform::control(&action));
+        let app = publisher.clone();
+        thread::spawn(move || {
+            platform::control(&action);
+            // Said at once rather than at the next tick, so the level under a
+            // finger pressing + keeps up with it.
+            if matches!(action, Action::Volume(_) | Action::Mute(_)) {
+                bus::publish(&app, "media:volume", "poller.media", platform::volume());
+            }
+        });
     });
 
     thread::spawn(move || {
         let mut last: Option<MediaPayload> = None;
         let mut last_track = String::new();
+        let mut last_volume: Option<Option<VolumePayload>> = None;
         let mut announced = false;
 
         loop {
+            let volume = platform::volume();
+            if last_volume != Some(volume) {
+                bus::publish(&app, "media:volume", "poller.media", volume);
+                last_volume = Some(volume);
+            }
+
             let current = platform::snapshot();
 
             if !announced {
@@ -111,11 +179,18 @@ pub fn spawn(app: AppHandle) {
 
 #[cfg(windows)]
 mod platform {
-    use super::MediaPayload;
+    use super::{Action, MediaPayload, VolumePayload};
     use windows::Media::Control::{
         GlobalSystemMediaTransportControlsSession as Session,
         GlobalSystemMediaTransportControlsSessionManager as Manager,
         GlobalSystemMediaTransportControlsSessionPlaybackStatus as Status,
+    };
+    use windows::Win32::Media::Audio::Endpoints::IAudioEndpointVolume;
+    use windows::Win32::Media::Audio::{
+        eConsole, eRender, IMMDeviceEnumerator, MMDeviceEnumerator,
+    };
+    use windows::Win32::System::Com::{
+        CoCreateInstance, CoInitializeEx, CoUninitialize, CLSCTX_ALL, COINIT_MULTITHREADED,
     };
 
     fn session() -> Option<Session> {
@@ -155,7 +230,81 @@ mod platform {
                 .SourceAppUserModelId()
                 .map(|s| friendly(&s.to_string()))
                 .unwrap_or_else(|_| "Unknown".to_string()),
+            can_seek: playback
+                .Controls()
+                .and_then(|c| c.IsPlaybackPositionEnabled())
+                .unwrap_or(false),
         })
+    }
+
+    /// This thread's place in the multithreaded apartment, which the audio
+    /// calls need, given back when dropped. Declared before any interface it
+    /// covers, so those are released first.
+    struct Apartment(bool);
+
+    impl Apartment {
+        #[allow(unsafe_code)]
+        fn join() -> Self {
+            // SAFETY: no pointers. S_FALSE (already in it) also counts, and is
+            // balanced on drop like S_OK.
+            Self(unsafe { CoInitializeEx(None, COINIT_MULTITHREADED) }.is_ok())
+        }
+    }
+
+    impl Drop for Apartment {
+        #[allow(unsafe_code)]
+        fn drop(&mut self) {
+            if self.0 {
+                // SAFETY: pairs the successful join above, on the same thread.
+                unsafe { CoUninitialize() };
+            }
+        }
+    }
+
+    /// The default output device's volume, the one the volume keys turn.
+    /// Looked up each time, so plugging in headphones moves it with them.
+    #[allow(unsafe_code)]
+    fn endpoint() -> Option<IAudioEndpointVolume> {
+        // SAFETY: a class the system registers, asked for by its own ID.
+        let devices: IMMDeviceEnumerator =
+            unsafe { CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) }.ok()?;
+        // SAFETY: plain calls on the live enumerator and the device it returns.
+        let device = unsafe { devices.GetDefaultAudioEndpoint(eRender, eConsole) }.ok()?;
+        unsafe { device.Activate::<IAudioEndpointVolume>(CLSCTX_ALL, None) }.ok()
+    }
+
+    #[allow(unsafe_code)]
+    pub fn volume() -> Option<VolumePayload> {
+        let _apartment = Apartment::join();
+        let endpoint = endpoint()?;
+        // SAFETY: getters on a live interface.
+        let level = unsafe { endpoint.GetMasterVolumeLevelScalar() }.ok()?;
+        let muted = unsafe { endpoint.GetMute() }.ok()?.as_bool();
+        Some(VolumePayload {
+            level: (level.clamp(0.0, 1.0) * 100.0).round() as u8,
+            muted,
+        })
+    }
+
+    #[allow(unsafe_code)]
+    fn set_volume(action: &Action) {
+        let _apartment = Apartment::join();
+        let Some(endpoint) = endpoint() else { return };
+        let none = std::ptr::null();
+        // SAFETY: setters on a live interface. A null event context only means
+        // the change carries no tag of ours.
+        let result = unsafe {
+            match *action {
+                Action::Volume(level) => endpoint
+                    .SetMute(false, none)
+                    .and_then(|()| endpoint.SetMasterVolumeLevelScalar(level, none)),
+                Action::Mute(muted) => endpoint.SetMute(muted, none),
+                _ => return,
+            }
+        };
+        if let Err(err) = result {
+            eprintln!("poller.media: volume not changed: {err}");
+        }
     }
 
     /// Reads the session's cover art as a data URL.
@@ -193,13 +342,21 @@ mod platform {
         Some(format!("data:{mime};base64,{encoded}"))
     }
 
-    pub fn control(action: &str) {
+    pub fn control(action: &Action) {
+        if matches!(action, Action::Volume(_) | Action::Mute(_)) {
+            set_volume(action);
+            return;
+        }
         let Some(session) = session() else { return };
-        let _ = match action {
-            "playpause" => session.TryTogglePlayPauseAsync().map(|op| op.get()),
-            "next" => session.TrySkipNextAsync().map(|op| op.get()),
-            "previous" => session.TrySkipPreviousAsync().map(|op| op.get()),
-            _ => return,
+        let _ = match *action {
+            Action::PlayPause => session.TryTogglePlayPauseAsync().map(|op| op.get()),
+            Action::Next => session.TrySkipNextAsync().map(|op| op.get()),
+            Action::Previous => session.TrySkipPreviousAsync().map(|op| op.get()),
+            // WinRT positions are 100-nanosecond ticks.
+            Action::Seek(sec) => session
+                .TryChangePlaybackPositionAsync((sec * 10_000_000.0) as i64)
+                .map(|op| op.get()),
+            Action::Volume(_) | Action::Mute(_) => return,
         };
     }
 
@@ -224,7 +381,7 @@ mod platform {
     use std::path::PathBuf;
     use std::sync::OnceLock;
 
-    use super::MediaPayload;
+    use super::{Action, MediaPayload, VolumePayload};
     use zbus::blocking::fdo::DBusProxy;
     use zbus::blocking::Connection;
     use zbus::zvariant::{OwnedValue, Value};
@@ -395,6 +552,10 @@ mod platform {
                 .unwrap_or(0),
             has_art: art_path(metadata).is_some(),
             player: identity(bus, &name),
+            can_seek: matches!(
+                props.get("CanSeek").map(|v| &**v).map(plain),
+                Some(Value::Bool(true))
+            ),
         })
     }
 
@@ -432,19 +593,36 @@ mod platform {
         Some(format!("data:{mime};base64,{encoded}"))
     }
 
-    pub fn control(action: &str) {
-        let method = match action {
-            "playpause" => "PlayPause",
-            "next" => "Next",
-            "previous" => "Previous",
-            _ => return,
-        };
+    /// The system volume belongs to PulseAudio or PipeWire, which Kehai has
+    /// no way into without another dependency. The speaker doesn't show.
+    pub fn volume() -> Option<VolumePayload> {
+        None
+    }
+
+    pub fn control(action: &Action) {
         let Some(bus) = bus() else { return };
-        let Some((name, _)) = current(bus) else {
+        let Some((name, props)) = current(bus) else {
             return;
         };
-        if let Err(err) = bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), method, &()) {
-            eprintln!("poller.media: {method} refused by {name}: {err}");
+        let result = match *action {
+            Action::PlayPause => {
+                bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), "PlayPause", &())
+            }
+            Action::Next => bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), "Next", &()),
+            Action::Previous => {
+                bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), "Previous", &())
+            }
+            // Seek moves by an offset in microseconds, so it needs no track
+            // ID, which SetPosition does and not every player gives.
+            Action::Seek(sec) => {
+                let now = micros(props.get("Position").map(|v| &**v)).unwrap_or(0);
+                let offset = (sec * 1_000_000.0) as i64 - now;
+                bus.call_method(Some(name.as_str()), PATH, Some(PLAYER), "Seek", &offset)
+            }
+            Action::Volume(_) | Action::Mute(_) => return,
+        };
+        if let Err(err) = result {
+            eprintln!("poller.media: a command was refused by {name}: {err}");
         }
     }
 }
@@ -453,7 +631,7 @@ mod platform {
 /// wired, so the widget correctly reports nothing playing rather than pretending.
 #[cfg(not(any(windows, target_os = "linux")))]
 mod platform {
-    use super::MediaPayload;
+    use super::{Action, MediaPayload, VolumePayload};
 
     pub fn snapshot() -> Option<MediaPayload> {
         None
@@ -463,5 +641,9 @@ mod platform {
         None
     }
 
-    pub fn control(_action: &str) {}
+    pub fn volume() -> Option<VolumePayload> {
+        None
+    }
+
+    pub fn control(_action: &Action) {}
 }

@@ -125,7 +125,7 @@ a layout as JSON if you want to commit or share one.
 | `vitals` | Status strip | CPU, memory, network, unread and agents in a line | CPU, memory, network, notifications, agents |
 | `agents` | Agents | Which agent sessions are working and which are waiting on you | `dev:agents` |
 | `quota` | Token usage | Agent tokens in the current 5-hour block, and when it resets | `dev:llm_tokens` |
-| `media` | Now playing | Track, transport and cover art | `media:now_playing`, `media:art` |
+| `media` | Now playing | Track, transport, seek, cover art and this computer's volume | `media:now_playing`, `media:art`, `media:volume` |
 | `notify` | Notifications | System notification feed, dismissable | `sys:notify` |
 | `clock` | Clock | Time and date; hours over minutes in a tall tile | `os:clock` |
 | `sprint` | Focus timer | Start, pause, skip, reset | `flow:pomodoro` |
@@ -136,7 +136,8 @@ a layout as JSON if you want to commit or share one.
 | --- | --- | --- | --- |
 | CPU, memory, network, disk | via `sysinfo` | via `sysinfo` | via `sysinfo` |
 | CPU package temperature | usually unavailable — see below | label varies | label varies |
-| Media session and transport | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
+| Media session, transport and seek | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
+| System volume | the default output, as the volume keys turn it | not wired | not wired |
 | Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |
 | Agent token usage | optional — needs local agent transcripts | same | same |
 | Agent sessions | optional — the same transcripts | same | same |
@@ -172,17 +173,22 @@ The display does not have to hang off the machine being watched. Turn on
 the same network — an old laptop, a tablet, a Raspberry Pi driving the 10-inch
 screen.
 
-Settings shows a link for each of this machine's network addresses. Open one on the
-other device and it pairs by itself: the link carries a key, which the remote panel
-keeps and takes out of the address bar. A device where opening a link is awkward can
-paste the link or the key into the prompt instead. **New key** cuts off every remote
-panel at once.
+Under **Pair a tablet or phone**, press **Show code** and scan it with the other
+device's camera, or copy the link. Either pairs by itself: the link carries a key,
+which the remote panel keeps and takes out of the address bar. The code holds the key
+too, so it stays covered until you ask for it and covers itself again after two
+minutes or when Settings closes. Settings lists this machine's network addresses with
+real adapters first; a virtual one, such as WSL's, is marked, since nothing else on
+the network can reach it. A device where opening a link is awkward can paste the link
+or the key into the prompt instead. **New key** cuts off every remote panel at once.
 
 A remote panel has its own layout and theme, kept in its own browser. It only reads
 unless **Allow control** is on, and even then it can only press the buttons the panel
-has — play and skip, dismiss a notification, start or pause the focus timer. It can
+has — play, skip and seek, the volume, dismiss a notification, start or pause the focus timer. It can
 never change a setting, name a file or start an update. The header says `REMOTE`,
-`REMOTE · VIEW ONLY`, or why it is not connected.
+`REMOTE · VIEW ONLY`, or why it is not connected. When the host stops answering —
+asleep, off, or off the network — every tile dims and the header says since when, so
+an old reading never passes for a live one. The panel comes back by itself.
 
 The same port answers to scripts, with the key as a bearer token:
 
@@ -217,7 +223,11 @@ release.
 
 It listens for nothing unless you turn on **Settings → Remote**. Then it accepts
 connections on one port from your network, and shows the panel's data only to a
-device holding the key.
+device holding the key. While it serves, it also announces itself on your local
+network over mDNS, the way printers and speakers are found: this computer's name and
+the port, never the key, so a paired tablet can find it again after the router hands
+it a new address. The pairing link and code carry the same name. Turn the remote panel
+off and the announcement stops.
 
 Four sources are worth stating plainly:
 

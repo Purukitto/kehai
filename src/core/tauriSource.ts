@@ -29,6 +29,7 @@ export const ENGINE_TOPICS = [
   'dev:agents',
   'media:now_playing',
   'media:art',
+  'media:volume',
   'sys:notify',
   'app:update',
   'app:remote',

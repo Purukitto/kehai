@@ -4,6 +4,7 @@ import { displayLabel } from './components/DisplayMap';
 import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { PairPrompt } from './components/PairPrompt';
 import { Quiet } from './components/Quiet';
+import { Stale, hhmmAt } from './components/Stale';
 import { WindowControls } from './components/WindowControls';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
@@ -63,7 +64,7 @@ export default function App() {
   // not on screen.
   const [arranging, setArranging] = useState(settings.layoutId);
   const [engine, setEngine] = useState(false);
-  const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting' });
+  const [remote, setRemote] = useState<RemoteLink>({ state: 'connecting', heard: null });
   const update = useTopic<UpdatePayload>('app:update');
   const displays = useTopic<DisplaysPayload>('app:displays');
   const presence = useTopic<PresencePayload>('os:presence');
@@ -287,12 +288,23 @@ export default function App() {
         ? { live: false, label: 'NOT PAIRED', title: remote.reason }
         : {
             live: false,
-            label: remote.state === 'offline' ? 'REMOTE · OFFLINE' : 'REMOTE · CONNECTING',
+            label:
+              remote.heard !== null
+                ? `REMOTE · OFFLINE SINCE ${hhmmAt(remote.heard)}`
+                : remote.state === 'offline'
+                  ? 'REMOTE · OFFLINE'
+                  : 'REMOTE · CONNECTING',
             title: 'Reaching ' + location.host,
           }
     : engine
       ? { live: true, label: 'ENGINE', title: 'Rust engine connected' }
       : { live: false, label: 'MOCK', title: 'Mock source' };
+
+  // A remote panel that has heard from its host and lost it.
+  const stale =
+    REMOTE && (remote.state === 'offline' || remote.state === 'connecting') && remote.heard !== null
+      ? { ...remote, heard: remote.heard }
+      : null;
 
   const bar = (
       <div
@@ -400,8 +412,12 @@ export default function App() {
             },
           }}
         >
-          <Grid key={shape} arrangement={layout.shapes[shape]} />
+          {/* Every tile dims while the host is away: what they show is as old as the header says. */}
+          <div style={{ height: '100%', opacity: stale ? 0.3 : undefined }}>
+            <Grid key={shape} arrangement={layout.shapes[shape]} />
+          </div>
         </NavProvider>
+        {stale && <Stale heard={stale.heard} retryAt={stale.state === 'offline' ? stale.retryAt : null} />}
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
       </div>
     </div>

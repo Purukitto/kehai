@@ -40,6 +40,9 @@ tauri-plugin-opener = "2"
 tungstenite = "0.30"
 httparse = "1"
 getrandom = "0.3"
+# While serving a remote panel, Kehai says on the local network that it is
+# there (its name and port), so a paired tablet finds it at a new address.
+mdns-sd = { version = "0.21.6", default-features = false }
 
 [profile.release]
 codegen-units = 1
@@ -48,7 +51,7 @@ opt-level = "s"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display", "Win32_System_RemoteDesktop", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse"] }
+windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display", "Win32_System_RemoteDesktop", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 
 # Already in the tree through Tauri. MPRIS players and the notification server
 # are both on the session bus.
