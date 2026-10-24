@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-24
+
 ### Added
 
 - A short setup the first time Kehai opens. Choose the display it is for and it moves
@@ -210,7 +212,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/Purukitto/kehai/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/Purukitto/kehai/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/Purukitto/kehai/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/Purukitto/kehai/compare/v0.3.0...v0.4.0
