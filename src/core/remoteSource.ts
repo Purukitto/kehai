@@ -20,15 +20,23 @@ function isRemote(): boolean {
  */
 export const REMOTE_PANEL = !isTauri() && isRemote();
 
+/**
+ * Where the panel stands with its host. `heard` is when the host last said
+ * anything, kept while it is away so the panel can say how old its readings
+ * are; null until it has said something on this page.
+ */
 export type RemoteLink =
-  | { state: 'connecting' }
+  | { state: 'connecting'; heard: number | null }
   | { state: 'live'; control: boolean }
-  | { state: 'offline' }
+  | { state: 'offline'; heard: number | null; retryAt: number }
   | { state: 'unpaired'; reason: string };
 
 const KEY_STORE = 'kehai.remote.key';
+const NAME_STORE = 'kehai.remote.name';
 /** Close code the host uses for a missing, wrong or replaced key. Mirrors `remote.rs`. */
 const CLOSE_UNPAIRED = 4401;
+/** Two missed beats and some. The host beats every 20 seconds (`PING_EVERY` in `remote.rs`). */
+const SILENT_FOR = 45_000;
 /**
  * What a remote panel may ask the host for. The host checks again and refuses
  * anything else, so this only saves sending what would be refused.
@@ -49,6 +57,31 @@ function storeKey(key: string | null) {
     else localStorage.removeItem(KEY_STORE);
   } catch {
     // Storage refused: pairing lasts until the tab closes.
+  }
+}
+
+let hostName: string | null = null;
+
+/**
+ * What the host calls itself, as it said when the panel last connected, and
+ * kept so a panel reloaded while the host is off can still name it. Its
+ * address until it has said.
+ */
+export function remoteHostName(): string {
+  if (hostName) return hostName;
+  try {
+    return localStorage.getItem(NAME_STORE) ?? location.hostname;
+  } catch {
+    return location.hostname;
+  }
+}
+
+function storeName(name: string) {
+  hostName = name;
+  try {
+    localStorage.setItem(NAME_STORE, name);
+  } catch {
+    // Storage refused: the name lasts until the tab closes.
   }
 }
 
@@ -94,6 +127,8 @@ export function startRemoteSource(onLink: (link: RemoteLink) => void): () => voi
   let retry = 0;
   let timer: number | undefined;
   let control = false;
+  let heard: number | null = null;
+  let opened = 0;
 
   const connect = () => {
     const key = readKey();
@@ -102,11 +137,14 @@ export function startRemoteSource(onLink: (link: RemoteLink) => void): () => voi
       return;
     }
 
-    onLink({ state: 'connecting' });
+    onLink({ state: 'connecting', heard });
     const socket = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/bus');
     ws = socket;
 
-    socket.onopen = () => socket.send(JSON.stringify({ type: 'hello', key }));
+    socket.onopen = () => {
+      opened = Date.now();
+      socket.send(JSON.stringify({ type: 'hello', key }));
+    };
 
     socket.onmessage = (event) => {
       let msg: unknown;
@@ -116,33 +154,48 @@ export function startRemoteSource(onLink: (link: RemoteLink) => void): () => voi
         return;
       }
       if (!msg || typeof msg !== 'object') return;
-      const m = msg as { type?: unknown; control?: unknown; topic?: unknown };
+      heard = Date.now();
+      const m = msg as { type?: unknown; control?: unknown; topic?: unknown; name?: unknown };
       if (m.type === 'welcome') {
         retry = 0;
         control = m.control === true;
+        if (typeof m.name === 'string' && m.name) storeName(m.name);
         onLink({ state: 'live', control });
       } else if (typeof m.topic === 'string') {
         bus.ingest(msg as Envelope);
       }
     };
 
-    socket.onclose = (event) => {
-      // A socket replaced by `reconnect` has nothing more to say.
-      if (stopped || ws !== socket) return;
-      ws = null;
-      control = false;
-      if (event.code === CLOSE_UNPAIRED) {
-        onLink({ state: 'unpaired', reason: event.reason || 'The host did not accept this key.' });
-        return;
-      }
-      onLink({ state: 'offline' });
-      // Backs off to half a minute, so a host that is off for the night is
-      // not asked every second until morning.
-      const delay = Math.min(30_000, 1000 * 2 ** retry);
-      retry += 1;
-      timer = window.setTimeout(connect, delay);
-    };
+    socket.onclose = (event) => lost(socket, event.code, event.reason);
   };
+
+  const lost = (socket: WebSocket, code: number, reason: string) => {
+    // A socket replaced by `reconnect`, or given up on, has nothing more to say.
+    if (stopped || ws !== socket) return;
+    ws = null;
+    control = false;
+    if (code === CLOSE_UNPAIRED) {
+      onLink({ state: 'unpaired', reason: reason || 'The host did not accept this key.' });
+      return;
+    }
+    // Backs off to half a minute, so a host that is off for the night is
+    // not asked every second until morning.
+    const delay = Math.min(30_000, 1000 * 2 ** retry);
+    retry += 1;
+    onLink({ state: 'offline', heard, retryAt: Date.now() + delay });
+    timer = window.setTimeout(connect, delay);
+  };
+
+  // A host that sleeps or loses its network mid-connection closes nothing,
+  // and a browser can hold the dead socket open for hours. The host beats
+  // every 20 seconds, so this much silence means it is gone.
+  const watchdog = window.setInterval(() => {
+    const socket = ws;
+    if (socket?.readyState === WebSocket.OPEN && Date.now() - Math.max(opened, heard ?? 0) > SILENT_FOR) {
+      lost(socket, 1006, '');
+      socket.close();
+    }
+  }, 5000);
 
   reconnect = () => {
     window.clearTimeout(timer);
@@ -169,6 +222,7 @@ export function startRemoteSource(onLink: (link: RemoteLink) => void): () => voi
     stopped = true;
     reconnect = null;
     window.clearTimeout(timer);
+    window.clearInterval(watchdog);
     stopCommands.forEach((stop) => stop());
     ws?.close();
   };

@@ -8,6 +8,7 @@ import type {
   DisplayCommand,
   DisplaysPayload,
   FlowCommand,
+  MediaCommand,
   MediaPayload,
   MemPayload,
   NetPayload,
@@ -21,6 +22,7 @@ import type {
   SprintPayload,
   UpdateCommand,
   UpdatePayload,
+  VolumePayload,
 } from './payloads';
 
 /**
@@ -64,7 +66,9 @@ export function startMockSource(options: MockOptions = {}): () => void {
     durationSec: 348,
     hasArt: true,
     player: 'Spotify',
+    canSeek: true,
   };
+  const volume: VolumePayload = { level: 40, muted: false };
 
   // Walks the same states as `flow.rs`, a second at a time, so the timer's
   // controls can be built and reviewed without the engine.
@@ -281,10 +285,15 @@ export function startMockSource(options: MockOptions = {}): () => void {
   // media:command is the one topic the UI publishes. The engine owns the side
   // effect; here we reflect it back so the transport feels connected.
   const unsub = bus.subscribe('media:command', (e) => {
-    const action = (e.data as { action: string }).action;
-    if (action === 'playpause') media.playing = !media.playing;
+    const command = e.data as MediaCommand;
+    if (command.action === 'playpause') media.playing = !media.playing;
+    if (command.action === 'seek') media.elapsedSec = Math.min(media.durationSec, Math.max(0, Math.round(command.positionSec)));
+    if (command.action === 'volume') Object.assign(volume, { level: Math.round(command.level), muted: false });
+    if (command.action === 'mute') volume.muted = command.muted;
     pub<MediaPayload>('media:now_playing', 'mock.media', { ...media });
+    pub<VolumePayload>('media:volume', 'mock.media', { ...volume });
   });
+  pub<VolumePayload>('media:volume', 'mock.media', { ...volume });
 
   const unsubFlow = bus.subscribe('flow:command', (e) => {
     const command = e.data as FlowCommand;
@@ -394,7 +403,8 @@ export function startMockSource(options: MockOptions = {}): () => void {
     on: false,
     listening: false,
     port: 5280,
-    links: [],
+    name: 'DESKTOP-PURU',
+    addresses: [],
     key: null,
     control: false,
     clients: 0,
@@ -408,7 +418,15 @@ export function startMockSource(options: MockOptions = {}): () => void {
       Object.assign(remote, { on: command.on, listening: command.on, port: command.port, control: command.control });
     }
     if (command.action === 'new_key' || (remote.on && !remote.key)) remote.key = mockKey();
-    remote.links = remote.listening ? [`http://192.168.1.20:${remote.port}/#key=${remote.key}`] : [];
+    const at = (adapter: string, ip: string, virtual = false) => ({
+      adapter,
+      ip,
+      virtual,
+      link: `http://${ip}:${remote.port}/#key=${remote.key}&name=${remote.name}`,
+    });
+    remote.addresses = remote.listening
+      ? [at('Ethernet', '192.168.1.20'), at('Wi-Fi', '192.168.1.34'), at('vEthernet (WSL)', '172.28.160.1', true)]
+      : [];
     pub<RemotePayload>('app:remote', 'mock.remote', { ...remote });
   });
 

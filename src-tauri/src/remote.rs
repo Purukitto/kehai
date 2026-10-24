@@ -6,10 +6,14 @@
 //! WebSocket, the REST API — needs the key, which lives in the link Settings
 //! hands out. A remote panel only reads, unless the host also allows control,
 //! and even then it can only press the buttons the panel itself has.
+//!
+//! While it serves, Kehai also announces itself on the local network over
+//! mDNS, with this machine's name and the port and nothing else, so a paired
+//! tablet can find it again after the router hands out a new address.
 
 use std::fs;
 use std::io::{ErrorKind, Read, Write};
-use std::net::{IpAddr, TcpListener, TcpStream};
+use std::net::{IpAddr, Ipv4Addr, TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Sender, TryRecvError};
@@ -17,6 +21,7 @@ use std::sync::{Arc, RwLock};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
+use mdns_sd::{IfKind, IfPredicate, ServiceDaemon, ServiceInfo};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Listener, Manager};
 use tungstenite::handshake::derive_accept_key;
@@ -30,6 +35,8 @@ const TOPIC: &str = "app:remote";
 const SRC: &str = "remote";
 const STORE_FILE: &str = "remote.json";
 const DEFAULT_PORT: u16 = 5280;
+/// The mDNS service type Kehai announces while it serves.
+const SERVICE: &str = "_kehai._tcp.local.";
 /// A second display, maybe a third. Past this a connection is turned away
 /// rather than allowed to multiply the work every publish does.
 const MAX_CLIENTS: usize = 8;
@@ -54,12 +61,15 @@ const CLOSE_FULL: u16 = 4429;
 
 /// What a remote panel may ask for, and only when control is allowed: the
 /// buttons on the panel itself. Nothing here names a path, a URL or a setting,
-/// and a focus timer's lengths are the host's to choose.
+/// and a focus timer's lengths are the host's to choose. Seek and volume carry
+/// a number, which the media poller puts in range itself.
 fn allowed(topic: &str, action: &str) -> bool {
     matches!(
         (topic, action),
-        ("media:command", "playpause" | "next" | "previous")
-            | ("notify:command", "dismiss" | "clear")
+        (
+            "media:command",
+            "playpause" | "next" | "previous" | "seek" | "volume" | "mute"
+        ) | ("notify:command", "dismiss" | "clear")
             | ("flow:command", "start" | "pause" | "skip" | "reset")
     )
 }
@@ -72,13 +82,29 @@ struct RemotePayload {
     on: bool,
     listening: bool,
     port: u16,
-    /// Where another machine can open the panel, one per address this one has,
-    /// key included.
-    links: Vec<String>,
+    /// What this machine calls itself, as the links and the network name it.
+    name: String,
+    /// Where another machine can open the panel, real adapters first.
+    addresses: Vec<Address>,
     key: Option<String>,
     control: bool,
     clients: usize,
     error: Option<String>,
+}
+
+/// One address another device might reach this machine on. Mirrors
+/// `RemoteAddress` in `src/core/payloads.ts`.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Address {
+    /// The network adapter's own name, such as Ethernet or Wi-Fi.
+    adapter: String,
+    ip: String,
+    /// Made by software on this machine, so no other device can reach it.
+    #[serde(rename = "virtual")]
+    is_virtual: bool,
+    /// Opens the panel at this address, key and name included.
+    link: String,
 }
 
 /// Renderer → engine on `remote:command`. Mirrors `RemoteCommand` in
@@ -109,6 +135,8 @@ struct Stored {
 
 struct Shared {
     app: AppHandle,
+    /// This machine's name, told to each remote panel as it connects.
+    name: String,
     key: RwLock<String>,
     control: AtomicBool,
     clients: AtomicUsize,
@@ -138,6 +166,8 @@ struct Listening {
     port: u16,
     stop: Arc<AtomicBool>,
     accept: Option<JoinHandle<()>>,
+    /// Withdrawn when this drops, after the socket has stopped.
+    _announced: Option<Announced>,
 }
 
 impl Drop for Listening {
@@ -183,24 +213,160 @@ fn save(path: &Path, key: &str) {
     }
 }
 
-/// Every address another machine might reach this one on. Loopback and
-/// link-local addresses lead nowhere useful, and IPv6 ones make for links
-/// nobody would type.
-fn links(port: u16, key: &str) -> Vec<String> {
-    let networks = sysinfo::Networks::new_with_refreshed_list();
-    let mut out: Vec<String> = networks
-        .values()
-        .flat_map(|data| data.ip_networks())
-        .filter_map(|net| match net.addr {
-            IpAddr::V4(v4) if !v4.is_loopback() && !v4.is_link_local() => {
-                Some(format!("http://{v4}:{port}/#key={key}"))
+/// What this machine calls itself. The links carry it, so the Kehai app can
+/// say which PC it is showing, and so does the announcement on the network.
+fn host_name() -> String {
+    sysinfo::System::host_name()
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "Kehai".to_string())
+}
+
+/// Adapters made by software on this machine, which nothing else on the
+/// network can reach: WSL and Hyper-V switches, Docker bridges, VM host-only
+/// networks. Known by the names they come with.
+fn virtual_adapter(name: &str) -> bool {
+    let name = name.to_ascii_lowercase();
+    // Windows names them in words; Linux by a prefix.
+    let named = [
+        "vethernet",
+        "hyper-v",
+        "wsl",
+        "virtualbox",
+        "vmware",
+        "docker",
+    ];
+    let prefixed = ["veth", "virbr", "vboxnet", "vmnet", "br-"];
+    named.iter().any(|v| name.contains(v)) || prefixed.iter().any(|v| name.starts_with(v))
+}
+
+/// Home networks first, since a tablet on the desk is most likely on one:
+/// 192.168/16, then 10/8, then 172.16/12, where WSL and Docker also put
+/// themselves. Sorting the addresses as text put 172 before 192.
+fn rank(ip: Ipv4Addr) -> u8 {
+    match ip.octets() {
+        [192, 168, ..] => 0,
+        [10, ..] => 1,
+        [172, b, ..] if (16..32).contains(&b) => 2,
+        _ => 3,
+    }
+}
+
+/// Everything but letters, digits and `-._~` as `%XX`, so a name can sit in
+/// the link beside the key.
+fn escape(text: &str) -> String {
+    text.bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+                char::from(b).to_string()
+            } else {
+                format!("%{b:02X}")
             }
-            _ => None,
+        })
+        .collect()
+}
+
+/// Every address another machine might reach this one on, real adapters
+/// first. Loopback and link-local addresses lead nowhere useful, and IPv6
+/// ones make for links nobody would type.
+fn addresses(port: u16, key: &str, name: &str) -> Vec<Address> {
+    let networks = sysinfo::Networks::new_with_refreshed_list();
+    let mut found: Vec<(bool, u8, Ipv4Addr, String)> = networks
+        .iter()
+        .flat_map(|(adapter, data)| {
+            data.ip_networks()
+                .iter()
+                .filter_map(move |net| match net.addr {
+                    IpAddr::V4(v4) if !v4.is_loopback() && !v4.is_link_local() => {
+                        Some((virtual_adapter(adapter), rank(v4), v4, adapter.clone()))
+                    }
+                    _ => None,
+                })
         })
         .collect();
-    out.sort();
-    out.dedup();
-    out
+    found.sort();
+    found.dedup_by_key(|(_, _, ip, _)| *ip);
+    let name = escape(name);
+    found
+        .into_iter()
+        .map(|(is_virtual, _, ip, adapter)| Address {
+            adapter,
+            ip: ip.to_string(),
+            is_virtual,
+            link: format!("http://{ip}:{port}/#key={key}&name={name}"),
+        })
+        .collect()
+}
+
+/// Kehai on the local network over mDNS while it serves: this machine's name
+/// and the port, never the key. A paired tablet whose PC has moved to a new
+/// address finds it again by name. Virtual adapters are left out, as they are
+/// last in the links, and so is IPv6, which no link uses.
+struct Announced {
+    daemon: ServiceDaemon,
+    fullname: String,
+}
+
+impl Drop for Announced {
+    fn drop(&mut self) {
+        // A goodbye, so whoever was looking drops it now rather than when the
+        // record would have run out.
+        if let Ok(done) = self.daemon.unregister(&self.fullname) {
+            let _ = done.recv_timeout(Duration::from_secs(1));
+        }
+        let _ = self.daemon.shutdown();
+    }
+}
+
+fn announce(name: &str, port: u16) -> Option<Announced> {
+    let daemon = match ServiceDaemon::new() {
+        Ok(daemon) => daemon,
+        Err(err) => {
+            eprintln!("remote: not announced on the network: {err}");
+            return None;
+        }
+    };
+    let _ = daemon.disable_interface(vec![
+        IfKind::IPv6,
+        IfKind::LoopbackV4,
+        IfKind::Predicate(IfPredicate::new(|intf| virtual_adapter(&intf.name))),
+    ]);
+    // A host name of Kehai's own: Windows already answers for the machine's.
+    let label: String = name
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let host = format!("kehai-{}.local.", label.trim_matches('-'));
+    let registered = ServiceInfo::new(
+        SERVICE,
+        name,
+        &host,
+        "",
+        port,
+        None::<std::collections::HashMap<String, String>>,
+    )
+    .map(ServiceInfo::enable_addr_auto)
+    .and_then(|info| {
+        let fullname = info.get_fullname().to_string();
+        daemon.register(info).map(|()| fullname)
+    });
+    match registered {
+        Ok(fullname) => {
+            eprintln!("remote: announced on the network as {name}");
+            Some(Announced { daemon, fullname })
+        }
+        Err(err) => {
+            eprintln!("remote: not announced on the network: {err}");
+            let _ = daemon.shutdown();
+            None
+        }
+    }
 }
 
 pub fn spawn(app: AppHandle) {
@@ -220,6 +386,7 @@ pub fn spawn(app: AppHandle) {
         let store = store_path(&app);
         let shared = Arc::new(Shared {
             app: app.clone(),
+            name: host_name(),
             key: RwLock::new(store.as_deref().and_then(load).unwrap_or_default()),
             control: AtomicBool::new(false),
             clients: AtomicUsize::new(0),
@@ -243,7 +410,12 @@ pub fn spawn(app: AppHandle) {
                     on,
                     listening: live,
                     port,
-                    links: if live { links(port, &key) } else { Vec::new() },
+                    name: shared.name.clone(),
+                    addresses: if live {
+                        addresses(port, &key, &shared.name)
+                    } else {
+                        Vec::new()
+                    },
                     key: (!key.is_empty()).then_some(key),
                     control: shared.control.load(Ordering::Relaxed),
                     clients: shared.clients.load(Ordering::Relaxed),
@@ -351,6 +523,7 @@ fn start(shared: &Arc<Shared>, store: Option<&Path>, port: u16) -> Result<Listen
         port,
         stop,
         accept: Some(accept),
+        _announced: announce(&shared.name, port),
     })
 }
 
@@ -742,7 +915,10 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
     let generation = shared.generation.load(Ordering::Relaxed);
 
     let welcome = |control: bool| {
-        Message::text(serde_json::json!({ "type": "welcome", "control": control }).to_string())
+        Message::text(
+            serde_json::json!({ "type": "welcome", "control": control, "name": shared.name })
+                .to_string(),
+        )
     };
     let mut control = shared.control.load(Ordering::Relaxed);
     if ws.send(welcome(control)).is_err() {
@@ -820,7 +996,13 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
         }
         if pinged.elapsed() > PING_EVERY {
             pinged = Instant::now();
-            if ws.send(Message::Ping(Bytes::new())).is_err() {
+            // A browser answers pings without telling the page, so the page
+            // gets a beat it can see too. Without it, a host that went to
+            // sleep mid-connection would look live for as long as the
+            // browser kept the dead socket open.
+            if ws.send(Message::Ping(Bytes::new())).is_err()
+                || ws.send(Message::text(r#"{"type":"beat"}"#)).is_err()
+            {
                 return;
             }
         }

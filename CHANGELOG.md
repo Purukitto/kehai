@@ -9,6 +9,29 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- Pair a tablet or phone by scanning a code. **Settings → Remote → Show code** shows it
+  for two minutes; it covers itself again when the time is up or Settings closes, since
+  it holds the key. The link beside it does the same in a browser.
+- While it serves a remote panel, Kehai announces itself on your local network (its
+  name and port, never the key), so a paired tablet can find it at a new address.
+- Seek in **Now playing**: tap or drag the progress bar, or the line along the bottom of
+  a one-row tile. The time shows as you drag, and the player moves when you let go.
+- This computer's volume in **Now playing**, on Windows: the speaker after the skip
+  buttons opens mute, −, + and ten steps to tap, and goes back to the buttons after a
+  few seconds. A wide tile keeps it beside the buttons. With **Allow control** on, a
+  remote panel can seek and change the volume too.
+- **Settings → About → Support Kehai**, for anyone who wants to buy its author a coffee.
+
+### Changed
+
+- Settings → Remote lists this computer's real network adapters first and marks virtual
+  ones, such as WSL's, which a tablet can't reach. Port now sits beside Status.
+- A remote panel whose computer stops answering dims every tile and says since when it
+  last heard from it, instead of showing old readings as if they were live. It notices
+  within a minute even when the computer goes to sleep without saying goodbye.
+
 ## [0.7.0] - 2026-10-24
 
 ### Added

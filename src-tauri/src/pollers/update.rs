@@ -30,6 +30,8 @@ const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 const PROGRESS_EVERY: Duration = Duration::from_millis(250);
 /// Where a build that cannot install itself sends people instead.
 const RELEASES_URL: &str = "https://github.com/Purukitto/kehai/releases/latest";
+/// About → Support. The same page `.github/FUNDING.yml` names.
+const SUPPORT_URL: &str = "https://buymeacoffee.com/purukitto";
 /// Points the check at another manifest, to exercise an install end to end
 /// against a prerelease. Safe to honour in a release build: whatever it serves
 /// must still be signed by the release key, for the version it claims, and be
@@ -78,6 +80,7 @@ enum Command {
     Install,
     SetAuto { on: bool },
     OpenRelease,
+    OpenSupport,
 }
 
 fn now_ms() -> u64 {
@@ -329,6 +332,12 @@ pub fn spawn(app: AppHandle) {
                 Command::OpenRelease => {
                     if let Err(err) = app.opener().open_url(RELEASES_URL, None::<&str>) {
                         eprintln!("poller.update: release page did not open: {err}");
+                    }
+                }
+
+                Command::OpenSupport => {
+                    if let Err(err) = app.opener().open_url(SUPPORT_URL, None::<&str>) {
+                        eprintln!("poller.update: support page did not open: {err}");
                     }
                 }
             }
