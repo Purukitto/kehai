@@ -137,6 +137,8 @@ jobs:
           New-Item -ItemType Directory -Path "artifacts/$name" | Out-Null
           Copy-Item src-tauri/target/release/kehai.exe "artifacts/$name/"
           Copy-Item README.md, LICENSE, CHANGELOG.md "artifacts/$name/"
+          # The README links into docs/ and shows its screenshots.
+          Copy-Item docs "artifacts/$name/" -Recurse
           Compress-Archive -Path "artifacts/$name" -DestinationPath "artifacts/$name.zip"
 
       - name: Collect installers

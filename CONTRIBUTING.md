@@ -60,7 +60,7 @@ is fine — that is one thing — but a refactor bundled with a feature is two.
 
 ## How the pieces fit
 
-Read the [architecture section of the README](README.md#architecture) first. The short
+Read [Architecture](docs/architecture.md) first. The short
 version: sources are polled in Rust, normalised into one envelope shape, published to
 topics on a bus, and consumed by widgets that subscribe to topics. Nothing else couples.
 
