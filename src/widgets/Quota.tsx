@@ -5,7 +5,7 @@ import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { QuotaPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Awaiting, Meter, Pane } from './chrome';
 
 /** Escalation against a budget the user set. Amber stays the identity colour. */
@@ -55,7 +55,7 @@ const LINE: CSSProperties = {
   flex: 1,
 };
 
-function Quota({ props }: WidgetProps) {
+export function Quota({ props }: WidgetProps) {
   const quota = useTopic<QuotaPayload>('dev:llm_tokens');
   const size = useTileSize();
   const { settings } = useSettings();
@@ -189,11 +189,3 @@ function Quota({ props }: WidgetProps) {
     </Pane>
   );
 }
-
-export const quotaSpec: WidgetSpec = {
-  title: 'Token usage',
-  about: 'Agent tokens in the current 5-hour block, and when it resets.',
-  min: [3, 2],
-  topics: ['dev:llm_tokens'],
-  component: Quota,
-};

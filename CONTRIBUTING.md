@@ -66,14 +66,16 @@ topics on a bus, and consumed by widgets that subscribe to topics. Nothing else 
 
 ### Adding a widget
 
-1. Write `src/widgets/YourWidget.tsx`. Export the component and a `WidgetSpec` giving
-   its `title` and a one-line `about` (what Settings and the arranger show), its
-   minimum size in grid cells and the topics it reads. Its `Pane` label names what it
-   shows, never the topic.
-2. Add it to the map in `src/widgets/registry.ts`. That is the only place a widget is
+1. Write `src/widgets/YourWidget.tsx` and export the component. Its `Pane` label names
+   what it shows, never the topic.
+2. Describe it in `src/widgets/<id>.widget.json`: its `id`, the `name` and one-line
+   `about` that Settings and the arranger show, its `min` size in grid cells, and the
+   `sources` it reads, by their ids in `src/core/sources.ts`. `src/core/widget.ts`
+   checks the file when Kehai starts. A new kind of data needs a new source there too.
+3. Import both in `src/widgets/registry.ts`. That is the only place a widget is
    reachable from, so nothing in the grid changes.
-3. Reference it by key from a layout in `src/layouts/`, or add it from
-   **Settings → Widgets** at runtime.
+4. Reference it by id from a layout in `src/layouts/`, or turn it on from
+   **Settings → Layout → On this layout** at runtime.
 
 Use the shared chrome in `src/widgets/chrome.tsx` (`Pane`, `Meter`, `Awaiting`) rather
 than rolling your own. `Pane` must keep `flex: 1` or the grid cell shows through behind

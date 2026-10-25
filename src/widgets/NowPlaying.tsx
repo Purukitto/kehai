@@ -6,7 +6,7 @@ import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import type { ArtPayload, MediaCommand, MediaPayload, VolumePayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
 const PREV = 'M13 3v10L5 8ZM3 3h1.6v10H3Z';
@@ -488,7 +488,7 @@ function VolumeRow({ volume, opened }: { volume: Volume; opened: ReturnType<type
   );
 }
 
-function NowPlaying({ props }: WidgetProps) {
+export function NowPlaying({ props }: WidgetProps) {
   const size = useTileSize();
   const media = useTopic<MediaPayload>('media:now_playing');
   const art = useTopic<ArtPayload>('media:art');
@@ -621,11 +621,3 @@ function NowPlaying({ props }: WidgetProps) {
     </div>
   );
 }
-
-export const mediaSpec: WidgetSpec = {
-  title: 'Now playing',
-  about: 'The track playing anywhere on this machine, with play, pause, skip and seek, and this machine’s volume.',
-  min: [3, 2],
-  topics: ['media:now_playing', 'media:art', 'media:volume'],
-  component: NowPlaying,
-};

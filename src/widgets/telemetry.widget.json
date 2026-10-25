@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "telemetry",
+  "name": "Machine",
+  "about": "Processor history, memory, network and disks.",
+  "min": [2, 2],
+  "sources": ["cpu", "memory", "network", "disk"]
+}

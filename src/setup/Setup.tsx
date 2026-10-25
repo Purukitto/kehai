@@ -456,7 +456,7 @@ function PresetCard({ layout, shape, chosen, suggested, isEmpty, onPick }: { lay
                 }}
               >
                 <span style={{ fontSize: 8, letterSpacing: '0.12em', padding: '0 4px', textAlign: 'center', lineHeight: 1.3, color: hatched ? 'var(--cc-muted)' : chosen ? 'var(--cc-text)' : 'var(--cc-muted)' }}>
-                  {(registry[t.widget]?.title ?? t.widget).toUpperCase()}
+                  {(registry[t.widget]?.name ?? t.widget).toUpperCase()}
                 </span>
               </div>
             );

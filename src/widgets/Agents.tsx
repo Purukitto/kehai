@@ -4,7 +4,7 @@ import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import type { AgentSession, AgentsPayload, ClockPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Awaiting, Pane } from './chrome';
 
 /**
@@ -132,7 +132,7 @@ export function agentSummary(agents: AgentsPayload): { text: string; color: stri
   return { text: 'IDLE', color: 'var(--cc-dim)' };
 }
 
-function Agents({ props }: WidgetProps) {
+export function Agents({ props }: WidgetProps) {
   const agents = useTopic<AgentsPayload>('dev:agents');
   const size = useTileSize();
   const now = useNow();
@@ -238,11 +238,3 @@ function Agents({ props }: WidgetProps) {
     </Pane>
   );
 }
-
-export const agentsSpec: WidgetSpec = {
-  title: 'Agents',
-  about: 'Which coding-agent sessions are working and which are waiting on you.',
-  min: [3, 1],
-  topics: ['dev:agents'],
-  component: Agents,
-};

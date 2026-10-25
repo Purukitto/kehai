@@ -27,7 +27,8 @@ Three layouts ship. They use the same widgets and differ only in where those go.
 | **Ambient** | Nine values, large, for a panel that is mostly in the corner of your eye. |
 
 Stage's main readout follows attention: it moves to **Agents** while one is waiting on
-you, and back to the tab you chose once none is. **Settings → Widgets** turns that off.
+you, and back to the tab you chose once none is. **On this layout**, under
+**Settings → Layout**, turns that off.
 It also drops a tab whose source has nothing to report rather than leaving it blank.
 
 ## One layout, three shapes
@@ -56,9 +57,9 @@ repository or sharing. That is the only time you need to see the JSON.
 
 ## Arranging
 
-**Settings → Widgets** turns each widget on or off in the arrangement on screen; one
-turned on goes in the first space it fits. **Arrange** opens a grid editor with one
-tab per shape:
+**On this layout**, at the bottom of **Settings → Layout**, turns each widget on or off
+in the arrangement on screen; one turned on goes in the first space it fits. **Arrange**
+opens a grid editor with one tab per shape:
 
 - drag a tile to move it, and drag its corner to resize it;
 - drop a tile onto another and the two swap, so a full grid can still be rearranged;

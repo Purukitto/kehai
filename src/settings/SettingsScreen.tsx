@@ -18,9 +18,11 @@ import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTileProp, withTiles } from 
 import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
 import type { DimLevel, FocusSettings, QuietShow, RemoteSettings } from '../core/settings';
 import { DIM_NAME, hhmm, previewDim } from '../core/night';
+import { SOURCES, SOURCE_IDS } from '../core/sources';
+import type { SourceId } from '../core/sources';
 import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
-import type { Layout, Shape, ThemeId } from '../core/types';
+import type { Layout, Shape, ThemeId, WidgetSpec } from '../core/types';
 import { minSize, registry, widgetNames } from '../widgets/registry';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
@@ -259,6 +261,69 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
       </div>
       <span className="cc-mini" style={{ flex: 'none' }}>
         {live ? 'REPORTING' : refused ? 'UNAVAILABLE' : 'SILENT'}
+      </span>
+    </div>
+  );
+}
+
+interface SourceState {
+  live: boolean;
+  refused: boolean;
+  /** Notifications waiting for Allow, which is a refusal nobody has made yet. */
+  pending: boolean;
+  reason: string | null;
+}
+
+/** Whether each source is reporting, judged the way SourceRow judges it. */
+function useSourceStates(): Record<SourceId, SourceState> {
+  const states = {} as Record<SourceId, SourceState>;
+  // SOURCE_IDS never changes, so these hooks run in the same order every render.
+  for (const id of SOURCE_IDS) {
+    const value = useTopic<{ available?: boolean; pending?: boolean; reason?: string | null } | null>(SOURCES[id].topics[0]);
+    const refused = value?.available === false;
+    states[id] = {
+      live: value !== undefined && value !== null && !refused,
+      refused,
+      pending: value?.pending === true,
+      reason: refused ? (value?.reason ?? null) : null,
+    };
+  }
+  return states;
+}
+
+/**
+ * One widget under Installed: what it shows and what it reads. It is reporting
+ * while any of its sources is, so the main readout with no agent transcripts
+ * still counts, as the machine half of it does report.
+ */
+function WidgetRow({ widget, sources }: { widget: WidgetSpec; sources: Record<SourceId, SourceState> }) {
+  const states = widget.sources.map((s) => sources[s]);
+  const live = states.some((s) => s.live);
+  const blocked = !live && states.every((s) => s.refused);
+  const first = states[0];
+  const status = live ? 'REPORTING' : blocked ? (first.pending ? 'NOT ALLOWED YET' : 'UNAVAILABLE') : 'SILENT';
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: '12px 0',
+        borderBottom: '1px solid var(--cc-line)',
+      }}
+    >
+      <span style={{ width: 6, height: 6, flex: 'none', background: live ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12 }}>{widget.name}</div>
+        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+          {!blocked ? widget.about : first.pending ? 'Not read until you allow it under Sources.' : (first.reason ?? widget.about)}
+        </div>
+        <div className="cc-mini" style={{ marginTop: 4, letterSpacing: '0.12em' }}>
+          READS {widget.sources.map((s) => SOURCES[s].name.toUpperCase()).join(' · ')}
+        </div>
+      </div>
+      <span className="cc-mini" style={{ flex: 'none' }}>
+        {status}
       </span>
     </div>
   );
@@ -1113,6 +1178,16 @@ export function SettingsScreen({
   const update = useTopic<UpdatePayload>('app:update');
   const displays = useTopic<DisplaysPayload>('app:displays');
   const [note, setNote] = useState<string | null>(null);
+  // On This Layout sits below the layout cards, out of sight of the note
+  // beside the section title, so what its switches did is said beside them.
+  const [onScreenNote, setOnScreenNote] = useState<string | null>(null);
+  const sources = useSourceStates();
+  const [jumpToOnScreen, setJumpToOnScreen] = useState(false);
+  useEffect(() => {
+    if (!jumpToOnScreen || section !== 'LAYOUT') return;
+    document.getElementById('on-this-layout')?.scrollIntoView({ block: 'start' });
+    setJumpToOnScreen(false);
+  }, [jumpToOnScreen, section]);
   const [confirmReset, setConfirmReset] = useConfirm();
   const [confirmDelete, setConfirmDelete] = useConfirm();
 
@@ -1131,7 +1206,7 @@ export function SettingsScreen({
     setRenaming(null);
   };
 
-  const label = (name: string) => registry[name]?.title ?? name;
+  const label = (name: string) => registry[name]?.name ?? name;
   const here = layout.shapes[shape];
   const mediaIndex = here.tiles.findIndex((t) => t.widget === 'media');
   const mediaTile = mediaIndex >= 0 ? here.tiles[mediaIndex] : undefined;
@@ -1168,13 +1243,13 @@ export function SettingsScreen({
     } else {
       const tiles = placeTile(here, name, minSize);
       if (!tiles) {
-        setNote(`No room for ${label(name)}. Make space with ARRANGE under Layout first.`);
+        setOnScreenNote(`No room for ${label(name)}. Make space with ARRANGE first.`);
         return;
       }
       editHere((a) => withTiles(a, tiles));
     }
-    if (copying) setNote(`${layout.name} is a preset, so this changed a copy of it, now under Yours and on screen.`);
-    else if (!on) setNote(`${label(name)} added. ARRANGE under Layout moves it.`);
+    if (copying) setOnScreenNote(`${layout.name} is a preset, so this changed a copy of it, now under Yours and on screen.`);
+    else setOnScreenNote(on ? `${label(name)} removed from this layout.` : `${label(name)} added. ARRANGE moves it.`);
   };
 
   return (
@@ -1427,62 +1502,104 @@ export function SettingsScreen({
                 landscape, bar and portrait displays, and Kehai shows the one that fits its window. Export copies the
                 selected layout to the clipboard; Import adds one from it.
               </div>
+
+              <div id="on-this-layout" style={{ marginTop: 28, paddingTop: 18, borderTop: '1px solid var(--cc-line)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <span className="cc-label">ON THIS LAYOUT</span>
+                  <span className="cc-mini" style={{ flex: 1, minWidth: 0 }}>
+                    {layout.name.toUpperCase()} · {shape.toUpperCase()}, THE ONE ON SCREEN
+                  </span>
+                  <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => onArrange(settings.layoutId)}>
+                    ARRANGE
+                  </button>
+                </div>
+                <div className="cc-mini" style={{ marginTop: 8, marginBottom: 6, lineHeight: 1.6 }}>
+                  Which widgets are in the {shape} arrangement of {layout.name}, and their options. One turned on goes in
+                  the first space it fits.
+                  {isPreset(settings.layoutId) ? ' It is a preset, so a change saves a copy under Yours.' : ''}
+                </div>
+                {onScreenNote && (
+                  <div className="cc-mini" style={{ color: 'var(--cc-accent)', marginBottom: 6 }}>
+                    {onScreenNote}
+                  </div>
+                )}
+                {[...widgetNames].sort((a, b) => label(a).localeCompare(label(b))).map((name) => {
+                  const on = here.tiles.some((t) => t.widget === name);
+                  return (
+                    <Row key={name} label={label(name)} desc={registry[name].about}>
+                      <Seg
+                        options={['OFF', 'ON']}
+                        value={on ? 'ON' : 'OFF'}
+                        onPick={(v) => {
+                          if ((v === 'ON') !== on) toggleWidget(name, on);
+                        }}
+                      />
+                    </Row>
+                  );
+                })}
+  
+                {here.tiles.some((t) => t.widget === 'stage') && (
+                  <Row
+                    label="Main readout follows attention"
+                    desc="Shows Agents while one waits on you, and goes back to your tab once none does. Picking a tab yourself keeps it until another agent starts waiting."
+                  >
+                    <Seg
+                      options={['OFF', 'ON']}
+                      value={settings.followAttention ? 'ON' : 'OFF'}
+                      onPick={(v) => setFollowAttention(v === 'ON')}
+                    />
+                  </Row>
+                )}
+  
+                {mediaTile && (
+                  <>
+                    <Row label="Album art" desc="Shown beside the track when the player provides one.">
+                      <Seg
+                        options={['OFF', 'ON']}
+                        value={mediaTile.props?.art === false ? 'OFF' : 'ON'}
+                        onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'art', v === 'ON'))}
+                      />
+                    </Row>
+                    <Row label="Equaliser" desc="A horizontal bar that freezes when playback pauses.">
+                      <Seg
+                        options={['off', 'bar']}
+                        value={mediaTile.props?.equaliser === 'off' ? 'off' : 'bar'}
+                        onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'equaliser', v))}
+                      />
+                    </Row>
+                  </>
+                )}
+              </div>
             </>
           )}
 
           {section === 'WIDGETS' && (
-            <div style={{ marginTop: 18 }}>
-              <div className="cc-mini" style={{ marginBottom: 6, lineHeight: 1.6 }}>
-                For the {shape} arrangement of {layout.name}, the one on screen.
-                {isPreset(settings.layoutId) ? ' It is a preset, so a change saves a copy under Yours.' : ''}
-              </div>
-              {[...widgetNames].sort((a, b) => label(a).localeCompare(label(b))).map((name) => {
-                const on = here.tiles.some((t) => t.widget === name);
-                return (
-                  <Row key={name} label={label(name)} desc={registry[name].about}>
-                    <Seg
-                      options={['OFF', 'ON']}
-                      value={on ? 'ON' : 'OFF'}
-                      onPick={(v) => {
-                        if ((v === 'ON') !== on) toggleWidget(name, on);
-                      }}
-                    />
-                  </Row>
-                );
-              })}
-
-              {here.tiles.some((t) => t.widget === 'stage') && (
-                <Row
-                  label="Main readout follows attention"
-                  desc="Shows Agents while one waits on you, and goes back to your tab once none does. Picking a tab yourself keeps it until another agent starts waiting."
+            <>
+              <Group
+                label={`BUNDLED WITH KEHAI · ${widgetNames.length}`}
+                note="Part of Kehai, and updated with it. Each reads only the computer Kehai runs on."
+              />
+              {[...widgetNames]
+                .sort((a, b) => label(a).localeCompare(label(b)))
+                .map((name) => (
+                  <WidgetRow key={name} widget={registry[name]} sources={sources} />
+                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
+                <span className="cc-mini" style={{ flex: 1, lineHeight: 1.6 }}>
+                  Which of them are on screen, and their options, is under Layout.
+                </span>
+                <button
+                  className="cc-chip"
+                  style={{ padding: '7px 13px' }}
+                  onClick={() => {
+                    setSection('LAYOUT');
+                    setJumpToOnScreen(true);
+                  }}
                 >
-                  <Seg
-                    options={['OFF', 'ON']}
-                    value={settings.followAttention ? 'ON' : 'OFF'}
-                    onPick={(v) => setFollowAttention(v === 'ON')}
-                  />
-                </Row>
-              )}
-
-              {mediaTile && (
-                <>
-                  <Row label="Album art" desc="Shown beside the track when the player provides one.">
-                    <Seg
-                      options={['OFF', 'ON']}
-                      value={mediaTile.props?.art === false ? 'OFF' : 'ON'}
-                      onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'art', v === 'ON'))}
-                    />
-                  </Row>
-                  <Row label="Equaliser" desc="A horizontal bar that freezes when playback pauses.">
-                    <Seg
-                      options={['off', 'bar']}
-                      value={mediaTile.props?.equaliser === 'off' ? 'off' : 'bar'}
-                      onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'equaliser', v))}
-                    />
-                  </Row>
-                </>
-              )}
-            </div>
+                  ON THIS LAYOUT
+                </button>
+              </div>
+            </>
           )}
 
           {section === 'APPEARANCE' && (

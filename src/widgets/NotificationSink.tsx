@@ -7,7 +7,7 @@ import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { NotifyItem, NotifyPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
 const PALETTE = ['var(--cc-accent)', 'var(--cc-accent-2)', 'var(--cc-ok)', 'var(--cc-muted)'];
@@ -106,7 +106,7 @@ function Row({ item, dense }: { item: NotifyItem; dense: boolean }) {
   );
 }
 
-function NotificationSink(_: WidgetProps) {
+export function NotificationSink(_: WidgetProps) {
   const { allowNotifications } = useSettings();
   const feed = useTopic<NotifyPayload>('sys:notify');
   const size = useTileSize();
@@ -245,11 +245,3 @@ function NotificationSink(_: WidgetProps) {
     </Pane>
   );
 }
-
-export const notifySpec: WidgetSpec = {
-  title: 'Notifications',
-  about: 'Notifications from your apps, filterable, dismissed with a tap.',
-  min: [2, 3],
-  topics: ['sys:notify'],
-  component: NotificationSink,
-};

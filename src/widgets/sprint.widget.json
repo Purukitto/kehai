@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "sprint",
+  "name": "Focus timer",
+  "about": "A countdown of focus blocks and breaks, with today's total.",
+  "min": [2, 2],
+  "sources": ["focus"]
+}

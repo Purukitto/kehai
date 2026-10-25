@@ -9,6 +9,14 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings → Widgets** lists every widget Kehai comes with, what each one reads, and
+  whether that is reporting.
+- Turning widgets on and off in the layout on screen, and their options, moved to
+  **Settings → Layout → On this layout**, with an **Arrange** button for that layout
+  beside it.
+
 ## [0.8.0] - 2026-10-24
 
 ### Added

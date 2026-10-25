@@ -81,8 +81,10 @@ checks every one again.
 | `src/components/Stale.tsx` | What a remote panel shows over its tiles when the host goes away |
 | `src/grid/Grid.tsx` | Renders a layout onto a CSS grid |
 | `src/grid/Arranger.tsx` | The tile arranger |
-| `src/widgets/` | One module per widget, each declaring its topics and minimum size |
+| `src/widgets/` | One module per widget, beside its description file, `<id>.widget.json` |
 | `src/widgets/registry.ts` | The only way a widget is reached |
+| `src/core/widget.ts` | Validates a widget's description file: name, minimum size, the sources it reads |
+| `src/core/sources.ts` | The sources widgets read, and the topics each publishes on |
 | `src/layouts/*.layout.json` | The three shipped presets |
 | `src/styles/tokens.css` | Thirteen custom properties per theme |
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
