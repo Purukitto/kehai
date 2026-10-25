@@ -24,7 +24,7 @@
 
 ## If this touches the UI
 
-- [ ] Checked at the smallest size the widget declares in its `WidgetSpec`
+- [ ] Checked at the smallest size the widget declares in its `<id>.widget.json`
 - [ ] Checked in all three themes
 - [ ] A topic with no data yet renders `--` or `Awaiting`, never `0`
 
