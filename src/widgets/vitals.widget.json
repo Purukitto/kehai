@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "vitals",
+  "name": "Status strip",
+  "about": "A line of small readings: processor, memory, network, unread, agents.",
+  "min": [2, 1],
+  "sources": ["cpu", "memory", "network", "notifications", "agents"]
+}

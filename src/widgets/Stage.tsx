@@ -6,7 +6,7 @@ import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { AgentsPayload, CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { AgentRow, agentSentence, useNow, waitingOnYou } from './Agents';
 import { Meter } from './chrome';
 import { budgetPct, budgetStatus, totalTokens } from './Quota';
@@ -43,7 +43,7 @@ interface Hero {
   controls?: ReactNode;
 }
 
-function Stage({ props }: WidgetProps) {
+export function Stage({ props }: WidgetProps) {
   const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'agents', 'machine', 'sprint']).filter(Boolean);
   const { settings, setStageTab } = useSettings();
   const { openSettings } = useNav();
@@ -359,11 +359,3 @@ function Stage({ props }: WidgetProps) {
     </div>
   );
 }
-
-export const stageSpec: WidgetSpec = {
-  title: 'Main readout',
-  about: 'One large reading, with tabs for tokens, agents, the machine and focus.',
-  min: [6, 4],
-  topics: ['dev:llm_tokens', 'dev:agents', 'telemetry:cpu', 'telemetry:mem', 'flow:pomodoro'],
-  component: Stage,
-};

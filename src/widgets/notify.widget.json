@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "notify",
+  "name": "Notifications",
+  "about": "Notifications from your apps, filterable, dismissed with a tap.",
+  "min": [2, 3],
+  "sources": ["notifications"]
+}

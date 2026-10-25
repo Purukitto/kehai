@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "quota",
+  "name": "Token usage",
+  "about": "Agent tokens in the current 5-hour block, and when it resets.",
+  "min": [3, 2],
+  "sources": ["tokens"]
+}

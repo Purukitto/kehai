@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "clock",
+  "name": "Clock",
+  "about": "The time and date.",
+  "min": [2, 2],
+  "sources": ["clock"]
+}

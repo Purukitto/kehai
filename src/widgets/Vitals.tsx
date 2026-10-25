@@ -3,13 +3,13 @@ import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import { rate } from '../core/format';
 import type { AgentsPayload, CpuPayload, MemPayload, NetPayload, NotifyPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { agentSummary, waitingOnYou } from './Agents';
 
 /** Below this the rows lay out along one line instead of stacking. */
 const ROW_BELOW = 110;
 
-function Vitals({ props }: WidgetProps) {
+export function Vitals({ props }: WidgetProps) {
   const size = useTileSize();
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
   const mem = useTopic<MemPayload>('telemetry:mem');
@@ -88,11 +88,3 @@ function Vitals({ props }: WidgetProps) {
     </div>
   );
 }
-
-export const vitalsSpec: WidgetSpec = {
-  title: 'Status strip',
-  about: 'A line of small readings: processor, memory, network, unread, agents.',
-  min: [2, 1],
-  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'sys:notify', 'dev:agents'],
-  component: Vitals,
-};

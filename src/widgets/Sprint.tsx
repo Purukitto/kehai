@@ -3,7 +3,7 @@ import { mmss } from '../core/format';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { FlowCommand, SprintPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Awaiting, Pane } from './chrome';
 
 function command(c: FlowCommand) {
@@ -84,7 +84,7 @@ export function SprintControls({
   );
 }
 
-function Sprint(_: WidgetProps) {
+export function Sprint(_: WidgetProps) {
   const size = useTileSize();
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
 
@@ -152,11 +152,3 @@ function Sprint(_: WidgetProps) {
     </Pane>
   );
 }
-
-export const sprintSpec: WidgetSpec = {
-  title: 'Focus timer',
-  about: "A countdown of focus blocks and breaks, with today's total.",
-  min: [2, 2],
-  topics: ['flow:pomodoro'],
-  component: Sprint,
-};

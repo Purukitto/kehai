@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "agents",
+  "name": "Agents",
+  "about": "Which coding-agent sessions are working and which are waiting on you.",
+  "min": [3, 1],
+  "sources": ["agents"]
+}

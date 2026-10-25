@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import type { WidgetDescription } from './widget';
 
 /** Everything on the bus is one of these, whatever the source. */
 export interface Envelope<T = unknown> {
@@ -53,15 +54,9 @@ export interface WidgetProps {
   props: Record<string, unknown>;
 }
 
-/** What a widget module declares about itself. */
-export interface WidgetSpec {
-  /** What it is called anywhere a person reads it: Settings, the arranger. */
-  title: string;
-  /** One line on what it shows, for Settings → Widgets. */
-  about: string;
-  /** Minimum size in grid cells, [cols, rows]. */
-  min: [number, number];
-  /** Topics it reads. Declared so the engine need not poll for nothing. */
+/** A widget as the grid reaches it: its description file, and the code that draws it. */
+export interface WidgetSpec extends WidgetDescription {
+  /** Every topic its sources publish on. Declared so the engine need not poll for nothing. */
   topics: string[];
   component: ComponentType<WidgetProps>;
 }

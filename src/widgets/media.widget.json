@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "media",
+  "name": "Now playing",
+  "about": "The track playing anywhere on this machine, with play, pause, skip and seek, and this machine’s volume.",
+  "min": [3, 2],
+  "sources": ["media"]
+}

@@ -10,18 +10,22 @@
 
 | Widget | Shows | Reads |
 | --- | --- | --- |
-| **Main readout** `stage` | One large reading with tabs for tokens, agents, machine and focus. Moves to Agents while one waits on you | tokens, agents, CPU, memory, timer |
-| **Machine** `telemetry` | CPU history, memory, network, volumes | all four telemetry topics |
-| **Status strip** `vitals` | CPU, memory, network, unread and agents in a line | CPU, memory, network, notifications, agents |
-| **Agents** `agents` | Which agent sessions are working and which are waiting on you | `dev:agents` |
-| **Token usage** `quota` | Agent tokens in the current 5-hour block, and when it resets | `dev:llm_tokens` |
-| **Now playing** `media` | Track, transport, seek, cover art and this computer's volume | `media:now_playing`, `media:art`, `media:volume` |
-| **Notifications** `notify` | System notification feed, dismissable | `sys:notify` |
-| **Clock** `clock` | Time and date; hours over minutes in a tall tile | `os:clock` |
-| **Focus timer** `sprint` | Start, pause, skip, reset | `flow:pomodoro` |
+| **Main readout** `stage` | One large reading with tabs for tokens, agents, machine and focus. Moves to Agents while one waits on you | agent tokens, agent sessions, processor, memory, focus timer |
+| **Machine** `telemetry` | CPU history, memory, network, volumes | processor, memory, network, disk |
+| **Status strip** `vitals` | CPU, memory, network, unread and agents in a line | processor, memory, network, notifications, agent sessions |
+| **Agents** `agents` | Which agent sessions are working and which are waiting on you | agent sessions |
+| **Token usage** `quota` | Agent tokens in the current 5-hour block, and when it resets | agent tokens |
+| **Now playing** `media` | Track, transport, seek, cover art and this computer's volume | media session |
+| **Notifications** `notify` | System notification feed, dismissable | notifications |
+| **Clock** `clock` | Time and date; hours over minutes in a tall tile | clock |
+| **Focus timer** `sprint` | Start, pause, skip, reset | focus timer |
 
 Every widget lays itself out for the size of its tile, so the same widget is a full
 pane in one layout and a single row in another.
+
+**Settings → Widgets** lists every widget, what it reads and whether that is reporting.
+Which widgets are on screen, and their options, is under **Settings → Layout → On this
+layout**.
 
 ### Now playing
 

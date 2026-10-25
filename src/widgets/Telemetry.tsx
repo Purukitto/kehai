@@ -3,7 +3,7 @@ import { useTileSize } from '../core/TileSize';
 import { useHistory } from '../core/useHistory';
 import { useTopic } from '../core/useTopic';
 import type { CpuPayload, DiskPayload, MemPayload, NetPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
 function threadColor(v: number): string {
@@ -26,7 +26,7 @@ function Section({ label, right, children }: { label: string; right?: string; ch
   );
 }
 
-function Telemetry(_: WidgetProps) {
+export function Telemetry(_: WidgetProps) {
   const size = useTileSize();
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
   const mem = useTopic<MemPayload>('telemetry:mem');
@@ -171,11 +171,3 @@ function Telemetry(_: WidgetProps) {
     </Pane>
   );
 }
-
-export const telemetrySpec: WidgetSpec = {
-  title: 'Machine',
-  about: 'Processor history, memory, network and disks.',
-  min: [2, 2],
-  topics: ['telemetry:cpu', 'telemetry:mem', 'telemetry:net', 'telemetry:disk'],
-  component: Telemetry,
-};

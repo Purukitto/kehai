@@ -2,9 +2,9 @@ import { clockParts } from '../core/format';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { ClockPayload } from '../core/payloads';
-import type { WidgetProps, WidgetSpec } from '../core/types';
+import type { WidgetProps } from '../core/types';
 
-function Clock({ props }: WidgetProps) {
+export function Clock({ props }: WidgetProps) {
   const size = useTileSize();
   const tick = useTopic<ClockPayload>('os:clock');
   const seconds = props.seconds === true;
@@ -78,11 +78,3 @@ function Clock({ props }: WidgetProps) {
     </div>
   );
 }
-
-export const clockSpec: WidgetSpec = {
-  title: 'Clock',
-  about: 'The time and date.',
-  min: [2, 2],
-  topics: ['os:clock'],
-  component: Clock,
-};
