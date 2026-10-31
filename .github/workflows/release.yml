@@ -141,6 +141,18 @@ jobs:
           Copy-Item docs "artifacts/$name/" -Recurse
           Compress-Archive -Path "artifacts/$name" -DestinationPath "artifacts/$name.zip"
 
+      # The renderer alone, on its mock source, with relative paths so it runs
+      # from any folder. The product page at purukitto.xyz/kehai unpacks it and
+      # frames it live. It reads nothing, so it is safe to serve anywhere.
+      - name: Package browser panel
+        shell: pwsh
+        run: |
+          $name = "kehai-${{ steps.version.outputs.version }}-web"
+          bunx vite build --base ./ --outDir "artifacts/$name"
+          if (-not (Test-Path "artifacts/$name/index.html")) { throw "vite build produced no index.html for the browser panel" }
+          tar -czf "artifacts/$name.tar.gz" -C "artifacts/$name" .
+          Remove-Item "artifacts/$name" -Recurse
+
       - name: Collect installers
         shell: pwsh
         run: |
@@ -221,6 +233,14 @@ jobs:
           $manifest | ConvertTo-Json -Depth 5 | Set-Content artifacts/latest.json -Encoding utf8NoBOM
           Get-Content artifacts/latest.json
 
+      # /releases/latest/download/ only resolves a name, so a link that should
+      # always fetch the newest installer needs one that never changes. A copy,
+      # made after the manifest: the updater keeps the versioned name, and the
+      # manifest's glob would otherwise find two installers.
+      - name: Copy installer under a stable name
+        shell: pwsh
+        run: Copy-Item (Get-Item artifacts/*_x64-setup.exe) artifacts/Kehai_x64-setup.exe
+
       - name: Write release notes
         shell: pwsh
         run: |
@@ -237,6 +257,8 @@ jobs:
           | ``Kehai_${version}_x64-setup.exe`` | NSIS installer. The usual choice. |
           | ``Kehai_${version}_x64_en-US.msi`` | MSI, for policy-managed or scripted installs. |
           | ``kehai-$version-windows-x64-portable.zip`` | A single ``kehai.exe``. No install, no uninstaller, no self-update. |
+          | ``Kehai_x64-setup.exe`` | The same installer under a name that stays put, for links that always want the newest. |
+          | ``kehai-$version-web.tar.gz`` | The panel alone on made-up numbers, for a browser. It reads nothing. |
 
           Windows 10 1803 or newer, x64. Needs the WebView2 runtime, which ships with
           Windows 11 and current Windows 10 — the installer offers to fetch it otherwise.
@@ -282,5 +304,6 @@ jobs:
             artifacts/*.exe
             artifacts/*.sig
             artifacts/*.zip
+            artifacts/*.tar.gz
             artifacts/latest.json
             artifacts/SHA256SUMS.txt

@@ -1,0 +1,29 @@
+name: Product page
+
+# purukitto.xyz/kehai reads the latest release when it builds: the version,
+# the download links and the live panel. Publishing a release is what should
+# change them, so it rebuilds the page. A draft or prerelease changes nothing
+# there, since neither is "latest".
+on:
+  release:
+    types: [published]
+  # After turning a bad release back into a draft, so the page follows.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  rebuild:
+    name: Rebuild purukitto.xyz
+    if: ${{ !github.event.release.prerelease }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call the deploy hook
+        env:
+          HOOK: ${{ secrets.SITE_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "SITE_DEPLOY_HOOK is not set, so there is nothing to rebuild."
+            exit 0
+          fi
+          curl --fail --silent --show-error -X POST "$HOOK"
