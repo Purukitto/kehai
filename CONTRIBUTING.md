@@ -159,7 +159,15 @@ them:
    changelog section as its notes.
 4. Read the draft over and publish it. Publishing is what installed copies see:
    `latest.json` is served from the latest *published* release, so a draft reaches
-   no one.
+   no one. It also rebuilds the product page at purukitto.xyz/kehai, which takes its
+   version, download links and live panel from the latest release. That needs a
+   `SITE_DEPLOY_HOOK` secret holding the site's Vercel deploy hook; without one the
+   **Product page** workflow says so and does nothing.
+
+Besides the versioned files, each release carries `Kehai_x64-setup.exe`, a copy of the
+installer whose name never changes, so `releases/latest/download/Kehai_x64-setup.exe`
+always fetches the newest. It also carries `kehai-x.y.z-web.tar.gz`, the renderer on
+its mock source, which is what the product page frames.
 
 A prerelease (`bun run release 0.3.0-rc.1`) can be cut from any branch. GitHub marks
 it as one, installed copies never update to it, and its changelog section is folded
@@ -167,7 +175,8 @@ into the real one when the release is cut.
 
 To pull a bad release, turn it back into a draft. `latest` falls back to the release
 before it, so nobody else gets it; anyone who already updated stays on it until a fix
-ships.
+ships. The product page's main download link follows `latest` by itself; run the
+**Product page** workflow by hand to bring its other links back too.
 
 ### The signing key
 
