@@ -11,6 +11,7 @@ import { Sprint } from './Sprint';
 import { Stage } from './Stage';
 import { Telemetry } from './Telemetry';
 import { Vitals } from './Vitals';
+import { OPTIONS } from './options';
 import agents from './agents.widget.json';
 import clock from './clock.widget.json';
 import media from './media.widget.json';
@@ -42,7 +43,8 @@ const BUNDLED: WidgetDescription[] = [agents, clock, media, notify, quota, sprin
 function spec(widget: WidgetDescription): WidgetSpec {
   const component = COMPONENTS[widget.id];
   if (!component) throw new Error(`${widget.id}.widget.json has no component in the registry`);
-  return { ...widget, topics: topicsOf(widget), component };
+  const options = (OPTIONS as Record<string, WidgetSpec['options']>)[widget.id];
+  return { ...widget, topics: topicsOf(widget), component, options };
 }
 
 /**

@@ -45,7 +45,11 @@ landscape, bar or portrait arrangement for its own screen.
 It only reads unless **Allow control** is on, and even then it can only press the
 buttons the panel has: play, skip and seek, the volume, dismissing a notification, and
 starting or pausing the focus timer. It can never change a setting, name a file or
-start an update. The header says `REMOTE`, `REMOTE · VIEW ONLY`, or why it is not
+start an update. Holding a tile there says the options are on the host.
+
+Notifications reach it as each app's name and how many, never what they say, unless
+the host's Notifications options say **Same as here** or **Nothing**. An app hidden on
+the host is hidden there too. The header says `REMOTE`, `REMOTE · VIEW ONLY`, or why it is not
 connected.
 
 ## When the computer goes away
@@ -86,8 +90,8 @@ Every envelope has the same shape; see [Architecture](architecture.md#the-bus).
 
 ## Security
 
-It is plain HTTP, so the key and everything the panel shows, notifications included,
-cross your network unencrypted. Use it on a network you trust. HTTPS is on the list of
+It is plain HTTP, so the key and everything the panel shows, including any notification
+text you let remote panels see, cross your network unencrypted. Use it on a network you trust. HTTPS is on the list of
 things [not built yet](../README.md#not-built-yet).
 
 What the server will and will not do is set out in [SECURITY.md](../SECURITY.md).

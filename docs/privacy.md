@@ -60,6 +60,11 @@ notification on its way to the notification server, the id the server gives it a
 word of it closing, and nothing else — the same access `dbus-monitor` uses, which any
 program running as you already has.
 
+Each app can be set to show only its name, or to hide, in the Notifications options.
+Kehai applies that as it reads them, so a hidden app's notifications, and a name-only
+app's text, never reach the panel or the network. Remote panels see names and counts
+only, unless you choose otherwise.
+
 ### Agent token usage
 
 The quota widget tallies token counts by tailing local coding agent session

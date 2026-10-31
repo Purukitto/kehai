@@ -13,7 +13,9 @@ import type {
   MemPayload,
   NetPayload,
   NotifyCommand,
+  NotifyItem,
   NotifyPayload,
+  NotifyRules,
   PresenceCommand,
   PresencePayload,
   QuotaPayload,
@@ -171,30 +173,57 @@ export function startMockSource(options: MockOptions = {}): () => void {
   };
 
   // Nothing until the go-ahead, as the engine does, so setup's Allow can be
-  // tried in a browser.
+  // tried in a browser. The rules apply here as the engine applies them.
   let listening = false;
-  const pubNotify = () =>
+  let rules: NotifyRules['apps'] = {};
+  const at = Date.now();
+  const note = (id: number, app: string, source: string, title: string, body: string, ago: number): NotifyItem => ({
+    id,
+    app,
+    source,
+    title,
+    body,
+    atMs: at - ago,
+    nameOnly: false,
+  });
+  let tray: NotifyItem[] = [
+    note(1, 'ci', 'Continuous Integration', 'build #2841 passed', 'windows-msvc, 3m 12s', 60_000),
+    note(2, 'chat', 'Chat', 'standup moved to 15:30', '', 120_000),
+    note(3, 'git', 'Git', 'pushed 4 commits', 'origin/feat/event-bus', 240_000),
+    note(4, 'chat', 'Chat', 'lunch?', 'in ten', 600_000),
+    note(5, 'chat', 'Chat', 'are you around', '', 900_000),
+  ];
+  const onTile = () =>
+    tray.flatMap((i) => {
+      const rule = rules[i.app] ?? 'show';
+      return rule === 'hide' ? [] : rule === 'name' ? [{ ...i, title: '', body: '', nameOnly: true }] : [i];
+    });
+  const pubNotify = () => {
+    const apps = [...new Set(tray.map((i) => i.app))].map((id) => {
+      const mine = tray.filter((i) => i.app === id);
+      return { id, name: mine[0].source, count: mine.length, lastMs: Math.max(...mine.map((i) => i.atMs)) };
+    });
     pub<NotifyPayload>(
       'sys:notify',
       'mock.notify',
       listening
-        ? {
-            available: true,
-            pending: false,
-            reason: null,
-            items: [
-              { id: 1, source: 'Continuous Integration', title: 'build #2841 passed', body: 'windows-msvc, 3m 12s', atMs: Date.now() - 60_000 },
-              { id: 2, source: 'Git', title: 'pushed 4 commits', body: 'origin/feat/event-bus', atMs: Date.now() - 240_000 },
-              { id: 3, source: 'Chat', title: 'standup moved to 15:30', body: '', atMs: Date.now() - 900_000 },
-            ],
-          }
-        : { available: false, pending: true, reason: 'not allowed yet', items: [] }
+        ? { available: true, pending: false, reason: null, items: onTile(), apps, withheld: false }
+        : { available: false, pending: true, reason: 'not allowed yet', items: [], apps: [], withheld: false }
     );
+  };
   const unsubNotify = bus.subscribe('notify:command', (e) => {
-    if ((e.data as NotifyCommand).action === 'listen' && !listening) {
-      listening = true;
-      pubNotify();
-    }
+    const cmd = e.data as NotifyCommand;
+    if (cmd.action === 'listen' && !listening) listening = true;
+    else if (cmd.action === 'dismiss' || cmd.action === 'clear') {
+      const may = new Set(onTile().map((i) => i.id));
+      const ids = cmd.action === 'dismiss' ? [cmd.id] : (cmd.ids ?? [...may]);
+      tray = tray.filter((i) => !(may.has(i.id) && ids.includes(i.id)));
+    } else return;
+    pubNotify();
+  });
+  const unsubRules = bus.subscribe('notify:rules', (e) => {
+    rules = (e.data as NotifyRules).apps;
+    if (listening) pubNotify();
   });
 
   // A desk of three, arranged as the system would: the main monitor, a laptop
@@ -443,6 +472,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
   return () => {
     unsub();
     unsubNotify();
+    unsubRules();
     unsubDisplay();
     unsubFlow();
     unsubRemote();

@@ -298,6 +298,8 @@ function useScrub(onRelease: (fraction: number) => void) {
   return {
     drag,
     handlers: {
+      // A finger held still on the track is a seek waiting to happen, not a hold.
+      'data-hold': 'off',
       onPointerDown: (e: ReactPointerEvent<HTMLElement>) => {
         e.currentTarget.setPointerCapture(e.pointerId);
         setDrag(at(e));

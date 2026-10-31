@@ -185,10 +185,23 @@ export interface ClockPayload {
 
 export interface NotifyItem {
   id: number;
+  /** The app's own id, which stays put when its name changes. Rules are kept under it. */
+  app: string;
   source: string;
   title: string;
   body: string;
   atMs: number;
+  /** Its app shows its name only: the engine sends no title or body. */
+  nameOnly: boolean;
+}
+
+/** One app with notifications in the list. Mirrors `App` in `notify.rs`. */
+export interface NotifyApp {
+  id: string;
+  name: string;
+  /** How many of its notifications are in the list, shown or not. */
+  count: number;
+  lastMs: number;
 }
 
 export interface NotifyPayload {
@@ -200,15 +213,40 @@ export interface NotifyPayload {
    */
   pending: boolean;
   reason: string | null;
+  /** What the panel may show. A hidden app's never arrive. */
   items: NotifyItem[];
+  /** Every app in the list, hidden ones too. Always empty on a remote panel. */
+  apps: NotifyApp[];
+  /** On a remote panel, when the host shows remote panels none of them. */
+  withheld: boolean;
 }
+
+/** What reaches the panel from one app. Mirrors `Rule` in `notify.rs`. */
+export type NotifyRule = 'show' | 'name' | 'hide';
+
+/** What a remote panel gets: the same as here, each app and how many, or nothing. */
+export type NotifyRemote = 'same' | 'name' | 'nothing';
 
 /**
  * Renderer → engine on `notify:command`. Mirrors `Command` in `notify.rs`.
  * `listen` is the go-ahead to ask for access and start reading; sent again, it
  * asks again after a refusal.
  */
-export type NotifyCommand = { action: 'listen' } | { action: 'dismiss'; id: number } | { action: 'clear' };
+export type NotifyCommand =
+  | { action: 'listen' }
+  | { action: 'dismiss'; id: number }
+  /** The ones the tile shows. Without ids, all it may show; a hidden app's are never cleared. */
+  | { action: 'clear'; ids?: number[] };
+
+/**
+ * Renderer → engine on `notify:rules`, at launch and on every change. Its own
+ * topic, so the bus's one retained command per topic cannot drop a `listen`.
+ * An app not named shows. Mirrors `RulesCommand` in `notify.rs`.
+ */
+export interface NotifyRules {
+  apps: Record<string, NotifyRule>;
+  remote: NotifyRemote;
+}
 
 export interface ArtPayload {
   /** Data URL of the current cover, or null when the player exposes none. */

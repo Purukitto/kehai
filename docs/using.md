@@ -30,6 +30,11 @@ brings setup back. A copy updated from 0.6 or earlier skips it.
 Nothing on the panel you can press is smaller than 28px, so a touchscreen needs no
 mode of its own. Transport and timer buttons are bigger still.
 
+Hold a tile for half a second, or right-click it, and that widget's options open beside
+it. The rest of the panel dims and the tile stays lit, so a change shows on it as you
+make it. Dragging the seek bar never counts as a hold. On a remote panel a hold only
+says the options are on the computer Kehai runs on.
+
 ## The header
 
 The layout's name in the header switches layout: tap it for a list, or on a
