@@ -1,6 +1,6 @@
 {
   "name": "kehai",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "description": "A companion dashboard for a secondary display: system telemetry, agent token usage, media and notifications in a terminal-inspired panel.",
