@@ -9,6 +9,11 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Fixed
+
+- Checking for updates no longer fails on networks where one of GitHub's download
+  addresses does not answer. Kehai moves on to the next one within a few seconds.
+
 ## [0.9.0] - 2026-10-31
 
 ### Added
