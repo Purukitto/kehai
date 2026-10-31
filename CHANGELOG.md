@@ -9,13 +9,29 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- Hold any tile, or right-click it, and that widget's options open beside it. The
+  **Options** button under **Settings → Widgets** opens the same ones.
+- Choose, app by app, whether notifications show, show only the app's name and how
+  many, or hide. It is in the Notifications options and applies here and on every
+  remote panel. A hidden app's notifications never leave this computer.
+- While a focus block runs, the Notifications tile shows only how many are waiting and
+  when the break comes. Its options can turn that off.
+
 ### Changed
 
+- Remote panels now see each app's name and how many, not what its notifications say,
+  including tablets paired before this version. **Same as here** in the Notifications
+  options brings the text back, and **Nothing** shows them none.
+- **Clear all** clears only what the tile shows. With an app's chip on it reads
+  **Clear** and that app's name, and clears only that app. A hidden app's notifications
+  stay in the Windows list.
 - **Settings → Widgets** lists every widget Kehai comes with, what each one reads, and
   whether that is reporting.
-- Turning widgets on and off in the layout on screen, and their options, moved to
-  **Settings → Layout → On this layout**, with an **Arrange** button for that layout
-  beside it.
+- Turning widgets on and off in the layout on screen moved to **Settings → Layout → On
+  this layout**, with an **Arrange** button for that layout beside it. Album art, the
+  equaliser and the main readout following attention moved into those widgets' options.
 
 ## [0.8.0] - 2026-10-24
 

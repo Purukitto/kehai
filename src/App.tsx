@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { displayLabel } from './components/DisplayMap';
 import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
+import { OptionsSheet } from './components/OptionsSheet';
+import type { Held } from './components/OptionsSheet';
 import { PairPrompt } from './components/PairPrompt';
 import { Quiet } from './components/Quiet';
 import { Stale, hhmmAt } from './components/Stale';
@@ -14,6 +16,9 @@ import type {
   DisplaysPayload,
   FlowCommand,
   NotifyCommand,
+  NotifyPayload,
+  NotifyRule,
+  NotifyRules,
   PresenceCommand,
   PresencePayload,
   QuotaCommand,
@@ -37,6 +42,9 @@ import { Setup } from './setup/Setup';
 
 type Mode = 'dashboard' | 'settings' | 'arrange';
 
+/** How long a remote panel's note that options are on the PC stays up. */
+const NOTE_MS = 2400;
+
 /** How bright the whole panel stays when it is left showing while you are away. */
 const QUIET_PANEL = 0.5;
 
@@ -53,8 +61,31 @@ async function toggleFullscreen(): Promise<void> {
   await win.setFullscreen(!(await win.isFullscreen()));
 }
 
+/** What a long press on a remote panel says instead of opening options. */
+function RemoteNote() {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: '50%',
+        bottom: 24,
+        transform: 'translateX(-50%)',
+        padding: '10px 16px',
+        background: 'var(--cc-pane-2)',
+        border: '1px solid var(--cc-line-2)',
+        fontSize: 11,
+        letterSpacing: '0.12em',
+        color: 'var(--cc-muted)',
+        pointerEvents: 'none',
+      }}
+    >
+      OPTIONS ARE ON THE PC KEHAI RUNS ON
+    </div>
+  );
+}
+
 export default function App() {
-  const { settings, layout } = useSettings();
+  const { settings, layout, noteApps } = useSettings();
   const { shape } = useWindowShape();
   const swipe = useLayoutSwipe();
   const autoHide = settings.autoHideBar;
@@ -70,6 +101,18 @@ export default function App() {
   const presence = useTopic<PresencePayload>('os:presence');
   const night = useNight(settings.night);
   const dimPreview = useDimPreview();
+  const [held, setHeld] = useState<Held | null>(null);
+  const [remoteNote, setRemoteNote] = useState(false);
+
+  useEffect(() => {
+    if (!remoteNote) return;
+    const t = window.setTimeout(() => setRemoteNote(false), NOTE_MS);
+    return () => window.clearTimeout(t);
+  }, [remoteNote]);
+
+  // Options belong to the screen they were opened on. Not to the layout: a
+  // change to a preset's tile puts a copy of it on screen, and the sheet stays.
+  useEffect(() => setHeld(null), [mode, shape]);
 
   // Under Tauri the Rust engine owns the topics it can actually source, and the
   // mock fills the rest until each poller lands. A remote panel gets the same
@@ -151,6 +194,31 @@ export default function App() {
     if (REMOTE || !notificationsAsked) return;
     bus.publish<NotifyCommand>('notify:command', 'settings', { action: 'listen' });
   }, [notificationsAsked]);
+
+  // And which apps' notifications reach the panel, and what remote panels get.
+  // Ahead of serving them: until the engine has heard this, it shows remote
+  // panels none at all.
+  const notifyApps = settings.notify.apps;
+  const notifyRemote = settings.notify.remote;
+  const rules = JSON.stringify(
+    Object.fromEntries(Object.entries(notifyApps).flatMap(([id, a]) => (a.rule === 'show' ? [] : [[id, a.rule]])))
+  );
+  useEffect(() => {
+    if (REMOTE) return;
+    bus.publish<NotifyRules>('notify:rules', 'settings', {
+      apps: JSON.parse(rules) as Record<string, NotifyRule>,
+      remote: notifyRemote,
+    });
+  }, [rules, notifyRemote]);
+
+  // Every app seen goes on the list in the Notifications options, at SHOW.
+  useEffect(() => {
+    if (REMOTE) return;
+    return bus.subscribe('sys:notify', (e) => {
+      const apps = (e.data as NotifyPayload).apps;
+      if (apps?.length) noteApps(apps);
+    });
+  }, [noteApps]);
 
   // And whether to serve remote panels at all.
   const { on: serveOn, port: servePort, control: serveControl } = settings.remote;
@@ -414,12 +482,36 @@ export default function App() {
         >
           {/* Every tile dims while the host is away: what they show is as old as the header says. */}
           <div style={{ height: '100%', opacity: stale ? 0.3 : undefined }}>
-            <Grid key={shape} arrangement={layout.shapes[shape]} />
+            <Grid
+              key={shape}
+              arrangement={layout.shapes[shape]}
+              onHold={(tile, el) => {
+                // A remote panel's options would be the browser's, not the host's.
+                if (REMOTE) {
+                  setRemoteNote(true);
+                  return;
+                }
+                const widget = layout.shapes[shape].tiles[tile]?.widget;
+                if (widget) setHeld({ widget, tile, rect: el.getBoundingClientRect() });
+              }}
+            />
           </div>
         </NavProvider>
         {stale && <Stale heard={stale.heard} retryAt={stale.state === 'offline' ? stale.retryAt : null} />}
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
+        {remoteNote && <RemoteNote />}
       </div>
+      {held && (
+        <OptionsSheet
+          held={held}
+          onClose={() => setHeld(null)}
+          onArrange={() => {
+            setHeld(null);
+            setArranging(settings.layoutId);
+            setMode('arrange');
+          }}
+        />
+      )}
     </div>
   );
 }

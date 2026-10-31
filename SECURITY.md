@@ -37,8 +37,10 @@ surface is what it reads and what it exposes:
   counters only. Reading, retaining or displaying prompt or response content would be
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
-  `notify:command`, `flow:command`, `quota:command`, `update:command`,
-  `remote:command`, `display:command` and `presence:command`. `media:command` drives
+  `notify:command`, `notify:rules`, `flow:command`, `quota:command`, `update:command`,
+  `remote:command`, `display:command` and `presence:command`. `notify:rules` says which
+  apps' notifications reach the panel and what remote panels see; a remote panel can
+  never send it, and until it arrives remote panels are shown none. `media:command` drives
   the player and this computer's volume, with positions and levels the engine puts in
   range. `flow:command` drives the focus timer and sets its block lengths,
   which the engine clamps; the only file it leads to is the timer's own daily total.

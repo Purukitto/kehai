@@ -24,7 +24,16 @@ export function useTileSize(): Size {
  * First measurement is taken in a layout effect, before paint, so no frame is
  * spent rendering a layout the tile is too small for.
  */
-export function TileSizeProvider({ children, style }: { children: ReactNode; style: React.CSSProperties }) {
+export function TileSizeProvider({
+  children,
+  style,
+  handlers,
+}: {
+  children: ReactNode;
+  style: React.CSSProperties;
+  /** Anything else the tile listens for, such as a long press. */
+  handlers?: React.HTMLAttributes<HTMLDivElement>;
+}) {
   const ref = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState<Size>({ w: 0, h: 0 });
 
@@ -49,7 +58,7 @@ export function TileSizeProvider({ children, style }: { children: ReactNode; sty
   }, []);
 
   return (
-    <div ref={ref} style={style}>
+    <div ref={ref} style={style} {...handlers}>
       <TileSizeContext.Provider value={size}>{children}</TileSizeContext.Provider>
     </div>
   );

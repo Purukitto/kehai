@@ -298,3 +298,36 @@ button {
     transition: none;
   }
 }
+
+/* Holding a tile: a ring fills under the finger, and the options open as it
+   closes. Nothing in a tile is selectable text, so a long press never starts
+   a selection instead. */
+.cc-hold-ring {
+  position: fixed;
+  z-index: 60;
+  pointer-events: none;
+}
+
+.cc-hold-arc {
+  stroke-dashoffset: var(--cc-hold-c);
+  animation: cc-hold var(--cc-hold-ms) linear forwards;
+}
+
+@keyframes cc-hold {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-hold-arc {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+.cc-tiles {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}

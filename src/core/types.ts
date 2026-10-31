@@ -54,9 +54,21 @@ export interface WidgetProps {
   props: Record<string, unknown>;
 }
 
+/**
+ * What a widget's options are drawn with. `tile` is the tile they were opened
+ * from, by its place in the arrangement on screen: an option kept with one
+ * tile needs it. Null when they were opened from Settings and the widget is
+ * not on screen.
+ */
+export interface OptionsProps {
+  tile: number | null;
+}
+
 /** A widget as the grid reaches it: its description file, and the code that draws it. */
 export interface WidgetSpec extends WidgetDescription {
   /** Every topic its sources publish on. Declared so the engine need not poll for nothing. */
   topics: string[];
   component: ComponentType<WidgetProps>;
+  /** Its options, for the ones that have any. */
+  options?: ComponentType<OptionsProps>;
 }

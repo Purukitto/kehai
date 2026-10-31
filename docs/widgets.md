@@ -24,8 +24,30 @@ Every widget lays itself out for the size of its tile, so the same widget is a f
 pane in one layout and a single row in another.
 
 **Settings → Widgets** lists every widget, what it reads and whether that is reporting.
-Which widgets are on screen, and their options, is under **Settings → Layout → On this
-layout**.
+Which widgets are on screen is under **Settings → Layout → On this layout**.
+
+A widget's options open from its tile: hold it, or right-click it. **Options** under
+Settings → Widgets opens the same ones. Each group of options says where it applies:
+album art is kept with one Now playing tile, the main readout following attention is
+for every layout, and the Notifications rules are for this computer and every remote
+panel.
+
+### Notifications
+
+Each app with a notification in the Windows list appears in the Notifications options,
+newest first, marked **New** the first time. Each can **Show**, show its **Name only**,
+as one row on the tile with how many, or **Hide**, which leaves it off the tile and out
+of the count. Kehai decides this before anything reaches the panel, so a hidden app's
+notifications never leave this computer. The Windows list itself is left alone, and
+**Clear all** clears only what the tile shows.
+
+While a focus block runs, the tile shows only how many are waiting and when the break
+comes, unless the options turn that off. It does not follow Windows' Do Not Disturb:
+Windows does not tell other apps reliably whether it is on, and a tile that went quiet
+while Do Not Disturb showed off would look broken.
+
+Remote panels see each app's name and how many unless the options say otherwise:
+**Same as here**, **Name only** or **Nothing**.
 
 ### Now playing
 

@@ -30,6 +30,7 @@ use tungstenite::protocol::{CloseFrame, Role, WebSocketConfig};
 use tungstenite::{Bytes, Message, WebSocket};
 
 use crate::bus;
+use crate::pollers::notify;
 
 const TOPIC: &str = "app:remote";
 const SRC: &str = "remote";
@@ -724,11 +725,14 @@ fn page(stream: &mut TcpStream, request: &Request, shared: &Shared) {
     );
 }
 
-fn public(envelope: &serde_json::Value) -> bool {
-    envelope
-        .get("topic")
-        .and_then(|t| t.as_str())
-        .is_some_and(|t| !PRIVATE_TOPICS.contains(&t))
+/// What a remote panel may see of an envelope: nothing on a private topic,
+/// and notifications only as the host chose for remote panels.
+fn outward(envelope: &serde_json::Value) -> Option<serde_json::Value> {
+    match envelope.get("topic").and_then(|t| t.as_str())? {
+        t if PRIVATE_TOPICS.contains(&t) => None,
+        "sys:notify" => Some(notify::for_remote(envelope)),
+        _ => Some(envelope.clone()),
+    }
 }
 
 /// `GET /api/topics`, `GET /api/topics/<topic>` and `POST /api/command/<topic>`,
@@ -755,16 +759,16 @@ fn api(stream: &mut TcpStream, mut body: Vec<u8>, request: &Request, route: &str
     match (request.method.as_str(), route.split_once('/')) {
         ("GET", None) if route == "topics" => {
             let all: serde_json::Map<String, serde_json::Value> = bus::snapshot()
-                .into_iter()
-                .filter(public)
+                .iter()
+                .filter_map(outward)
                 .filter_map(|e| Some((e.get("topic")?.as_str()?.to_string(), e)))
                 .collect();
             json(stream, "200 OK", &serde_json::Value::Object(all));
         }
         ("GET", Some(("topics", topic))) => {
             match bus::snapshot()
-                .into_iter()
-                .filter(public)
+                .iter()
+                .filter_map(outward)
                 .find(|e| e.get("topic").and_then(|t| t.as_str()) == Some(topic))
             {
                 Some(envelope) => json(stream, "200 OK", &envelope),
@@ -926,7 +930,7 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
     }
 
     let (retained, rx) = bus::tap();
-    for envelope in retained.iter().filter(|e| public(e)) {
+    for envelope in retained.iter().filter_map(outward) {
         if ws.send(Message::text(envelope.to_string())).is_err() {
             return;
         }
@@ -956,8 +960,10 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
         loop {
             match rx.try_recv() {
                 Ok(envelope) => {
-                    if public(&envelope) && ws.send(Message::text(envelope.to_string())).is_err() {
-                        return;
+                    if let Some(envelope) = outward(&envelope) {
+                        if ws.send(Message::text(envelope.to_string())).is_err() {
+                            return;
+                        }
                     }
                 }
                 Err(TryRecvError::Empty) => break,

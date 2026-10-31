@@ -41,6 +41,7 @@ export const ENGINE_TOPICS = [
 export const COMMAND_TOPICS = [
   'media:command',
   'notify:command',
+  'notify:rules',
   'flow:command',
   'quota:command',
   'update:command',

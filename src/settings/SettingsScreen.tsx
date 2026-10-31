@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DisplayMap, displayLabel } from '../components/DisplayMap';
+import { OptionsSheet } from '../components/OptionsSheet';
 import { QrCode } from '../components/QrCode';
 import { bus } from '../core/bus';
 import type {
@@ -14,7 +15,7 @@ import type {
   UpdatePayload,
 } from '../core/payloads';
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
-import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTileProp, withTiles } from '../core/layout';
+import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTiles } from '../core/layout';
 import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
 import type { DimLevel, FocusSettings, QuietShow, RemoteSettings } from '../core/settings';
 import { DIM_NAME, hhmm, previewDim } from '../core/night';
@@ -24,6 +25,7 @@ import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
 import type { Layout, Shape, ThemeId, WidgetSpec } from '../core/types';
 import { minSize, registry, widgetNames } from '../widgets/registry';
+import { Group, Row, Seg } from './controls';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
 export type Section = (typeof NAV)[number];
@@ -80,65 +82,6 @@ export const THEMES: { id: ThemeId; name: string; swatch: string[] }[] = [
   { id: 'phosphor', name: 'PHOSPHOR', swatch: ['#0a100b', '#6cf58a', '#c8ff8f', '#a9f5b4'] },
   { id: 'ice', name: 'ICE', swatch: ['#121820', '#56cfe1', '#9d8cff', '#dce6f2'] },
 ];
-
-function Row({
-  label,
-  desc,
-  children,
-}: {
-  label: string;
-  desc?: React.ReactNode;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 20,
-        padding: '12px 0',
-        borderBottom: '1px solid var(--cc-line)',
-      }}
-    >
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12 }}>{label}</div>
-        {desc && (
-          <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
-            {desc}
-          </div>
-        )}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Seg<T extends string | number>({
-  options,
-  value,
-  onPick,
-  format,
-}: {
-  options: T[];
-  value: T;
-  onPick: (v: T) => void;
-  format?: (v: T) => string;
-}) {
-  return (
-    <div style={{ display: 'flex', flex: 'none' }}>
-      {options.map((o) => (
-        <button
-          key={String(o)}
-          onClick={() => onPick(o)}
-          className={o === value ? 'cc-chip cc-chip-on' : 'cc-chip'}
-          style={{ padding: '7px 13px', marginLeft: -1 }}
-        >
-          {format ? format(o) : String(o)}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /**
  * A layout as it looks on the display Kehai is on. In use is marked in the
@@ -296,7 +239,16 @@ function useSourceStates(): Record<SourceId, SourceState> {
  * while any of its sources is, so the main readout with no agent transcripts
  * still counts, as the machine half of it does report.
  */
-function WidgetRow({ widget, sources }: { widget: WidgetSpec; sources: Record<SourceId, SourceState> }) {
+function WidgetRow({
+  widget,
+  sources,
+  onOptions,
+}: {
+  widget: WidgetSpec;
+  sources: Record<SourceId, SourceState>;
+  /** Opens its options, for a widget that has any. */
+  onOptions?: () => void;
+}) {
   const states = widget.sources.map((s) => sources[s]);
   const live = states.some((s) => s.live);
   const blocked = !live && states.every((s) => s.refused);
@@ -325,6 +277,18 @@ function WidgetRow({ widget, sources }: { widget: WidgetSpec; sources: Record<So
       <span className="cc-mini" style={{ flex: 'none' }}>
         {status}
       </span>
+      {/* A remote panel's options would be the browser's, not the host's. */}
+      {!REMOTE_PANEL && (
+        <span style={{ width: 96, flex: 'none', display: 'flex', justifyContent: 'flex-end' }}>
+          {onOptions ? (
+            <button className="cc-chip" style={{ padding: '7px 13px' }} onClick={onOptions}>
+              OPTIONS
+            </button>
+          ) : (
+            <span className="cc-mini">NONE</span>
+          )}
+        </span>
+      )}
     </div>
   );
 }
@@ -537,15 +501,6 @@ function FocusRows({ focus, onChange }: { focus: FocusSettings; onChange: (next:
 }
 
 const WINDOWS = typeof navigator !== 'undefined' && /Windows/.test(navigator.userAgent);
-
-function Group({ label, note }: { label: string; note: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 22, marginBottom: 8 }}>
-      <span className="cc-label">{label}</span>
-      <span className="cc-mini">{note}</span>
-    </div>
-  );
-}
 
 /** Half an hour a tap, round the clock. */
 function TimeStep({ value, onChange, label }: { value: number; onChange: (min: number) => void; label: string }) {
@@ -1163,7 +1118,6 @@ export function SettingsScreen({
     setTheme,
     setBudget,
     setAutoHideBar,
-    setFollowAttention,
     setTranscriptRoot,
     setAutoCheckUpdates,
     setFocus,
@@ -1208,8 +1162,12 @@ export function SettingsScreen({
 
   const label = (name: string) => registry[name]?.name ?? name;
   const here = layout.shapes[shape];
-  const mediaIndex = here.tiles.findIndex((t) => t.widget === 'media');
-  const mediaTile = mediaIndex >= 0 ? here.tiles[mediaIndex] : undefined;
+  // Whose options are open, from Widgets, and the first of its tiles on screen.
+  const [optionsFor, setOptionsFor] = useState<string | null>(null);
+  const tileOf = (widget: string) => {
+    const i = here.tiles.findIndex((t) => t.widget === widget);
+    return i >= 0 ? i : null;
+  };
   const editHere = (fn: Parameters<typeof editArrangement>[2]) => editArrangement(settings.layoutId, shape, fn);
 
   const exportSelected = async () => {
@@ -1514,8 +1472,8 @@ export function SettingsScreen({
                   </button>
                 </div>
                 <div className="cc-mini" style={{ marginTop: 8, marginBottom: 6, lineHeight: 1.6 }}>
-                  Which widgets are in the {shape} arrangement of {layout.name}, and their options. One turned on goes in
-                  the first space it fits.
+                  Which widgets are in the {shape} arrangement of {layout.name}. One turned on goes in the first space it
+                  fits.
                   {isPreset(settings.layoutId) ? ' It is a preset, so a change saves a copy under Yours.' : ''}
                 </div>
                 {onScreenNote && (
@@ -1538,37 +1496,9 @@ export function SettingsScreen({
                   );
                 })}
   
-                {here.tiles.some((t) => t.widget === 'stage') && (
-                  <Row
-                    label="Main readout follows attention"
-                    desc="Shows Agents while one waits on you, and goes back to your tab once none does. Picking a tab yourself keeps it until another agent starts waiting."
-                  >
-                    <Seg
-                      options={['OFF', 'ON']}
-                      value={settings.followAttention ? 'ON' : 'OFF'}
-                      onPick={(v) => setFollowAttention(v === 'ON')}
-                    />
-                  </Row>
-                )}
-  
-                {mediaTile && (
-                  <>
-                    <Row label="Album art" desc="Shown beside the track when the player provides one.">
-                      <Seg
-                        options={['OFF', 'ON']}
-                        value={mediaTile.props?.art === false ? 'OFF' : 'ON'}
-                        onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'art', v === 'ON'))}
-                      />
-                    </Row>
-                    <Row label="Equaliser" desc="A horizontal bar that freezes when playback pauses.">
-                      <Seg
-                        options={['off', 'bar']}
-                        value={mediaTile.props?.equaliser === 'off' ? 'off' : 'bar'}
-                        onPick={(v) => editHere((a) => withTileProp(a, mediaIndex, 'equaliser', v))}
-                      />
-                    </Row>
-                  </>
-                )}
+                <div className="cc-mini" style={{ marginTop: 12, lineHeight: 1.6 }}>
+                  A widget’s options are in its own sheet: hold its tile, right-click it, or OPTIONS under Widgets.
+                </div>
               </div>
             </>
           )}
@@ -1582,11 +1512,17 @@ export function SettingsScreen({
               {[...widgetNames]
                 .sort((a, b) => label(a).localeCompare(label(b)))
                 .map((name) => (
-                  <WidgetRow key={name} widget={registry[name]} sources={sources} />
+                  <WidgetRow
+                    key={name}
+                    widget={registry[name]}
+                    sources={sources}
+                    onOptions={registry[name].options ? () => setOptionsFor(name) : undefined}
+                  />
                 ))}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
                 <span className="cc-mini" style={{ flex: 1, lineHeight: 1.6 }}>
-                  Which of them are on screen, and their options, is under Layout.
+                  Which of them are on screen is under Layout.
+                  {REMOTE_PANEL ? ' Options are on the PC Kehai runs on.' : ' Holding a tile, or right-clicking it, opens the same options.'}
                 </span>
                 <button
                   className="cc-chip"
@@ -1802,6 +1738,17 @@ export function SettingsScreen({
           )}
         </div>
       </div>
+      {optionsFor && (
+        <OptionsSheet
+          held={{ widget: optionsFor, tile: tileOf(optionsFor), rect: null }}
+          inSettings
+          onClose={() => setOptionsFor(null)}
+          onArrange={() => {
+            setOptionsFor(null);
+            onArrange(settings.layoutId);
+          }}
+        />
+      )}
     </div>
   );
 }

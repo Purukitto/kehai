@@ -52,8 +52,8 @@ subscribed and the engine replays every retained topic in reply.
 ## Commands
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for eight command topics — `media:command`, `notify:command`,
-`flow:command`, `quota:command`, `update:command`, `remote:command`,
+read-only except for nine command topics — `media:command`, `notify:command`,
+`notify:rules`, `flow:command`, `quota:command`, `update:command`, `remote:command`,
 `display:command` and `presence:command`. The UI states an intent; the engine owns the
 side effect and runs it off the event thread, so a wedged media player cannot freeze
 the panel and a slow download cannot either.

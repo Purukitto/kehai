@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { isThemeId, parseLayout, safeParseLayout } from './layout';
+import type { NotifyApp, NotifyRemote, NotifyRule } from './payloads';
 import type { Arrangement, Layout, Shape, ThemeId } from './types';
 import ambient from '../layouts/ambient.layout.json';
 import panel from '../layouts/panel.layout.json';
@@ -84,7 +85,37 @@ export interface Settings {
    * when that is, from the delay here; a remote panel never goes quiet.
    */
   away: AwaySettings;
+  /**
+   * Which apps' notifications reach the panel, and what remote panels and
+   * quiet times get. The engine applies them, and hears them over
+   * `notify:rules`.
+   */
+  notify: NotifySettings;
 }
+
+export interface NotifiedApp {
+  /** As the app last called itself. */
+  name: string;
+  rule: NotifyRule;
+  lastMs: number;
+  /** Seen since the options were last open, so it is marked NEW there. */
+  fresh: boolean;
+}
+
+export interface NotifySettings {
+  /** Every app Kehai has seen a notification from, by the app's own id. */
+  apps: Record<string, NotifiedApp>;
+  remote: NotifyRemote;
+  /** Only how many, while a focus block runs. */
+  quietFocus: boolean;
+}
+
+/**
+ * A copy updating from before these existed starts here too: a tablet that
+ * was paired with every notification's text sees names only from now on,
+ * which the changelog says.
+ */
+const NOTIFY_DEFAULTS: NotifySettings = { apps: {}, remote: 'name', quietFocus: true };
 
 export type DimLevel = 'little' | 'half' | 'lot';
 
@@ -161,6 +192,7 @@ function defaults(): Settings {
     notificationsAsked: false,
     night: NIGHT_DEFAULTS,
     away: AWAY_DEFAULTS,
+    notify: NOTIFY_DEFAULTS,
   };
 }
 
@@ -232,6 +264,29 @@ function away(raw: unknown): AwaySettings {
   };
 }
 
+/** Each app on its own, so one bad entry costs only itself. */
+function notify(raw: unknown): NotifySettings {
+  const r = (raw ?? {}) as Partial<Record<keyof NotifySettings, unknown>>;
+  const apps: Record<string, NotifiedApp> = {};
+  if (r.apps && typeof r.apps === 'object') {
+    for (const [id, value] of Object.entries(r.apps as Record<string, unknown>)) {
+      const a = (value ?? {}) as Partial<Record<keyof NotifiedApp, unknown>>;
+      if (typeof a.name !== 'string') continue;
+      apps[id] = {
+        name: a.name,
+        rule: a.rule === 'name' || a.rule === 'hide' ? a.rule : 'show',
+        lastMs: typeof a.lastMs === 'number' ? a.lastMs : 0,
+        fresh: a.fresh === true,
+      };
+    }
+  }
+  return {
+    apps,
+    remote: r.remote === 'same' || r.remote === 'nothing' ? r.remote : 'name',
+    quietFocus: r.quietFocus !== false,
+  };
+}
+
 /** Blank means the default, so it is stored as null rather than as ''. */
 function folder(path: unknown): string | null {
   return typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
@@ -295,6 +350,7 @@ function load(): Settings {
       notificationsAsked: parsed.notificationsAsked !== false,
       night: night(parsed.night),
       away: away(parsed.away),
+      notify: notify(parsed.notify),
     };
   } catch {
     return defaults();
@@ -340,6 +396,12 @@ interface Store {
    * and gives a delay where there was none.
    */
   setQuiet: (on: boolean) => void;
+  /** Adds apps seen for the first time, at SHOW, and keeps names and times current. */
+  noteApps: (apps: NotifyApp[]) => void;
+  setAppRule: (id: string, rule: NotifyRule) => void;
+  setNotify: (next: Partial<Omit<NotifySettings, 'apps'>>) => void;
+  /** The options have been open, so nothing in them is new any more. */
+  seenApps: () => void;
   /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
@@ -476,6 +538,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           night: { ...prev.night, on },
           away: { ...prev.away, afterMin: on ? (prev.away.afterMin ?? AWAY_DEFAULTS.afterMin) : null },
         })),
+
+      noteApps: (seen) =>
+        setSettings((prev) => {
+          let apps: Record<string, NotifiedApp> | null = null;
+          for (const a of seen) {
+            const known = prev.notify.apps[a.id];
+            if (known && known.name === a.name && known.lastMs >= a.lastMs) continue;
+            apps ??= { ...prev.notify.apps };
+            apps[a.id] = known
+              ? { ...known, name: a.name, lastMs: Math.max(known.lastMs, a.lastMs) }
+              : { name: a.name, rule: 'show', lastMs: a.lastMs, fresh: true };
+          }
+          // Unchanged settings are not stored again every few seconds.
+          return apps ? { ...prev, notify: { ...prev.notify, apps } } : prev;
+        }),
+
+      setAppRule: (id, rule) =>
+        setSettings((prev) => {
+          const known = prev.notify.apps[id];
+          if (!known) return prev;
+          return { ...prev, notify: { ...prev.notify, apps: { ...prev.notify.apps, [id]: { ...known, rule } } } };
+        }),
+
+      setNotify: (next) => setSettings((prev) => ({ ...prev, notify: { ...prev.notify, ...next } })),
+
+      seenApps: () =>
+        setSettings((prev) => {
+          if (!Object.values(prev.notify.apps).some((a) => a.fresh)) return prev;
+          const apps = Object.fromEntries(Object.entries(prev.notify.apps).map(([id, a]) => [id, { ...a, fresh: false }]));
+          return { ...prev, notify: { ...prev.notify, apps } };
+        }),
 
       reset: () => setSettings(defaults()),
     };
