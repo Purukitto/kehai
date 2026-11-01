@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-01
+
 ### Added
 
 - Kehai lives in the tray. Click its icon to show or hide the panel. Right-click it to
@@ -307,7 +309,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/Purukitto/kehai/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Purukitto/kehai/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Purukitto/kehai/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Purukitto/kehai/compare/v0.8.0...v0.9.0
