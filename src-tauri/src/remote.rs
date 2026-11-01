@@ -30,6 +30,7 @@ use tungstenite::protocol::{CloseFrame, Role, WebSocketConfig};
 use tungstenite::{Bytes, Message, WebSocket};
 
 use crate::bus;
+use crate::log;
 use crate::pollers::notify;
 
 const TOPIC: &str = "app:remote";
@@ -53,9 +54,18 @@ const SILENT_FOR: Duration = Duration::from_secs(60);
 /// blocking, so this is a read timeout, not a sleep.
 const POLL: Duration = Duration::from_millis(100);
 /// Not for remote eyes: this server's own settings, key included, an update a
-/// remote panel could not install anyway, the host's monitors, which a
-/// browser has no window on, and whether anyone is at the host's desk.
-const PRIVATE_TOPICS: [&str; 4] = [TOPIC, "app:update", "app:displays", "os:presence"];
+/// remote panel could not install anyway, the host's monitors and window,
+/// which a browser has no part in, whether anyone is at the host's desk, and
+/// the host's log.
+const PRIVATE_TOPICS: [&str; 7] = [
+    TOPIC,
+    "app:update",
+    "app:displays",
+    "app:window",
+    "os:presence",
+    "app:log",
+    "app:log-copy",
+];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;
 const CLOSE_FULL: u16 = 4429;
@@ -208,8 +218,11 @@ fn save(path: &Path, key: &str) {
         .map_or(Ok(()), fs::create_dir_all)
         .and_then(|()| fs::write(path, text));
     if let Err(err) = result {
-        eprintln!(
-            "remote: key not saved, remote panels will need a new link after a restart: {err}"
+        log::problem(
+            "remote",
+            "Could not save the remote panels' key.",
+            Some("After a restart, paired tablets need the link again."),
+            err,
         );
     }
 }
@@ -323,7 +336,7 @@ fn announce(name: &str, port: u16) -> Option<Announced> {
     let daemon = match ServiceDaemon::new() {
         Ok(daemon) => daemon,
         Err(err) => {
-            eprintln!("remote: not announced on the network: {err}");
+            log::warn("remote", format!("not announced on the network: {err}"));
             return None;
         }
     };
@@ -359,11 +372,11 @@ fn announce(name: &str, port: u16) -> Option<Announced> {
     });
     match registered {
         Ok(fullname) => {
-            eprintln!("remote: announced on the network as {name}");
+            log::info("remote", format!("announced on the network as {name}"));
             Some(Announced { daemon, fullname })
         }
         Err(err) => {
-            eprintln!("remote: not announced on the network: {err}");
+            log::warn("remote", format!("not announced on the network: {err}"));
             let _ = daemon.shutdown();
             None
         }
@@ -379,7 +392,7 @@ pub fn spawn(app: AppHandle) {
             Ok(command) => {
                 let _ = commands.send(Msg::Command(command));
             }
-            Err(err) => eprintln!("remote: ignored a command: {err}"),
+            Err(err) => log::warn("remote", format!("ignored a command: {err}")),
         }
     });
 
@@ -443,7 +456,15 @@ pub fn spawn(app: AppHandle) {
                         if let Some(port) = want {
                             match start(&shared, store.as_deref(), port) {
                                 Ok(l) => listening = Some(l),
-                                Err(e) => error = Some(e),
+                                Err(e) => {
+                                    log::problem(
+                                        "remote",
+                                        &e,
+                                        Some("Remote panels can't connect until it can. Settings → Remote has the port."),
+                                        format!("port {port}"),
+                                    );
+                                    error = Some(e);
+                                }
                             }
                         }
                     }
@@ -459,7 +480,7 @@ pub fn spawn(app: AppHandle) {
                             *current = key;
                         }
                         shared.generation.fetch_add(1, Ordering::Relaxed);
-                        eprintln!("remote: new key; every remote panel is disconnected");
+                        log::info("remote", "new key; every remote panel is disconnected");
                     }
                     None => error = Some("No randomness available for a new key.".into()),
                 },
@@ -495,7 +516,7 @@ fn start(shared: &Arc<Shared>, store: Option<&Path>, port: u16) -> Result<Listen
     listener
         .set_nonblocking(true)
         .map_err(|e| format!("Could not listen on port {port}: {e}"))?;
-    eprintln!("remote: listening on port {port}");
+    log::info("remote", format!("listening on port {port}"));
 
     let stop = Arc::new(AtomicBool::new(false));
     let accept = {
@@ -511,12 +532,12 @@ fn start(shared: &Arc<Shared>, store: Option<&Path>, port: u16) -> Result<Listen
                     }
                     Err(e) if e.kind() == ErrorKind::WouldBlock => thread::sleep(POLL),
                     Err(e) => {
-                        eprintln!("remote: accept failed: {e}");
+                        log::warn("remote", format!("accept failed: {e}"));
                         thread::sleep(POLL);
                     }
                 }
             }
-            eprintln!("remote: stopped listening on port {port}");
+            log::info("remote", format!("stopped listening on port {port}"));
         })
     };
 
@@ -834,7 +855,7 @@ fn command(shared: &Shared, topic: &str, data: serde_json::Value) -> bool {
         return false;
     }
     if let Err(err) = shared.app.emit(topic, data) {
-        eprintln!("remote: could not pass on {topic}: {err}");
+        log::warn("remote", format!("could not pass on {topic}: {err}"));
     }
     true
 }
@@ -986,7 +1007,7 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
                     let topic = msg.get("topic").and_then(|t| t.as_str()).unwrap_or("");
                     let data = msg.get("data").cloned().unwrap_or(serde_json::Value::Null);
                     if !command(shared, topic, data) {
-                        eprintln!("remote: refused {topic} from a remote panel");
+                        log::warn("remote", format!("refused {topic} from a remote panel"));
                     }
                 }
             }

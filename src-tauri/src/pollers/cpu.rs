@@ -6,6 +6,7 @@ use sysinfo::{Components, System, MINIMUM_CPU_UPDATE_INTERVAL};
 use tauri::AppHandle;
 
 use crate::bus;
+use crate::log;
 
 /// Mirrors `CpuPayload` in `src/core/payloads.ts`.
 #[derive(Serialize, Clone)]
@@ -50,14 +51,17 @@ pub fn spawn(app: AppHandle) {
 
             if !announced {
                 announced = true;
-                eprintln!(
-                    "poller.cpu: {} threads, {:.2} GHz, temperature {}",
-                    threads.len(),
-                    clock_ghz,
-                    match temp_c {
-                        Some(t) => format!("{t:.1}C"),
-                        None => "unavailable on this platform".to_string(),
-                    }
+                log::info(
+                    "poller.cpu",
+                    format!(
+                        "{} threads, {:.2} GHz, temperature {}",
+                        threads.len(),
+                        clock_ghz,
+                        match temp_c {
+                            Some(t) => format!("{t:.1}C"),
+                            None => "unavailable on this platform".to_string(),
+                        }
+                    ),
                 );
             }
 

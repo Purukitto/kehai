@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener, Manager};
 
 use crate::bus;
+use crate::log;
 
 const TOPIC: &str = "flow:pomodoro";
 const SRC: &str = "poller.flow";
@@ -176,7 +177,10 @@ impl Timer {
             // block that finished unattended would count the nap as focus.
             self.left_ms = (self.deadline_ms - self.last_tick_ms).max(0);
             self.state = State::Paused;
-            eprintln!("poller.flow: paused after a {} s gap", delta / 1000);
+            log::info(
+                "poller.flow",
+                format!("paused after a {} s gap", delta / 1000),
+            );
             return;
         }
 
@@ -323,8 +327,9 @@ fn store_path(app: &AppHandle) -> Option<PathBuf> {
     match app.path().app_data_dir() {
         Ok(dir) => Some(dir.join(STORE_FILE)),
         Err(err) => {
-            eprintln!(
-                "poller.flow: no app data folder, today's total will not survive a restart: {err}"
+            log::warn(
+                "poller.flow",
+                format!("no app data folder, today's total will not survive a restart: {err}"),
             );
             None
         }
@@ -353,7 +358,12 @@ fn save(path: &Path, timer: &Timer) {
         .and_then(|()| fs::write(&tmp, text))
         .and_then(|()| fs::rename(&tmp, path));
     if let Err(err) = result {
-        eprintln!("poller.flow: could not save today's total: {err}");
+        log::problem(
+            "poller.flow",
+            "Could not save today's focus total.",
+            Some("A restart would start today's count again."),
+            err,
+        );
     }
 }
 
@@ -366,16 +376,16 @@ pub fn spawn(app: AppHandle) {
             Ok(command) => {
                 let _ = command_tx.send(command);
             }
-            Err(err) => eprintln!("poller.flow: ignored a command: {err}"),
+            Err(err) => log::warn("poller.flow", format!("ignored a command: {err}")),
         }
     });
 
     thread::spawn(move || {
         let store = store_path(&app);
         let mut timer = Timer::new(store.as_deref().and_then(load));
-        eprintln!(
-            "poller.flow: {} s focused today so far",
-            timer.focused_ms / 1000
+        log::info(
+            "poller.flow",
+            format!("{} s focused today so far", timer.focused_ms / 1000),
         );
 
         // The renderer sends its sprint lengths once its bridge is up. Whatever

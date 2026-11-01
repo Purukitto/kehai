@@ -12,6 +12,7 @@ import type {
   MediaPayload,
   NotifyCommand,
   NotifyPayload,
+  WindowCommand,
 } from '../core/payloads';
 import { REMOTE_PANEL } from '../core/remoteSource';
 import { PRESETS, PRESET_ORDER, useSettings } from '../core/settings';
@@ -736,7 +737,13 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
         )}
         <div style={{ flex: 1 }} />
         {skip}
-        {isTauri() && <WindowControls />}
+        {/* Setup has not said yet that Kehai lives in the tray, so closing it here quits. */}
+        {isTauri() && (
+          <WindowControls
+            onClose={() => bus.publish<WindowCommand>('window:command', 'setup', { action: 'quit' })}
+            closeLabel="Close"
+          />
+        )}
       </div>
       {!bar && (
         <div

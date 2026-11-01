@@ -6,8 +6,10 @@
 - [Keys and touch](#keys-and-touch)
 - [The header](#the-header)
 - [Window and displays](#window-and-displays)
+- [In the tray](#in-the-tray)
 - [Away and night](#away-and-night)
 - [Updating](#updating)
+- [When something goes wrong](#when-something-goes-wrong)
 
 ## First run
 
@@ -55,7 +57,9 @@ Beside the layout, a dot and a word say where the panel's data comes from:
 
 ## Window and displays
 
-The window is undecorated and draws its own title bar; drag it by the top strip.
+The window is undecorated and draws its own title bar; drag it by the top strip. The
+green light at its right end fills the display or puts Kehai in a window, and the red
+one hides it in the tray.
 
 **Settings → Window** shows your displays as the system arranges them. Tap one and
 Kehai moves there, filling it or in a window. It reopens on that display, and if the
@@ -64,6 +68,35 @@ header, and moves back by itself once the display returns. Dragging it onto anot
 display makes that the one it is for.
 
 The same page turns on starting with Windows and the auto-hiding header.
+
+## In the tray
+
+Kehai lives in the tray, as a wallpaper app does: it has no taskbar button and is not
+in Alt+Tab. Windows 11 puts a new icon under `^` at first; drag it onto the taskbar to
+keep it in sight.
+
+Click the icon to show the panel and again to hide it. If the panel is behind another
+window, a click brings it to the front instead. The diamond fills in while an agent
+waits on you, and the icon's hover text says where the panel is and how many remote
+panels are connected. Right-click it for the rest:
+
+| Item | Does |
+| --- | --- |
+| **Hide the panel** / **Show the panel** | The same as a click |
+| **Move to** | Puts the panel on another display, as Settings → Window does |
+| **Settings** | Shows the panel with Settings open |
+| **Report a bug** | See [When something goes wrong](#when-something-goes-wrong) |
+| **Open the log folder** | Shows `kehai.log` in Explorer |
+| **Check for updates** | Reads **Install 0.x.y** once one is found |
+| **Quit Kehai** | Stops Kehai, remote panels included |
+
+Closing the panel hides it, and Kehai carries on: its readings, the agents it watches,
+any tablet showing its panel. The first time, it says so and offers to quit instead.
+Starting Kehai again while it runs shows the panel rather than a second copy.
+
+**Settings → Window → Taskbar button** brings back the button and Alt+Tab. **When Kehai
+starts** can keep the panel hidden, for a desk where a tablet is the panel. On a Linux
+desktop with no tray, Kehai keeps its taskbar entry and closing it quits.
 
 ## Away and night
 
@@ -96,3 +129,18 @@ day; it is off until you do.
 Every update is signed, and Kehai refuses one whose signature does not match the key
 built into it. The portable build cannot replace itself, so it links to the release
 page instead.
+
+## When something goes wrong
+
+Kehai keeps a log on this PC of what it started, what failed and why: `kehai.log`, in
+its local app-data folder. **Settings → About** lists the last five problems, each with
+what Kehai did about it, and has:
+
+| Row | Does |
+| --- | --- |
+| **Log** | **Open folder** shows the file; **Copy** copies its last 200 lines |
+| **More detail** | Also logs how often each source published, until Kehai restarts |
+| **Report a bug** | Opens a new issue on GitHub with the version, Windows, your displays and the last problems filled in. You write what happened, read the rest, and press Create, or don't |
+
+If Kehai closed unexpectedly, the next start says so under the header, with **Report
+it**. What the log holds, and never holds, is in [Privacy](privacy.md).

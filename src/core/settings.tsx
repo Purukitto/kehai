@@ -91,6 +91,11 @@ export interface Settings {
    * `notify:rules`.
    */
   notify: NotifySettings;
+  /**
+   * Whether closing the panel has said once that Kehai carries on in the tray.
+   * Every copy hears it the first time, since close used to quit.
+   */
+  hideExplained: boolean;
 }
 
 export interface NotifiedApp {
@@ -193,6 +198,7 @@ function defaults(): Settings {
     night: NIGHT_DEFAULTS,
     away: AWAY_DEFAULTS,
     notify: NOTIFY_DEFAULTS,
+    hideExplained: false,
   };
 }
 
@@ -351,6 +357,7 @@ function load(): Settings {
       night: night(parsed.night),
       away: away(parsed.away),
       notify: notify(parsed.notify),
+      hideExplained: parsed.hideExplained === true,
     };
   } catch {
     return defaults();
@@ -402,6 +409,8 @@ interface Store {
   setNotify: (next: Partial<Omit<NotifySettings, 'apps'>>) => void;
   /** The options have been open, so nothing in them is new any more. */
   seenApps: () => void;
+  /** Closing the panel has said where Kehai goes. */
+  explainedHide: () => void;
   /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
@@ -569,6 +578,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           const apps = Object.fromEntries(Object.entries(prev.notify.apps).map(([id, a]) => [id, { ...a, fresh: false }]));
           return { ...prev, notify: { ...prev.notify, apps } };
         }),
+
+      explainedHide: () => setSettings((prev) => (prev.hideExplained ? prev : { ...prev, hideExplained: true })),
 
       reset: () => setSettings(defaults()),
     };

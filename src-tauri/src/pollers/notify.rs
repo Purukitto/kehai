@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener};
 
 use crate::bus;
+use crate::log;
 
 const INTERVAL: Duration = Duration::from_millis(3000);
 
@@ -245,7 +246,7 @@ pub fn spawn(app: AppHandle) {
     let rules_app = app.clone();
     app.listen("notify:rules", move |event| {
         let Ok(cmd) = serde_json::from_str::<RulesCommand>(event.payload()) else {
-            eprintln!("poller.notify: rules not understood");
+            log::warn("poller.notify", "rules not understood");
             return;
         };
         if let Ok(mut rules) = RULES.lock() {
@@ -316,9 +317,14 @@ pub fn spawn(app: AppHandle) {
 
 fn read_forever(app: AppHandle) {
     match platform::request_access() {
-        Ok(()) => eprintln!("poller.notify: listener access granted"),
+        Ok(()) => log::info("poller.notify", "listener access granted"),
         Err(reason) => {
-            eprintln!("poller.notify: unavailable — {reason}");
+            log::problem(
+                "poller.notify",
+                "Notifications can't be read.",
+                Some("Settings → Sources says why."),
+                &reason,
+            );
             ACCESS.store(REFUSED, Ordering::SeqCst);
             bus::publish(
                 &app,
@@ -344,9 +350,9 @@ fn read_forever(app: AppHandle) {
 
         if !announced {
             announced = true;
-            eprintln!(
-                "poller.notify: first read returned {} items",
-                payload.items.len()
+            log::info(
+                "poller.notify",
+                format!("first read returned {} items", payload.items.len()),
             );
         }
 
@@ -362,6 +368,7 @@ fn read_forever(app: AppHandle) {
 #[cfg(windows)]
 mod platform {
     use super::Item;
+    use crate::log;
     use windows::UI::Notifications::Management::{
         UserNotificationListener, UserNotificationListenerAccessStatus,
     };
@@ -392,13 +399,13 @@ mod platform {
         let listener = match UserNotificationListener::Current() {
             Ok(listener) => listener,
             Err(e) => {
-                eprintln!("poller.notify: listener unavailable: {e}");
+                log::warn("poller.notify", format!("listener unavailable: {e}"));
                 return;
             }
         };
         for &id in ids {
             if let Err(e) = listener.RemoveNotification(id) {
-                eprintln!("poller.notify: could not remove {id}: {e}");
+                log::warn("poller.notify", format!("could not remove {id}: {e}"));
             }
         }
     }
@@ -488,6 +495,7 @@ mod platform {
 /// while Kehai runs can be seen; there is no history to read back.
 #[cfg(target_os = "linux")]
 mod platform {
+    use crate::log;
     use std::collections::HashMap;
     use std::sync::{Mutex, OnceLock};
     use std::thread;
@@ -710,7 +718,10 @@ mod platform {
             }
         }
 
-        eprintln!("poller.notify: the session bus went away; no more notifications");
+        log::warn(
+            "poller.notify",
+            "the session bus went away; no more notifications",
+        );
     }
 
     pub fn read() -> Vec<Item> {
@@ -726,7 +737,7 @@ mod platform {
         if let Err(err) =
             bus.call_method(Some(SERVICE), PATH, Some(SERVICE), "CloseNotification", &id)
         {
-            eprintln!("poller.notify: close {id} refused: {err}");
+            log::warn("poller.notify", format!("close {id} refused: {err}"));
         }
     }
 

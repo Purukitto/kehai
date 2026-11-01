@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener, Manager, Monitor, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 use crate::bus;
+use crate::log;
 
 const TOPIC: &str = "app:displays";
 const SRC: &str = "poller.display";
@@ -387,16 +388,16 @@ fn act(window: &WebviewWindow, action: &Action, found: &[(Display, Monitor)]) {
     match action {
         Action::Show { id, fill } => {
             if let Some((_, monitor)) = found.iter().find(|(d, _)| &d.id == id) {
-                eprintln!("poller.display: showing on {id}, fill {fill}");
+                log::info("poller.display", format!("showing on {id}, fill {fill}"));
                 place(window, monitor, *fill);
             }
         }
         Action::Fallback => {
             let main = found.iter().find(|(d, _)| d.primary).or(found.first());
             if let Some((display, monitor)) = main {
-                eprintln!(
-                    "poller.display: display missing, showing on {} in a window",
-                    display.id
+                log::info(
+                    "poller.display",
+                    format!("display missing, showing on {} in a window", display.id),
                 );
                 place(window, monitor, false);
             }
@@ -411,7 +412,10 @@ fn store_path(app: &AppHandle) -> Option<PathBuf> {
     match app.path().app_data_dir() {
         Ok(dir) => Some(dir.join(STORE_FILE)),
         Err(err) => {
-            eprintln!("poller.display: no app data folder, the display choice will not survive a restart: {err}");
+            log::warn(
+                "poller.display",
+                format!("no app data folder, the display choice will not survive a restart: {err}"),
+            );
             None
         }
     }
@@ -435,7 +439,12 @@ fn save(path: &Path, stored: &Stored) {
         .and_then(|()| fs::write(&tmp, text))
         .and_then(|()| fs::rename(&tmp, path));
     if let Err(err) = result {
-        eprintln!("poller.display: could not save the display choice: {err}");
+        log::problem(
+            SRC,
+            "Could not save which display Kehai is for.",
+            Some("After a restart it may open somewhere else."),
+            err,
+        );
     }
 }
 
@@ -444,7 +453,7 @@ fn save(path: &Path, stored: &Stored) {
 /// it from setup, ahead of `show`.
 pub fn spawn(app: AppHandle) {
     let Some(window) = app.get_webview_window("main") else {
-        eprintln!("poller.display: no main window to place");
+        log::error("poller.display", "no main window to place");
         return;
     };
     let store = store_path(&app);
@@ -480,7 +489,7 @@ pub fn spawn(app: AppHandle) {
             Ok(command) => {
                 let _ = command_tx.send(command);
             }
-            Err(err) => eprintln!("poller.display: ignored a command: {err}"),
+            Err(err) => log::warn("poller.display", format!("ignored a command: {err}")),
         }
     });
 

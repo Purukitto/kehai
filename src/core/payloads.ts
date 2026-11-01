@@ -384,3 +384,79 @@ export type UpdateCommand =
   | { action: 'set_auto'; on: boolean }
   | { action: 'open_release' }
   | { action: 'open_support' };
+
+/**
+ * Engine → local renderer on `app:window`. Mirrors `WindowPayload` in
+ * `shell.rs`. Never sent to a remote panel, which has no window here.
+ */
+export interface WindowPayload {
+  /** A taskbar button, and a place in Alt+Tab. Off unless turned on. */
+  taskbar: boolean;
+  start: WindowStart;
+  /** False where the desktop has no tray: then closing quits. */
+  tray: boolean;
+}
+
+/** Only the tray suits a desk where a tablet is the panel. */
+export type WindowStart = 'panel' | 'tray';
+
+/** Renderer → engine on `window:command`. Mirrors `Command` in `shell.rs`. */
+export type WindowCommand =
+  | { action: 'hide' }
+  | { action: 'quit' }
+  | { action: 'set_taskbar'; on: boolean }
+  | { action: 'set_start'; start: WindowStart };
+
+/** One thing that went wrong, as About lists it. Mirrors `Problem` in `log.rs`. */
+export interface LogProblem {
+  atMs: number;
+  /** Which part of Kehai: `poller.update`, `remote`, `panel`, `kehai`. */
+  src: string;
+  level: 'info' | 'warn' | 'error';
+  /** In words for the panel. */
+  what: string;
+  /** What happens now, or what to do. */
+  then: string | null;
+  /** The cause as the code saw it. */
+  detail: string;
+  /** The same problem again, counted rather than listed again. */
+  count: number;
+}
+
+/**
+ * Engine → local renderer on `app:log`. Mirrors `LogPayload` in `log.rs`.
+ * Never sent to a remote panel.
+ */
+export interface LogPayload {
+  /** Where kehai.log is, when there is one. */
+  file: string | null;
+  /** More detail: on until Kehai restarts. */
+  detail: boolean;
+  /** The last few, newest first. */
+  problems: LogProblem[];
+  /** When Kehai last closed by crashing, until it is dismissed. */
+  crashedAtMs: number | null;
+}
+
+/** Engine → local renderer on `app:log-copy`: the log's last lines, once COPY asks. */
+export interface LogCopyPayload {
+  text: string;
+  atMs: number;
+}
+
+/** Renderer → engine on `log:command`. Mirrors `Command` in `log.rs`. */
+export type LogCommand =
+  | { action: 'write'; level: 'warn' | 'error'; what: string; detail: string }
+  | { action: 'detail'; on: boolean }
+  | { action: 'open_folder' }
+  | { action: 'copy' }
+  | { action: 'report' }
+  | { action: 'dismiss_crash' };
+
+/**
+ * Renderer → engine on `log:context`: what the panel knows that the engine
+ * does not, for a bug report. Never notification text or anything a source read.
+ */
+export interface LogContext {
+  text: string;
+}

@@ -10,6 +10,7 @@ use tauri_plugin_updater::{Error as UpdaterError, Update, Updater, UpdaterExt};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
 use crate::bus;
+use crate::log;
 
 const TOPIC: &str = "app:update";
 const SRC: &str = "poller.update";
@@ -140,7 +141,10 @@ fn updater(app: &AppHandle) -> tauri_plugin_updater::Result<Updater> {
         .timeout(CHECK_TIMEOUT)
         .configure_client(|client| client.connect_timeout(CONNECT_TIMEOUT));
     if let Ok(endpoint) = std::env::var(ENDPOINT_ENV) {
-        eprintln!("poller.update: checking {endpoint} instead of the release feed");
+        log::info(
+            "poller.update",
+            format!("checking {endpoint} instead of the release feed"),
+        );
         builder = builder.endpoints(vec![Url::parse(&endpoint)?])?;
     }
     builder.build()
@@ -190,7 +194,7 @@ fn install(
     // plugin's save on exit, and the new version would open wherever the window
     // was at launch rather than where it was left.
     if let Err(err) = app.save_window_state(StateFlags::all()) {
-        eprintln!("poller.update: window state not saved: {err}");
+        log::warn("poller.update", format!("window state not saved: {err}"));
     }
 
     update.install(bytes)?;
@@ -211,7 +215,7 @@ pub fn spawn(app: AppHandle) {
                 // download takes far longer than an event handler should.
                 let _ = command_tx.send(command);
             }
-            Err(err) => eprintln!("poller.update: ignored a command: {err}"),
+            Err(err) => log::warn("poller.update", format!("ignored a command: {err}")),
         }
     });
 
@@ -232,14 +236,17 @@ pub fn spawn(app: AppHandle) {
             auto: false,
         };
         publish(&app, &payload);
-        eprintln!(
-            "poller.update: running {}, {}",
-            payload.current,
-            if installable {
-                "can self-install"
-            } else {
-                "cannot self-install"
-            }
+        log::info(
+            "poller.update",
+            format!(
+                "running {}, {}",
+                payload.current,
+                if installable {
+                    "can self-install"
+                } else {
+                    "cannot self-install"
+                }
+            ),
         );
 
         let mut pending: Option<Update> = None;
@@ -273,7 +280,7 @@ pub fn spawn(app: AppHandle) {
 
                     match check(&app) {
                         Ok(Some(update)) => {
-                            eprintln!("poller.update: {} is available", update.version);
+                            log::info("poller.update", format!("{} is available", update.version));
                             payload.state = State::Available;
                             payload.latest = Some(update.version.clone());
                             payload.notes = update.body.clone().filter(|n| !n.trim().is_empty());
@@ -290,7 +297,16 @@ pub fn spawn(app: AppHandle) {
                             pending = None;
                         }
                         Err(err) => {
-                            eprintln!("poller.update: check failed: {err}");
+                            log::problem(
+                                SRC,
+                                &format!("Checking for updates failed. {}", describe(&err)),
+                                Some(if payload.auto {
+                                    "Kehai tries again tomorrow, or press Check."
+                                } else {
+                                    "Press Check to try again."
+                                }),
+                                &err,
+                            );
                             payload.error = Some(describe(&err));
                             // A failed check says nothing about a release already
                             // found. An offline morning should not hide it.
@@ -306,19 +322,25 @@ pub fn spawn(app: AppHandle) {
 
                 Command::Install => {
                     let Some(update) = pending.clone() else {
-                        eprintln!("poller.update: install asked for with nothing to install");
+                        log::warn("poller.update", "install asked for with nothing to install");
                         continue;
                     };
                     if !payload.installable {
-                        eprintln!(
-                            "poller.update: install asked for by a build that cannot install"
+                        log::warn(
+                            "poller.update",
+                            "install asked for by a build that cannot install",
                         );
                         continue;
                     }
 
-                    eprintln!("poller.update: installing {}", update.version);
+                    log::info("poller.update", format!("installing {}", update.version));
                     if let Err(err) = install(&app, &mut payload, update) {
-                        eprintln!("poller.update: install failed: {err}");
+                        log::problem(
+                            SRC,
+                            &format!("The update did not install. {}", describe(&err)),
+                            Some("The version you have keeps running."),
+                            &err,
+                        );
                         payload.state = State::Available;
                         payload.progress = None;
                         payload.error = Some(describe(&err));
@@ -339,13 +361,13 @@ pub fn spawn(app: AppHandle) {
 
                 Command::OpenRelease => {
                     if let Err(err) = app.opener().open_url(RELEASES_URL, None::<&str>) {
-                        eprintln!("poller.update: release page did not open: {err}");
+                        log::warn("poller.update", format!("release page did not open: {err}"));
                     }
                 }
 
                 Command::OpenSupport => {
                     if let Err(err) = app.opener().open_url(SUPPORT_URL, None::<&str>) {
-                        eprintln!("poller.update: support page did not open: {err}");
+                        log::warn("poller.update", format!("support page did not open: {err}"));
                     }
                 }
             }

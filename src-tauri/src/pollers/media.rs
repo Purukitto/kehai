@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener};
 
 use crate::bus;
+use crate::log;
 
 const INTERVAL: Duration = Duration::from_millis(1000);
 
@@ -125,10 +126,11 @@ pub fn spawn(app: AppHandle) {
             if !announced {
                 announced = true;
                 match &current {
-                    Some(m) => eprintln!("poller.media: session found via {}", m.player),
-                    None => {
-                        eprintln!("poller.media: no media session; widget shows nothing playing")
-                    }
+                    Some(m) => log::info("poller.media", format!("session found via {}", m.player)),
+                    None => log::info(
+                        "poller.media",
+                        "no media session; widget shows nothing playing",
+                    ),
                 }
             }
 
@@ -150,10 +152,10 @@ pub fn spawn(app: AppHandle) {
                 } else {
                     None
                 };
-                match &data_url {
-                    Some(url) => eprintln!("poller.media: artwork {} bytes", url.len()),
-                    None => eprintln!("poller.media: no artwork for this track"),
-                }
+                log::detail("poller.media", || match &data_url {
+                    Some(url) => format!("artwork {} bytes", url.len()),
+                    None => "no artwork for this track".into(),
+                });
                 bus::publish(&app, "media:art", "poller.media", ArtPayload { data_url });
             }
 
@@ -180,6 +182,7 @@ pub fn spawn(app: AppHandle) {
 #[cfg(windows)]
 mod platform {
     use super::{Action, MediaPayload, VolumePayload};
+    use crate::log;
     use windows::Media::Control::{
         GlobalSystemMediaTransportControlsSession as Session,
         GlobalSystemMediaTransportControlsSessionManager as Manager,
@@ -303,7 +306,7 @@ mod platform {
             }
         };
         if let Err(err) = result {
-            eprintln!("poller.media: volume not changed: {err}");
+            log::warn("poller.media", format!("volume not changed: {err}"));
         }
     }
 
@@ -377,6 +380,7 @@ mod platform {
 /// Linux reaches players over MPRIS on the session bus.
 #[cfg(target_os = "linux")]
 mod platform {
+    use crate::log;
     use std::collections::HashMap;
     use std::path::PathBuf;
     use std::sync::OnceLock;
@@ -401,7 +405,7 @@ mod platform {
         BUS.get_or_init(|| match Connection::session() {
             Ok(conn) => Some(conn),
             Err(err) => {
-                eprintln!("poller.media: no session bus: {err}");
+                log::warn("poller.media", format!("no session bus: {err}"));
                 None
             }
         })
@@ -622,7 +626,10 @@ mod platform {
             Action::Volume(_) | Action::Mute(_) => return,
         };
         if let Err(err) = result {
-            eprintln!("poller.media: a command was refused by {name}: {err}");
+            log::warn(
+                "poller.media",
+                format!("a command was refused by {name}: {err}"),
+            );
         }
     }
 }

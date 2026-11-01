@@ -34,6 +34,9 @@ export const ENGINE_TOPICS = [
   'app:update',
   'app:remote',
   'app:displays',
+  'app:window',
+  'app:log',
+  'app:log-copy',
   'os:presence',
 ];
 
@@ -48,6 +51,9 @@ export const COMMAND_TOPICS = [
   'remote:command',
   'display:command',
   'presence:command',
+  'window:command',
+  'log:command',
+  'log:context',
 ];
 
 export async function startTauriSource(): Promise<() => void> {

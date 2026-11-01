@@ -25,7 +25,7 @@ unwrap_used = "warn"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sysinfo = "0.39"
@@ -37,6 +37,9 @@ tauri-plugin-autostart = "2"
 tauri-plugin-window-state = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-opener = "2"
+# A second launch shows the copy already running, now that the panel can be
+# hidden in the tray, instead of starting a second engine beside it.
+tauri-plugin-single-instance = "2"
 tungstenite = "0.30"
 httparse = "1"
 getrandom = "0.3"
@@ -51,7 +54,7 @@ opt-level = "s"
 strip = true
 
 [target."cfg(windows)".dependencies]
-windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display", "Win32_System_RemoteDesktop", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
+windows = { version = "0.61.3", features = ["Media_Control", "Foundation", "Foundation_Collections", "Storage_Streams", "UI_Notifications", "UI_Notifications_Management", "ApplicationModel", "Win32_Foundation", "Win32_Devices_Display", "Win32_System_RemoteDesktop", "Win32_System_SystemInformation", "Win32_UI_Input_KeyboardAndMouse", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant", "Win32_UI_Shell", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 
 # Already in the tree through Tauri. MPRIS players and the notification server
 # are both on the session bus.

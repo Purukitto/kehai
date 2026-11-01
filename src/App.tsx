@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { displayLabel } from './components/DisplayMap';
+import { HideSheet } from './components/HideSheet';
 import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { OptionsSheet } from './components/OptionsSheet';
 import type { Held } from './components/OptionsSheet';
@@ -15,6 +16,9 @@ import { DIM, useDimPreview, useNight } from './core/night';
 import type {
   DisplaysPayload,
   FlowCommand,
+  LogCommand,
+  LogContext,
+  LogPayload,
   NotifyCommand,
   NotifyPayload,
   NotifyRule,
@@ -23,14 +27,18 @@ import type {
   PresencePayload,
   QuotaCommand,
   RemoteCommand,
+  RemotePayload,
   UpdateCommand,
   UpdatePayload,
+  WindowCommand,
+  WindowPayload,
 } from './core/payloads';
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
 import { HideText } from './core/quiet';
 import { useSettings } from './core/settings';
 import type { QuietShow } from './core/settings';
+import { SOURCES, SOURCE_IDS } from './core/sources';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
 import { useTopic } from './core/useTopic';
 import { useWindowShape } from './core/useWindowShape';
@@ -61,6 +69,94 @@ async function toggleFullscreen(): Promise<void> {
   await win.setFullscreen(!(await win.isFullscreen()));
 }
 
+/** At most this many of the panel's own errors reach the log a minute: a render loop that throws would fill it. */
+const ERRORS_A_MINUTE = 10;
+
+/** How often what the panel knows is passed on for a bug report: sources come and go. */
+const CONTEXT_EVERY_MS = 30_000;
+
+/** Today at 09:12, yesterday at 23:40, or on 28 Oct at 23:40. */
+function dayAt(ms: number): string {
+  const d = new Date(ms);
+  const today = new Date();
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  const day = same(d, today)
+    ? 'TODAY'
+    : same(d, yesterday)
+      ? 'YESTERDAY'
+      : 'ON ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
+  return `${day} AT ${hhmmAt(ms)}`;
+}
+
+/**
+ * What the panel knows that the engine does not, for a bug report: the
+ * layout, the displays, which sources report. Never what any of them read.
+ */
+function reportContext(theme: string, layoutName: string, shape: string, displays: DisplaysPayload | undefined): string {
+  const lines: string[] = [];
+  const edge = /Edg\/([\d.]+)/.exec(navigator.userAgent)?.[1];
+  if (edge) lines.push(`WebView2 ${edge}`);
+  if (displays?.displays.length) {
+    const each = displays.displays.map((d) => {
+      const scale = d.scale !== 1 ? ` at ${Math.round(d.scale * 100)}%` : '';
+      const here = d.id === displays.current ? (displays.fill ? ', Kehai filling it' : ', Kehai here in a window') : '';
+      return `${d.width}×${d.height}${d.primary ? ' main' : ''}${scale}${here}`;
+    });
+    lines.push(`Displays: ${each.join(' · ')}${displays.missing ? ' · the chosen display is missing' : ''}`);
+  }
+  lines.push(`Layout: ${layoutName}, ${shape} · ${theme}`);
+  const sources = SOURCE_IDS.map((id) => {
+    const data = bus.peek<{ available?: boolean; pending?: boolean }>(SOURCES[id].topics[0])?.data;
+    const state = !data ? 'silent' : data.available === false ? (data.pending ? 'not allowed yet' : 'unavailable') : 'ok';
+    return `${id} ${state}`;
+  });
+  lines.push(`Sources: ${sources.join(' · ')}`);
+  const remote = bus.peek<RemotePayload>('app:remote')?.data;
+  if (remote) lines.push(`Remote panels: ${remote.on ? `on, ${remote.clients} connected` : 'off'}`);
+  const shell = bus.peek<WindowPayload>('app:window')?.data;
+  if (shell) {
+    lines.push(
+      `Window: ${shell.tray ? 'in the tray' : 'no tray'}, taskbar button ${shell.taskbar ? 'on' : 'off'}, starts ${shell.start === 'tray' ? 'in the tray only' : 'with the panel'}`
+    );
+  }
+  return lines.join('\n');
+}
+
+/**
+ * Under the header after Kehai crashed, once: when, and a way to report it
+ * while it is fresh.
+ */
+function CrashLine({ at, onReport, onDismiss }: { at: number; onReport: () => void; onDismiss: () => void }) {
+  return (
+    <div
+      style={{
+        minHeight: 40,
+        flex: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 12,
+        padding: '4px 10px 4px 16px',
+        background: 'var(--cc-pane-2)',
+        borderBottom: '1px solid var(--cc-line)',
+        boxShadow: 'inset 2px 0 0 var(--cc-danger)',
+      }}
+    >
+      <span style={{ width: 7, height: 7, flex: 'none', background: 'var(--cc-danger)' }} />
+      <span style={{ fontSize: 11, letterSpacing: '0.14em' }}>KEHAI CLOSED UNEXPECTEDLY {dayAt(at)}.</span>
+      <span className="cc-mini">THE LOG HAS WHAT HAPPENED.</span>
+      <span style={{ flex: 1 }} />
+      <button className="cc-chip" style={{ padding: '6px 14px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }} onClick={onReport}>
+        REPORT IT
+      </button>
+      <button className="cc-chip" style={{ padding: '6px 14px' }} onClick={onDismiss}>
+        DISMISS
+      </button>
+    </div>
+  );
+}
+
 /** What a long press on a remote panel says instead of opening options. */
 function RemoteNote() {
   return (
@@ -85,7 +181,7 @@ function RemoteNote() {
 }
 
 export default function App() {
-  const { settings, layout, noteApps } = useSettings();
+  const { settings, layout, noteApps, explainedHide } = useSettings();
   const { shape } = useWindowShape();
   const swipe = useLayoutSwipe();
   const autoHide = settings.autoHideBar;
@@ -103,6 +199,9 @@ export default function App() {
   const dimPreview = useDimPreview();
   const [held, setHeld] = useState<Held | null>(null);
   const [remoteNote, setRemoteNote] = useState(false);
+  const shell = useTopic<WindowPayload>('app:window');
+  const logState = useTopic<LogPayload>('app:log');
+  const [hiding, setHiding] = useState(false);
 
   useEffect(() => {
     if (!remoteNote) return;
@@ -242,6 +341,79 @@ export default function App() {
     });
   }, [awayAfterMin]);
 
+  // Errors in the panel's own page go to the engine's log, so a release build
+  // keeps them. A remote panel's stay on the device it runs on.
+  useEffect(() => {
+    if (REMOTE || !isTauri()) return;
+    let since = Date.now();
+    let sent = 0;
+    const send = (what: string, detail: string) => {
+      if (Date.now() - since > 60_000) {
+        since = Date.now();
+        sent = 0;
+      }
+      sent += 1;
+      if (sent > ERRORS_A_MINUTE) return;
+      bus.publish<LogCommand>('log:command', 'panel', {
+        action: 'write',
+        level: 'error',
+        what: `The panel hit an error: ${what}`,
+        detail,
+      });
+    };
+    const onError = (e: ErrorEvent) =>
+      send(e.message, `${e.filename}:${e.lineno}:${e.colno}
+${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason: unknown = e.reason;
+      send(reason instanceof Error ? reason.message : String(reason), reason instanceof Error ? (reason.stack ?? '') : '');
+    };
+    window.addEventListener('error', onError);
+    window.addEventListener('unhandledrejection', onRejection);
+    return () => {
+      window.removeEventListener('error', onError);
+      window.removeEventListener('unhandledrejection', onRejection);
+    };
+  }, []);
+
+  // And what the panel knows for a bug report, which the tray's menu files too,
+  // without asking the panel.
+  const layoutName = layout.name;
+  const theme = settings.theme;
+  useEffect(() => {
+    if (REMOTE) return;
+    const send = () =>
+      bus.publish<LogContext>('log:context', 'panel', {
+        text: reportContext(theme, layoutName, shape, bus.peek<DisplaysPayload>('app:displays')?.data),
+      });
+    send();
+    const id = window.setInterval(send, CONTEXT_EVERY_MS);
+    return () => window.clearInterval(id);
+  }, [theme, layoutName, shape, displays]);
+
+  // Settings, from the tray's menu. The engine has shown the window already.
+  useEffect(() => {
+    if (REMOTE || !isTauri()) return;
+    let stop: (() => void) | undefined;
+    let cancelled = false;
+    import('@tauri-apps/api/event')
+      .then(({ listen }) =>
+        listen('shell:open', () => {
+          setSettingsAt(undefined);
+          setMode('settings');
+        })
+      )
+      .then((unlisten) => {
+        if (cancelled) unlisten();
+        else stop = unlisten;
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      stop?.();
+    };
+  }, []);
+
   // Night turns down everything Kehai draws, setup and settings included, so
   // opening them late does not light up the room.
   const dim = dimPreview ? DIM[dimPreview] : night ? DIM[settings.night.level] : 1;
@@ -287,7 +459,10 @@ export default function App() {
         return;
       }
 
-      if (e.key === 'Escape') setMode('dashboard');
+      if (e.key === 'Escape') {
+        setMode('dashboard');
+        setHiding(false);
+      }
       if (e.key === 's' || e.key === 'S') setMode((m) => (m === 'settings' ? 'dashboard' : 'settings'));
       if (e.key === 'F11') {
         e.preventDefault();
@@ -367,6 +542,16 @@ export default function App() {
     : engine
       ? { live: true, label: 'ENGINE', title: 'Rust engine connected' }
       : { live: false, label: 'MOCK', title: 'Mock source' };
+
+  // Close hides the panel in the tray, and says so the first time. Where there
+  // is no tray it quits, as it always has.
+  const sendWindow = (command: WindowCommand) => bus.publish<WindowCommand>('window:command', 'window', command);
+  const sendLog = (command: LogCommand) => bus.publish<LogCommand>('log:command', 'panel', command);
+  const closePanel = () => {
+    if (shell?.tray === false) sendWindow({ action: 'quit' });
+    else if (settings.hideExplained) sendWindow({ action: 'hide' });
+    else setHiding(true);
+  };
 
   // A remote panel that has heard from its host and lost it.
   const stale =
@@ -454,7 +639,12 @@ export default function App() {
             <path d="M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M12.7 3.3l-1.4 1.4M4.7 11.3l-1.4 1.4" />
           </svg>
         </button>
-        {isTauri() && <WindowControls />}
+        {isTauri() && (
+          <WindowControls
+            onClose={closePanel}
+            closeLabel={shell?.tray === false ? 'Close' : 'Hide · Kehai stays in the tray'}
+          />
+        )}
       </div>
   );
 
@@ -469,6 +659,16 @@ export default function App() {
       }}
     >
       {autoHide ? <div className="cc-barzone">{bar}</div> : bar}
+      {!REMOTE && logState?.crashedAtMs != null && (
+        <CrashLine
+          at={logState.crashedAtMs}
+          onReport={() => {
+            sendLog({ action: 'report' });
+            sendLog({ action: 'dismiss_crash' });
+          }}
+          onDismiss={() => sendLog({ action: 'dismiss_crash' })}
+        />
+      )}
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {/* Keyed by shape: a tile that moves to another shape starts afresh, rather
             than keeping a breakpoint its old size decided. */}
@@ -510,6 +710,20 @@ export default function App() {
             setArranging(settings.layoutId);
             setMode('arrange');
           }}
+        />
+      )}
+      {hiding && (
+        <HideSheet
+          onHide={() => {
+            explainedHide();
+            setHiding(false);
+            sendWindow({ action: 'hide' });
+          }}
+          onQuit={() => {
+            explainedHide();
+            sendWindow({ action: 'quit' });
+          }}
+          onCancel={() => setHiding(false)}
         />
       )}
     </div>

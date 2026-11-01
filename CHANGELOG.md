@@ -9,6 +9,32 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- Kehai lives in the tray. Click its icon to show or hide the panel. Right-click it to
+  move the panel to another display, open Settings, report a bug, check for updates or
+  quit. The icon fills in while an agent waits on you.
+- **Settings → Window → When Kehai starts** can keep the panel hidden, for a desk
+  where a tablet is the panel. Kehai still reads this PC and serves the tablet.
+- A log. Kehai writes down what it started, what failed and why, in a file on this PC,
+  and never what it read. **Settings → About** lists the last problems, opens the
+  log's folder, copies its last lines, and can log more detail until Kehai restarts.
+- **Report a bug**, in Settings → About and in the tray's menu, opens a new issue on
+  GitHub in your browser, with the version, Windows, your displays and the last
+  problems filled in. Nothing is sent until you press Create there.
+- When Kehai closed unexpectedly, the next start says so under the header, with a way
+  to report it.
+
+### Changed
+
+- Kehai no longer has a taskbar button or a place in Alt+Tab, on every copy, including
+  ones already installed. **Settings → Window → Taskbar button** brings both back.
+- Closing the panel hides it in the tray rather than quitting, and says so the first
+  time. Minimise is gone: with no taskbar button it had nowhere to go. Quit is in the
+  tray's menu.
+- Starting Kehai while it is already running shows the panel, rather than starting a
+  second copy.
+
 ## [0.9.2] - 2026-11-01
 
 ### Fixed

@@ -6,6 +6,10 @@ import { bus } from '../core/bus';
 import type {
   DisplayCommand,
   DisplaysPayload,
+  LogCommand,
+  LogCopyPayload,
+  LogPayload,
+  LogProblem,
   NotifyCommand,
   NotifyPayload,
   PresencePayload,
@@ -13,6 +17,8 @@ import type {
   RemotePayload,
   UpdateCommand,
   UpdatePayload,
+  WindowCommand,
+  WindowPayload,
 } from '../core/payloads';
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
 import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTiles } from '../core/layout';
@@ -924,6 +930,213 @@ function sendUpdate(command: UpdateCommand) {
   bus.publish<UpdateCommand>('update:command', 'settings', command);
 }
 
+/**
+ * How Kehai sits in Windows: in the tray, with a taskbar button or without,
+ * and whether it shows the panel when it starts. The engine keeps both, since
+ * they apply before the window is first shown.
+ */
+function TrayRows() {
+  const shell = useTopic<WindowPayload>('app:window');
+  if (!shell) return null;
+  const send = (command: WindowCommand) => bus.publish<WindowCommand>('window:command', 'settings', command);
+  if (!shell.tray) {
+    return (
+      <Row label="Tray" desc="This desktop has no tray for Kehai's icon, so Kehai keeps its taskbar button and closing it quits.">
+        <span className="cc-mini" style={{ flex: 'none' }}>
+          NO TRAY
+        </span>
+      </Row>
+    );
+  }
+  return (
+    <>
+      <Row
+        label="Taskbar button"
+        desc="Off: Kehai is only in the tray, and not in Alt+Tab, like a wallpaper. On: it also has a taskbar button and shows in Alt+Tab."
+      >
+        <Seg
+          options={['OFF', 'ON']}
+          value={shell.taskbar ? 'ON' : 'OFF'}
+          onPick={(v) => send({ action: 'set_taskbar', on: v === 'ON' })}
+        />
+      </Row>
+      <Row
+        label="When Kehai starts"
+        desc="Only the tray suits a desk where a tablet is the panel: Kehai reads this PC and serves the tablet, with nothing on screen here."
+      >
+        <Seg
+          options={['SHOW THE PANEL', 'ONLY THE TRAY']}
+          value={shell.start === 'tray' ? 'ONLY THE TRAY' : 'SHOW THE PANEL'}
+          onPick={(v) => send({ action: 'set_start', start: v === 'ONLY THE TRAY' ? 'tray' : 'panel' })}
+        />
+      </Row>
+    </>
+  );
+}
+
+/** Which part of Kehai a problem came from, as a tag, in its colour. */
+function problemTag(p: LogProblem): [string, string] {
+  const named: Record<string, string> = {
+    'poller.update': 'UPDATES',
+    'poller.notify': 'NOTIFICATIONS',
+    'poller.display': 'DISPLAY',
+    'poller.flow': 'FOCUS TIMER',
+    'poller.media': 'MEDIA',
+    'poller.agents': 'AGENTS',
+    'poller.quota': 'AGENT TOKENS',
+    remote: 'REMOTE PANELS',
+    shell: 'TRAY',
+    panel: 'PANEL',
+    kehai: 'KEHAI',
+  };
+  const label = named[p.src] ?? p.src.replace(/^poller\./, '').toUpperCase();
+  const color = p.level === 'error' ? 'var(--cc-danger)' : p.src === 'poller.update' ? 'var(--cc-accent)' : 'var(--cc-accent-2)';
+  return [label, color];
+}
+
+/** The time for today's, the day too for older ones. */
+function when(ms: number): string {
+  const d = new Date(ms);
+  const time = hhmm(d.getHours() * 60 + d.getMinutes());
+  const today = new Date();
+  if (d.toDateString() === today.toDateString()) return time;
+  const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+  if (d.toDateString() === yesterday.toDateString()) return `YESTERDAY ${time}`;
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()} ${time}`;
+}
+
+function ProblemList({ problems }: { problems: LogProblem[] }) {
+  return (
+    <div style={{ background: 'var(--cc-inset)', boxShadow: 'inset 0 0 0 1px var(--cc-line)', margin: '4px 0 6px' }}>
+      <div style={{ height: 30, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 12 }}>
+        <span className="cc-label">LAST PROBLEMS · NEWEST FIRST</span>
+        <span style={{ flex: 1 }} />
+        <span className="cc-mini">THE LAST 5 WARNINGS AND ERRORS</span>
+      </div>
+      {problems.length === 0 ? (
+        <div className="cc-mini" style={{ padding: '10px 14px', borderTop: '1px solid var(--cc-line)' }}>
+          NOTHING HAS GONE WRONG THAT KEHAI KNOWS OF.
+        </div>
+      ) : (
+        problems.map((p) => {
+          const [tag, color] = problemTag(p);
+          return (
+            <div
+              key={`${p.atMs}-${p.src}`}
+              title={p.detail}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 14, padding: '9px 14px', borderTop: '1px solid var(--cc-line)' }}
+            >
+              <span className="cc-mini" style={{ width: 104, flex: 'none', paddingTop: 2 }}>
+                {when(p.atMs)}
+              </span>
+              <span style={{ width: 118, flex: 'none' }}>
+                <span style={{ fontSize: 9, letterSpacing: '0.1em', padding: '2px 6px', border: '1px solid currentColor', color }}>{tag}</span>
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12 }}>
+                  {p.what}
+                  {p.count > 1 && <span className="cc-mini">{`  ×${p.count}`}</span>}
+                </div>
+                {p.then && (
+                  <div className="cc-mini" style={{ marginTop: 3, textTransform: 'uppercase' }}>
+                    {p.then}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+/**
+ * What went wrong lately, the log it came from, and a way to report it. All
+ * of it stays on this PC until you press Create on the issue GitHub shows.
+ */
+function ProblemRows() {
+  const log = useTopic<LogPayload>('app:log');
+  const [copy, setCopy] = useState<'asking' | 'copied' | 'failed' | null>(null);
+  const send = (command: LogCommand) => bus.publish<LogCommand>('log:command', 'settings', command);
+
+  // COPY asks the engine for the log's last lines and copies them once they
+  // arrive. Listening first, so a quick answer is not missed.
+  useEffect(() => {
+    if (copy !== 'asking') return;
+    const asked = Date.now();
+    const stop = bus.subscribe('app:log-copy', (e) => {
+      const data = e.data as LogCopyPayload;
+      // The last copy is retained, and replays on subscribing.
+      if (data.atMs < asked - 1000) return;
+      navigator.clipboard.writeText(data.text).then(
+        () => setCopy('copied'),
+        () => setCopy('failed')
+      );
+    });
+    bus.publish<LogCommand>('log:command', 'settings', { action: 'copy' });
+    const t = window.setTimeout(() => setCopy((c) => (c === 'asking' ? 'failed' : c)), 4000);
+    return () => {
+      stop();
+      window.clearTimeout(t);
+    };
+  }, [copy]);
+  useEffect(() => {
+    if (copy !== 'copied' && copy !== 'failed') return;
+    const t = window.setTimeout(() => setCopy(null), 2400);
+    return () => window.clearTimeout(t);
+  }, [copy]);
+
+  if (!log) return null;
+  return (
+    <>
+      <Group label="PROBLEMS" note="WHAT WENT WRONG, AND WHERE TO LOOK" />
+      <ProblemList problems={log.problems} />
+      <Row
+        label="Log"
+        desc="What Kehai started, what failed and why, in kehai.log on this PC. Never what notifications say, what agents wrote, what is playing, or a tablet's key."
+      >
+        <div style={{ display: 'flex', flex: 'none' }}>
+          <button
+            className="cc-chip"
+            style={{ padding: '8px 16px' }}
+            title={log.file ?? undefined}
+            onClick={() => send({ action: 'open_folder' })}
+          >
+            OPEN FOLDER
+          </button>
+          <button
+            className="cc-chip"
+            style={{ padding: '8px 16px', marginLeft: -1, minWidth: 96 }}
+            title="The last 200 lines, to paste into an issue or a message"
+            onClick={() => setCopy('asking')}
+          >
+            {copy === 'copied' ? 'COPIED' : copy === 'failed' ? 'NOT COPIED' : 'COPY'}
+          </button>
+        </div>
+      </Row>
+      <Row
+        label="More detail"
+        desc="Also what each source published and how often, until Kehai restarts. For a problem the usual log doesn't catch."
+      >
+        <Seg options={['OFF', 'ON']} value={log.detail ? 'ON' : 'OFF'} onPick={(v) => send({ action: 'detail', on: v === 'ON' })} />
+      </Row>
+      <Row
+        label="Report a bug"
+        desc="Opens a new issue on github.com in your browser, with the version, Windows, your displays and the last problems filled in. Nothing is sent until you press Create there."
+      >
+        <button
+          className="cc-chip"
+          style={{ padding: '8px 16px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+          onClick={() => send({ action: 'report' })}
+        >
+          REPORT A BUG
+        </button>
+      </Row>
+    </>
+  );
+}
+
 function ago(ms: number): string {
   const mins = Math.round((Date.now() - ms) / 60_000);
   if (mins < 1) return 'just now';
@@ -1580,6 +1793,7 @@ export function SettingsScreen({
           {section === 'WINDOW' && (
             <div style={{ marginTop: 18 }}>
               {!REMOTE_PANEL && displays && displays.displays.length > 0 && <DisplayRows state={displays} />}
+              {!REMOTE_PANEL && <TrayRows />}
               {/* A remote panel is a browser tab: it starts with nothing and has no window to remember. */}
               {!REMOTE_PANEL && (
                 <Row
@@ -1682,6 +1896,7 @@ export function SettingsScreen({
                       onPick={(v) => setAutoCheckUpdates(v === 'ON')}
                     />
                   </Row>
+                  <ProblemRows />
                   {/* Not on a remote panel either: it may be showing inside another app, whose store decides which links it may carry. */}
                   <Row
                     label="Support Kehai"
