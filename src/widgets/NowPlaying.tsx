@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { bus } from '../core/bus';
 import { mmss } from '../core/format';
@@ -22,6 +22,11 @@ const VOLUME_BESIDE_FROM = 720;
 const ROW_COVER_FROM = 460;
 /** As the volume keys move it. A block sets a tenth. */
 const VOLUME_STEP = 2;
+/**
+ * Narrower than this a volume block cannot be aimed at, so the blocks give
+ * way to the level between − and +.
+ */
+const BLOCK_MIN = 12;
 /** Volume opened from the speaker goes back to the buttons after this long untouched. */
 const VOLUME_CLOSES_MS = 5000;
 /** How long a seek's target is shown before the player has said where it is. */
@@ -198,9 +203,24 @@ function VolumeControls({
   };
   const on = Math.round(volume.level / 10);
   const square = { width: size, height: size, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' } as const;
+  // The row's own width, which its parent sets, so the blocks coming and going
+  // cannot change it.
+  const row = useRef<HTMLDivElement | null>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = row.current;
+    if (!el) return;
+    setWidth(el.getBoundingClientRect().width);
+    const ro = new ResizeObserver((entries) => setWidth(entries[0]?.contentRect.width ?? 0));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const squares = 3 + (onClose ? 1 : 0);
+  const fixed = squares * size + (readout ? 44 : 0) + (squares + (readout ? 1 : 0)) * 8;
+  const blocks = width - fixed >= 10 * BLOCK_MIN + 9 * 3;
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div ref={row} style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
       <button
         style={{ ...square, color: volume.muted ? 'var(--cc-accent)' : 'var(--cc-muted)' }}
         onClick={press(() => volume.mute(!volume.muted))}
@@ -214,7 +234,9 @@ function VolumeControls({
           <path d="M2 7h10" />
         </svg>
       </button>
-      <div style={{ flex: 1, minWidth: 40, height: size, display: 'flex', gap: 3 }} role="group" aria-label="Volume level">
+      {!blocks &&
+        (readout ? <Level volume={volume} style={{ flex: 1, textAlign: 'center' }} /> : <div style={{ flex: 1 }} />)}
+      <div style={{ flex: 1, minWidth: 0, height: size, display: blocks ? 'flex' : 'none', gap: 3 }} role="group" aria-label="Volume level">
         {Array.from({ length: 10 }, (_, i) => (
           <button
             key={i}
@@ -238,7 +260,7 @@ function VolumeControls({
           <path d="M2 7h10M7 2v10" />
         </svg>
       </button>
-      {readout && <Level volume={volume} style={{ width: 44, textAlign: 'right' }} />}
+      {readout && blocks && <Level volume={volume} style={{ width: 44, textAlign: 'right' }} />}
       {onClose && (
         <button style={{ ...square, border: 0, color: 'var(--cc-dim)' }} onClick={onClose} aria-label="Close volume">
           <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.4">

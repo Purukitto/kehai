@@ -61,14 +61,15 @@ export function WindowControls() {
         <button
           key={light.action}
           className="cc-light"
-          style={{ background: light.color }}
           onClick={() => void run(light.action)}
           aria-label={light.label}
           title={light.label}
         >
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--cc-bg)" strokeWidth="1.6" strokeLinecap="round">
-            <path d={light.glyph} />
-          </svg>
+          <span className="cc-light-dot" style={{ background: light.color }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="var(--cc-bg)" strokeWidth="1.6" strokeLinecap="round">
+              <path d={light.glyph} />
+            </svg>
+          </span>
         </button>
       ))}
     </div>

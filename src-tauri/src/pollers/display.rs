@@ -330,17 +330,33 @@ fn look(window: &WebviewWindow, found: &[(Display, Monitor)]) -> Seen {
 }
 
 /// A window of the size Kehai was designed at, centred in what the display
-/// leaves free of taskbars, and no bigger than most of it.
+/// leaves free of taskbars. On a display that size or smaller, such as a small
+/// panel or a bar, there is nothing to leave room for, so it takes all of it.
 fn window_rect(monitor: &Monitor) -> (PhysicalPosition<i32>, PhysicalSize<u32>) {
     let area = monitor.work_area();
-    let scale = monitor.scale_factor();
-    let width = ((WINDOW_W * scale) as u32).min(area.size.width * 9 / 10);
-    let height = ((WINDOW_H * scale) as u32).min(area.size.height * 9 / 10);
-    let x = area.position.x + ((area.size.width - width) / 2) as i32;
-    let y = area.position.y + ((area.size.height - height) / 2) as i32;
+    let (x, y, width, height) = window_in(
+        (area.position.x, area.position.y),
+        (area.size.width, area.size.height),
+        monitor.scale_factor(),
+    );
     (
         PhysicalPosition::new(x, y),
         PhysicalSize::new(width, height),
+    )
+}
+
+/// `window_rect` in physical pixels: x, y, width and height.
+fn window_in(at: (i32, i32), area: (u32, u32), scale: f64) -> (i32, i32, u32, u32) {
+    let width = (WINDOW_W * scale) as u32;
+    let height = (WINDOW_H * scale) as u32;
+    if width >= area.0 || height >= area.1 {
+        return (at.0, at.1, area.0, area.1);
+    }
+    (
+        at.0 + ((area.0 - width) / 2) as i32,
+        at.1 + ((area.1 - height) / 2) as i32,
+        width,
+        height,
     )
 }
 
@@ -653,6 +669,23 @@ mod tests {
             number: None,
             fill,
         })
+    }
+
+    #[test]
+    fn a_big_display_gets_the_design_size_centred() {
+        // 2560 by 1440 at 100%, as the LG on the desk.
+        assert_eq!(window_in((0, 0), (2560, 1400), 1.0), (640, 300, 1280, 800));
+    }
+
+    #[test]
+    fn a_display_no_bigger_than_the_design_gets_all_of_it() {
+        // The 1280 by 800 panel at 125%: 1024 by 640 logical, smaller than the design.
+        assert_eq!(
+            window_in((1038, 1440), (1280, 800), 1.25),
+            (1038, 1440, 1280, 800)
+        );
+        // A bar: wide enough, not tall enough.
+        assert_eq!(window_in((0, 0), (1920, 480), 1.0), (0, 0, 1920, 480));
     }
 
     #[test]
