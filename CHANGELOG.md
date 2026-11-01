@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-11-01
+
 ### Fixed
 
 - Checking for updates no longer fails on networks where one of GitHub's download
@@ -268,7 +270,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/Purukitto/kehai/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/Purukitto/kehai/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/Purukitto/kehai/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/Purukitto/kehai/compare/v0.6.0...v0.7.0
