@@ -125,6 +125,10 @@ impl Source {
 fn relative(dir: &str) -> Option<PathBuf> {
     let mut path = PathBuf::new();
     for part in dir.split(['/', '\\']) {
+        // A drive is only a prefix on Windows; anywhere else it would pass as a name.
+        if part.contains(':') {
+            return None;
+        }
         let mut one = Path::new(part).components();
         match (one.next(), one.next()) {
             (Some(c @ Component::Normal(_)), None) => path.push(c),
