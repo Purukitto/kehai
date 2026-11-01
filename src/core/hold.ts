@@ -23,21 +23,35 @@ export interface Ring {
 const exempt = (target: EventTarget | null) => target instanceof Element && target.closest('[data-hold="off"]') !== null;
 
 /**
- * The click that ends a hold would otherwise land on whatever the finger was
- * on, and holding a notification would dismiss it too.
+ * Swallows the click the current press ends in, wherever it lands. Without it
+ * the click that ends a hold presses whatever the finger was on, and the tap
+ * that wakes a quiet panel presses what was hidden under it.
+ *
+ * It waits for the press to end, however long that takes, then a moment more
+ * for the click that follows.
  */
-function swallowNextClick() {
+export function swallowNextClick() {
+  let timer = 0;
   const stop = (e: Event) => {
     e.stopPropagation();
     e.preventDefault();
     done();
   };
+  const released = () => {
+    window.clearTimeout(timer);
+    timer = window.setTimeout(done, 400);
+  };
   const done = () => {
     window.removeEventListener('click', stop, true);
+    window.removeEventListener('pointerup', released, true);
+    window.removeEventListener('pointercancel', released, true);
     window.clearTimeout(timer);
   };
   window.addEventListener('click', stop, true);
-  const timer = window.setTimeout(done, 600);
+  window.addEventListener('pointerup', released, true);
+  window.addEventListener('pointercancel', released, true);
+  // A press this page never hears end still lets go of it.
+  timer = window.setTimeout(done, 10_000);
 }
 
 /**

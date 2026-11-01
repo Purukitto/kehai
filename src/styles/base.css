@@ -36,17 +36,26 @@ button {
 .cc-traffic {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0 14px 0 12px;
+  padding: 0 6px 0 4px;
   flex: none;
 }
 
-/* Colour carries the meaning; the glyph is a hover affordance, as on macOS. */
+/* A 28px target round each 12px light, so a finger hits the one it means.
+   Colour carries the meaning; the glyph is a hover affordance, as on macOS. */
 .cc-light {
-  width: 12px;
-  height: 12px;
+  width: 28px;
+  height: 28px;
   border: 0;
   padding: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cc-light-dot {
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -55,8 +64,8 @@ button {
   transition: opacity 120ms ease;
 }
 
-.cc-traffic:hover .cc-light,
-.cc-light:focus-visible {
+.cc-traffic:hover .cc-light-dot,
+.cc-light:focus-visible .cc-light-dot {
   opacity: 1;
 }
 
@@ -70,7 +79,7 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cc-light,
+  .cc-light-dot,
   .cc-light svg {
     transition: none;
   }

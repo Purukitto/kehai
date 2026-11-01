@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
 import { clockParts, mmss } from '../core/format';
+import { swallowNextClick } from '../core/hold';
 import type { AgentsPayload, ClockPayload, NotifyPayload, SprintPayload } from '../core/payloads';
 import type { QuietShow } from '../core/settings';
 import { useTopic } from '../core/useTopic';
@@ -187,6 +188,9 @@ export function Quiet({ show, onWake }: { show: QuietShow | 'blank'; onWake: () 
       style={cover}
       onPointerDown={(e) => {
         e.preventDefault();
+        // This view is gone before the finger lifts, and the click would
+        // otherwise press whatever it was covering.
+        swallowNextClick();
         onWake();
       }}
       aria-label="Kehai is quiet while you are away. Touch to wake it."

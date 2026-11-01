@@ -9,6 +9,15 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Fixed
+
+- The tap that wakes a quiet panel no longer also presses whatever was under it.
+- A narrow Now playing tile shows the volume as −, + and the level, instead of ten
+  blocks too thin to hit.
+- The window buttons in the header are now big enough to hit with a finger.
+- With **Fill the display** off, Kehai moved to a display no bigger than 1280 × 800,
+  such as a small panel or a bar, takes all of it instead of most of it.
+
 ## [0.9.1] - 2026-11-01
 
 ### Fixed
