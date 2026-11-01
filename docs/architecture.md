@@ -52,10 +52,10 @@ subscribed and the engine replays every retained topic in reply.
 ## Commands
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for twelve command topics — `media:command`, `notify:command`,
+read-only except for fourteen command topics — `media:command`, `notify:command`,
 `notify:rules`, `flow:command`, `quota:command`, `update:command`, `remote:command`,
-`display:command`, `presence:command`, `window:command`, `log:command` and
-`log:context`. The UI states an intent; the engine owns the
+`display:command`, `presence:command`, `window:command`, `log:command`,
+`log:context`, `game:command` and `widgets:command`. The UI states an intent; the engine owns the
 side effect and runs it off the event thread, so a wedged media player cannot freeze
 the panel and a slow download cannot either.
 
@@ -85,8 +85,12 @@ checks every one again.
 | `src/grid/Arranger.tsx` | The tile arranger |
 | `src/widgets/` | One module per widget, beside its description file, `<id>.widget.json` |
 | `src/widgets/registry.ts` | The only way a widget is reached |
-| `src/core/widget.ts` | Validates a widget's description file: name, minimum size, the sources it reads |
+| `src/core/widget.ts` | Validates a widget's description file: name, minimum size, the sources it reads or the game it brings |
 | `src/core/sources.ts` | The sources widgets read, and the topics each publishes on |
+| `src/core/game.ts` | A game widget's file: its source, its readings and the paths into the game's state |
+| `src/widgets/Game.tsx` | Draws every game widget from its file, at any size |
+| `src/components/GameSetup.tsx` | SET UP: where the game is and the file Kehai writes there |
+| `src/core/matchLayout.ts` | Puts a chosen layout on screen while a match is live |
 | `src/layouts/*.layout.json` | The three shipped presets |
 | `src/styles/tokens.css` | Thirteen custom properties per theme |
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
@@ -98,6 +102,8 @@ checks every one again.
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
 | `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel |
+| `src-tauri/src/pollers/game.rs` | Finds a game through Steam, writes and removes its file, and listens on 127.0.0.1 for what it sends |
+| `src-tauri/src/pollers/widgets.rs` | Hands the widgets folder's files to the panel to check |
 | `src-tauri/src/remote.rs` | Serves the panel, the bus and the API to other machines, and announces it |
 | `scripts/release.ts` | Cuts a release: version, changelog, commit, tag |
 

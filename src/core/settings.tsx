@@ -96,6 +96,35 @@ export interface Settings {
    * Every copy hears it the first time, since close used to quit.
    */
   hideExplained: boolean;
+  /** Each game widget's settings for the whole panel, by widget id. */
+  games: Record<string, GameSettings>;
+  /**
+   * While a match has put a layout on screen: which, for which game, and the
+   * layout it goes back to when the match ends. Kept, so a restart mid-match
+   * still goes back.
+   */
+  matchLayout: MatchLayout | null;
+}
+
+export interface GameSettings {
+  /** What happens when a match goes live: nothing, another layout, or the tile full screen. */
+  onMatch: 'stay' | 'layout' | 'full';
+  /** The layout for `layout`. */
+  switchTo: string | null;
+  /** The game's own colours, or the theme's. */
+  colours: 'game' | 'theme';
+  /** The tile's edge lit, and flashes and smoke washed over it, as RGB lighting does. */
+  lighting: boolean;
+}
+
+export const GAME_DEFAULTS: GameSettings = { onMatch: 'stay', switchTo: null, colours: 'game', lighting: true };
+
+export interface MatchLayout {
+  widget: string;
+  /** The layout the match put on screen. */
+  to: string;
+  /** The one it goes back to. */
+  from: string;
 }
 
 export interface NotifiedApp {
@@ -199,6 +228,8 @@ function defaults(): Settings {
     away: AWAY_DEFAULTS,
     notify: NOTIFY_DEFAULTS,
     hideExplained: false,
+    games: {},
+    matchLayout: null,
   };
 }
 
@@ -293,6 +324,30 @@ function notify(raw: unknown): NotifySettings {
   };
 }
 
+function games(raw: unknown): Record<string, GameSettings> {
+  const out: Record<string, GameSettings> = {};
+  if (raw && typeof raw === 'object') {
+    for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
+      const g = (value ?? {}) as Partial<Record<keyof GameSettings, unknown>>;
+      const switchTo = typeof g.switchTo === 'string' ? g.switchTo : null;
+      out[id] = {
+        onMatch: g.onMatch === 'full' ? 'full' : g.onMatch === 'layout' && switchTo ? 'layout' : 'stay',
+        switchTo,
+        colours: g.colours === 'theme' ? 'theme' : 'game',
+        lighting: g.lighting !== false,
+      };
+    }
+  }
+  return out;
+}
+
+function matchLayout(raw: unknown): MatchLayout | null {
+  const m = (raw ?? {}) as Partial<Record<keyof MatchLayout, unknown>>;
+  return typeof m.widget === 'string' && typeof m.to === 'string' && typeof m.from === 'string'
+    ? { widget: m.widget, to: m.to, from: m.from }
+    : null;
+}
+
 /** Blank means the default, so it is stored as null rather than as ''. */
 function folder(path: unknown): string | null {
   return typeof path === 'string' && path.trim() !== '' ? path.trim() : null;
@@ -358,6 +413,8 @@ function load(): Settings {
       away: away(parsed.away),
       notify: notify(parsed.notify),
       hideExplained: parsed.hideExplained === true,
+      games: games(parsed.games),
+      matchLayout: matchLayout(parsed.matchLayout),
     };
   } catch {
     return defaults();
@@ -411,6 +468,12 @@ interface Store {
   seenApps: () => void;
   /** Closing the panel has said where Kehai goes. */
   explainedHide: () => void;
+  setGame: (widget: string, next: Partial<GameSettings>) => void;
+  /**
+   * A match went live: put its layout on screen, remembering the one to go
+   * back to. Null when it ends: back, unless the layout was changed meanwhile.
+   */
+  setMatchLayout: (next: MatchLayout | null) => void;
   /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
@@ -580,6 +643,25 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         }),
 
       explainedHide: () => setSettings((prev) => (prev.hideExplained ? prev : { ...prev, hideExplained: true })),
+
+      setGame: (widget, next) =>
+        setSettings((prev) => ({
+          ...prev,
+          games: { ...prev.games, [widget]: { ...(prev.games[widget] ?? GAME_DEFAULTS), ...next } },
+        })),
+
+      setMatchLayout: (next) =>
+        setSettings((prev) => {
+          if (next) {
+            if (!findLayout(prev, next.to) || prev.layoutId === next.to) return prev;
+            return { ...prev, matchLayout: next, layoutId: next.to };
+          }
+          const was = prev.matchLayout;
+          if (!was) return prev;
+          // Changed by hand during the match: that choice stays.
+          const back = prev.layoutId === was.to && findLayout(prev, was.from) ? was.from : prev.layoutId;
+          return { ...prev, matchLayout: null, layoutId: back };
+        }),
 
       reset: () => setSettings(defaults()),
     };

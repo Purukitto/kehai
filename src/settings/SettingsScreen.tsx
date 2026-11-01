@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { DisplayMap, displayLabel } from '../components/DisplayMap';
+import { GameIcon, GameSetup } from '../components/GameSetup';
 import { OptionsSheet } from '../components/OptionsSheet';
 import { QrCode } from '../components/QrCode';
 import { bus } from '../core/bus';
 import type {
   DisplayCommand,
   DisplaysPayload,
+  GamePayload,
   LogCommand,
   LogCopyPayload,
   LogPayload,
@@ -18,6 +20,7 @@ import type {
   UpdateCommand,
   UpdatePayload,
   WindowCommand,
+  WidgetsCommand,
   WindowPayload,
 } from '../core/payloads';
 import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
@@ -30,7 +33,8 @@ import type { SourceId } from '../core/sources';
 import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
 import type { Layout, Shape, ThemeId, WidgetSpec } from '../core/types';
-import { minSize, registry, widgetNames } from '../widgets/registry';
+import { localWidgets, minSize, registry, useRegistry, widgetNames } from '../widgets/registry';
+import type { GameDescription } from '../widgets/Game';
 import { Group, Row, Seg } from './controls';
 
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
@@ -296,6 +300,155 @@ function WidgetRow({
         </span>
       )}
     </div>
+  );
+}
+
+/** What a game widget's row and source say, from what its game last sent. */
+function gameStatus(g: GameDescription, value: GamePayload | undefined): { text: string; color: string } {
+  const short = g.game.source.short;
+  if (!value || value.setup === 'none') return { text: 'NOT SET UP', color: 'var(--cc-accent-2)' };
+  if (value.setup === 'gone') return { text: 'FILE GONE', color: 'var(--cc-danger)' };
+  if (value.setup === 'waiting') return { text: `WAITING FOR ${short}`, color: 'var(--cc-accent-2)' };
+  if (!value.live) return { text: `${short} ISN’T RUNNING`, color: 'var(--cc-dim)' };
+  return { text: 'REPORTING', color: 'var(--cc-ok)' };
+}
+
+/**
+ * A widget that reads a game: SET UP until its file is written, then its
+ * options like any other.
+ */
+function GameWidgetRow({
+  widget,
+  file,
+  onSetUp,
+  onOptions,
+}: {
+  widget: GameDescription;
+  file?: string;
+  onSetUp: () => void;
+  onOptions: () => void;
+}) {
+  const value = useTopic<GamePayload>(`game:${widget.id}`);
+  const status = gameStatus(widget, value);
+  const needsSetUp = !value || value.setup === 'none' || value.setup === 'gone';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--cc-line)' }}>
+      <span style={{ width: 6, height: 6, flex: 'none', background: status.color === 'var(--cc-dim)' ? 'var(--cc-line-2)' : status.color }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 9 }}>
+          <GameIcon path={widget.game.source.icon} size={13} color="var(--cc-muted)" />
+          {widget.name}
+          {file && <span className="cc-mini">{file}</span>}
+        </div>
+        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+          {widget.about}
+        </div>
+        <div className="cc-mini" style={{ marginTop: 4, letterSpacing: '0.12em' }}>
+          READS {widget.game.source.game.toUpperCase()}, SENT BY THE GAME TO THIS PC
+        </div>
+      </div>
+      <span className="cc-mini" style={{ flex: 'none', color: status.color }}>
+        {status.text}
+      </span>
+      {!REMOTE_PANEL && (
+        <span style={{ width: 96, flex: 'none', display: 'flex', justifyContent: 'flex-end' }}>
+          {needsSetUp ? (
+            <button
+              className="cc-chip"
+              style={{ padding: '7px 13px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+              onClick={onSetUp}
+            >
+              SET UP
+            </button>
+          ) : (
+            <button className="cc-chip" style={{ padding: '7px 13px' }} onClick={onOptions}>
+              OPTIONS
+            </button>
+          )}
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A game's source, as Sources lists it. */
+function GameSourceRow({ widget }: { widget: GameDescription }) {
+  const value = useTopic<GamePayload>(`game:${widget.id}`);
+  const status = gameStatus(widget, value);
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--cc-line)' }}>
+      <span style={{ width: 6, height: 6, flex: 'none', background: status.text === 'REPORTING' ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 12 }}>{widget.game.source.game}</div>
+        <div className="cc-mini" style={{ marginTop: 4 }}>
+          Sent by the game to Kehai on this PC, once SET UP under Widgets has written its file. Only what its HUD shows.
+        </div>
+      </div>
+      <span className="cc-mini" style={{ flex: 'none', color: status.color }}>
+        {status.text}
+      </span>
+    </div>
+  );
+}
+
+/** Widget files you add yourself, each loaded or said why not. */
+function LocalWidgetRows({ onSetUp, onOptions }: { onSetUp: (id: string) => void; onOptions: (id: string) => void }) {
+  const { folder, files } = localWidgets();
+  return (
+    <>
+      <Group
+        label={`YOUR WIDGETS FOLDER · ${files.length} ${files.length === 1 ? 'FILE' : 'FILES'}`}
+        note="Widgets you add yourself, checked when Kehai starts and whenever the folder changes."
+      />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', background: 'var(--cc-inset)', border: '1px solid var(--cc-line)' }}>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12, color: 'var(--cc-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {folder || '--'}
+        </span>
+        <button
+          className="cc-chip"
+          style={{ padding: '7px 13px' }}
+          onClick={() => bus.publish<WidgetsCommand>('widgets:command', 'panel', { action: 'open' })}
+        >
+          OPEN FOLDER
+        </button>
+      </div>
+      {files.length === 0 && (
+        <div className="cc-mini" style={{ marginTop: 10, lineHeight: 1.6 }}>
+          Empty. A file ending in .widget.json shows here within a few seconds. docs/widgets.md says how to write one.
+        </div>
+      )}
+      {files.map((f) => {
+        const spec = f.error === null && f.id ? registry[f.id] : undefined;
+        if (spec?.game) {
+          return (
+            <GameWidgetRow
+              key={f.name}
+              widget={spec as GameDescription}
+              file={f.name}
+              onSetUp={() => onSetUp(spec.id)}
+              onOptions={() => onOptions(spec.id)}
+            />
+          );
+        }
+        // A file that asks for something this Kehai lacks is not broken, only early.
+        const lacking = f.error?.includes('doesn’t have') ?? false;
+        return (
+          <div key={f.name} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--cc-line)' }}>
+            <span style={{ width: 6, height: 6, flex: 'none', background: lacking ? 'var(--cc-line-2)' : 'var(--cc-danger)' }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 12 }}>{f.name}</div>
+              <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5, color: lacking ? undefined : 'var(--cc-danger)' }}>
+                {f.error}
+              </div>
+            </div>
+            <span className="cc-mini" style={{ flex: 'none', color: lacking ? undefined : 'var(--cc-danger)' }}>
+              NOT LOADED
+            </span>
+            <span style={{ width: 96, flex: 'none' }} />
+          </div>
+        );
+      })}
+    </>
   );
 }
 
@@ -1319,6 +1472,8 @@ export function SettingsScreen({
   /** Opens the arranger on a layout, which need not be the one on screen. */
   onArrange: (layoutId: string) => void;
 }) {
+  // Widgets from the folder join after the first render.
+  useRegistry();
   const {
     settings,
     layout,
@@ -1377,6 +1532,7 @@ export function SettingsScreen({
   const here = layout.shapes[shape];
   // Whose options are open, from Widgets, and the first of its tiles on screen.
   const [optionsFor, setOptionsFor] = useState<string | null>(null);
+  const [settingUp, setSettingUp] = useState<string | null>(null);
   const tileOf = (widget: string) => {
     const i = here.tiles.findIndex((t) => t.widget === widget);
     return i >= 0 ? i : null;
@@ -1719,19 +1875,30 @@ export function SettingsScreen({
           {section === 'WIDGETS' && (
             <>
               <Group
-                label={`BUNDLED WITH KEHAI · ${widgetNames.length}`}
+                label={`BUNDLED WITH KEHAI · ${widgetNames.filter((n) => !registry[n].local).length}`}
                 note="Part of Kehai, and updated with it. Each reads only the computer Kehai runs on."
               />
-              {[...widgetNames]
+              {widgetNames
+                .filter((name) => !registry[name].local)
                 .sort((a, b) => label(a).localeCompare(label(b)))
-                .map((name) => (
-                  <WidgetRow
-                    key={name}
-                    widget={registry[name]}
-                    sources={sources}
-                    onOptions={registry[name].options ? () => setOptionsFor(name) : undefined}
-                  />
-                ))}
+                .map((name) =>
+                  registry[name].game ? (
+                    <GameWidgetRow
+                      key={name}
+                      widget={registry[name] as GameDescription}
+                      onSetUp={() => setSettingUp(name)}
+                      onOptions={() => setOptionsFor(name)}
+                    />
+                  ) : (
+                    <WidgetRow
+                      key={name}
+                      widget={registry[name]}
+                      sources={sources}
+                      onOptions={registry[name].options ? () => setOptionsFor(name) : undefined}
+                    />
+                  )
+                )}
+              {!REMOTE_PANEL && <LocalWidgetRows onSetUp={setSettingUp} onOptions={setOptionsFor} />}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
                 <span className="cc-mini" style={{ flex: 1, lineHeight: 1.6 }}>
                   Which of them are on screen is under Layout.
@@ -1861,6 +2028,11 @@ export function SettingsScreen({
               {!REMOTE_PANEL && <TranscriptRootRow value={settings.transcriptRoot} onCommit={setTranscriptRoot} />}
               <SourceRow label="Media session" topic="media:now_playing" desc="Track, position and transport." />
               <NotifyRow />
+              {widgetNames
+                .filter((name) => registry[name].game)
+                .map((name) => (
+                  <GameSourceRow key={name} widget={registry[name] as GameDescription} />
+                ))}
             </div>
           )}
 
@@ -1963,6 +2135,9 @@ export function SettingsScreen({
             onArrange(settings.layoutId);
           }}
         />
+      )}
+      {settingUp && registry[settingUp]?.game && (
+        <GameSetup widget={registry[settingUp] as GameDescription} onClose={() => setSettingUp(null)} />
       )}
     </div>
   );

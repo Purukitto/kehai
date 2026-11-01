@@ -3,6 +3,7 @@ pub mod cpu;
 pub mod disk;
 pub mod display;
 pub mod flow;
+pub mod game;
 pub mod media;
 pub mod mem;
 pub mod net;
@@ -11,6 +12,7 @@ pub mod presence;
 pub mod quota;
 mod transcripts;
 pub mod update;
+pub mod widgets;
 
 use tauri::AppHandle;
 
@@ -30,5 +32,7 @@ pub fn spawn_all(app: AppHandle) {
     media::spawn(app.clone());
     update::spawn(app.clone());
     presence::spawn(app.clone());
+    game::spawn(app.clone());
+    widgets::spawn(app.clone());
     notify::spawn(app);
 }

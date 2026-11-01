@@ -1,0 +1,217 @@
+{
+  "kehai": 1,
+  "id": "cs2",
+  "name": "Counter-Strike 2",
+  "about": "Your health, armour, money, weapon and the score, while you play.",
+  "min": [2, 1],
+  "source": {
+    "kind": "valve-gsi",
+    "game": "Counter-Strike 2",
+    "short": "CS2",
+    "icon": "M8 1.8v3.4M8 10.8v3.4M1.8 8h3.4M10.8 8h3.4M8 4.2a3.8 3.8 0 1 0 0 7.6 3.8 3.8 0 1 0 0-7.6",
+    "steamApp": 730,
+    "cfgDir": "game/csgo/cfg",
+    "data": ["provider", "map", "map_round_wins", "round", "player_id", "player_state", "player_weapons", "player_match_stats"],
+    "asks": [
+      "Your health, armour, money and weapons",
+      "The round, the score and who won each round",
+      "Your kills, assists, deaths and MVPs",
+      "The map and the mode"
+    ],
+    "never": ["Other players", "Where anyone is", "When the bomb goes off"]
+  },
+  "match": {"in": "map.phase", "title": "{map.name} · {map.mode}", "phase": "map.phase", "over": ["gameover"]},
+  "subject": {"self": "provider.steamid", "who": "player.steamid", "name": "player.name", "tag": "DEAD"},
+  "lighting": {
+    "edge": [
+      {
+        "when": {"path": "round.bomb", "is": ["planted"]},
+        "color": "#ff3b3b",
+        "pulse": true,
+        "tone": "danger"
+      },
+      {
+        "when": {"path": "player.state.burning", "above": 0},
+        "color": "#ff7a1a",
+        "pulse": true,
+        "tone": "first"
+      },
+      {
+        "when": {"path": "player.state.health", "below": 30, "above": 0},
+        "color": "#ff4d4d",
+        "pulse": true,
+        "tone": "danger"
+      },
+      {
+        "when": {"path": "round.phase", "is": ["over"]},
+        "color": "winner",
+        "tone": "second"
+      },
+      {
+        "when": {"path": "round.phase", "is": ["freezetime"]},
+        "color": "you",
+        "tone": "second"
+      }
+    ],
+    "overlays": [
+      {"path": "player.state.flashed", "max": 255, "color": "#ffffff", "tone": "text"},
+      {"path": "player.state.smoked", "max": 255, "color": "#9a9a9a", "tone": "muted"}
+    ]
+  },
+  "readings": [
+    {
+      "id": "score",
+      "display": "teams",
+      "name": "Score and round",
+      "about": "CT – T, the round, LIVE or BOMB PLANTED, and who won each round so far.",
+      "unless": {"path": "map.mode", "is": ["deathmatch", "gungameprogressive", "gungametrbomb", "custom"]},
+      "you": "player.team",
+      "sides": [
+        {"label": "CT", "is": "CT", "score": "map.team_ct.score", "color": "second", "wins": "ct_", "hex": "#6f9ce6"},
+        {"label": "T", "is": "T", "score": "map.team_t.score", "color": "first", "wins": "t_", "hex": "#e8a43c"}
+      ],
+      "round": {
+        "path": "map.round",
+        "add": 1,
+        "of": {
+          "path": "map.mode",
+          "values": {"competitive": 24, "premier": 24, "wingman": 16, "scrimcomp2v2": 16}
+        }
+      },
+      "history": "map.round_wins",
+      "phase": [
+        {
+          "path": "map.phase",
+          "labels": {"warmup": "WARMUP", "intermission": "HALF TIME", "gameover": "MATCH OVER"}
+        },
+        {
+          "path": "round.phase",
+          "labels": {"live": "LIVE", "freezetime": "BUY TIME", "over": "ROUND OVER"}
+        }
+      ],
+      "alert": {"path": "round.bomb", "is": ["planted"], "text": "BOMB PLANTED"},
+      "winner": "round.win_team"
+    },
+    {
+      "id": "vitals",
+      "display": "meters",
+      "name": "Health and armour",
+      "about": "With a helmet tag. Red under 30.",
+      "items": [
+        {
+          "label": "HEALTH",
+          "value": "player.state.health",
+          "max": 100,
+          "low": 30,
+          "ramp": [{"above": 60, "color": "#5fd17a"}, {"above": 29, "color": "#f2c037"}, {"above": -1, "color": "#ff4d4d"}]
+        },
+        {
+          "label": "ARMOR",
+          "value": "player.state.armor",
+          "max": 100,
+          "tag": {"path": "player.state.helmet", "text": "HELMET"},
+          "color": "#8fb4dc"
+        }
+      ]
+    },
+    {
+      "id": "money",
+      "display": "numbers",
+      "name": "Money",
+      "about": "What there is to spend this round.",
+      "unless": {"path": "map.mode", "is": ["deathmatch"]},
+      "items": [{"label": "MONEY", "value": "player.state.money", "prefix": "$", "color": "#8fd16b"}]
+    },
+    {
+      "id": "weapon",
+      "display": "item",
+      "name": "Weapon and ammo",
+      "about": "The one in hand, the magazine and what’s left.",
+      "label": "WEAPON",
+      "item": "player.weapons.*[state=active].name",
+      "strip": "weapon_",
+      "count": "player.weapons.*[state=active].ammo_clip",
+      "max": "player.weapons.*[state=active].ammo_clip_max",
+      "rest": "player.weapons.*[state=active].ammo_reserve",
+      "names": {
+        "weapon_ak47": "AK-47",
+        "weapon_m4a1": "M4A4",
+        "weapon_m4a1_silencer": "M4A1-S",
+        "weapon_awp": "AWP",
+        "weapon_deagle": "DESERT EAGLE",
+        "weapon_glock": "GLOCK-18",
+        "weapon_usp_silencer": "USP-S",
+        "weapon_hkp2000": "P2000",
+        "weapon_p250": "P250",
+        "weapon_fiveseven": "FIVE-SEVEN",
+        "weapon_tec9": "TEC-9",
+        "weapon_cz75a": "CZ75-AUTO",
+        "weapon_elite": "DUAL BERETTAS",
+        "weapon_revolver": "R8 REVOLVER",
+        "weapon_famas": "FAMAS",
+        "weapon_galilar": "GALIL AR",
+        "weapon_aug": "AUG",
+        "weapon_sg556": "SG 553",
+        "weapon_ssg08": "SSG 08",
+        "weapon_scar20": "SCAR-20",
+        "weapon_g3sg1": "G3SG1",
+        "weapon_mac10": "MAC-10",
+        "weapon_mp9": "MP9",
+        "weapon_mp7": "MP7",
+        "weapon_mp5sd": "MP5-SD",
+        "weapon_ump45": "UMP-45",
+        "weapon_p90": "P90",
+        "weapon_bizon": "PP-BIZON",
+        "weapon_nova": "NOVA",
+        "weapon_xm1014": "XM1014",
+        "weapon_sawedoff": "SAWED-OFF",
+        "weapon_mag7": "MAG-7",
+        "weapon_m249": "M249",
+        "weapon_negev": "NEGEV",
+        "weapon_taser": "ZEUS X27",
+        "weapon_knife": "KNIFE",
+        "weapon_knife_t": "KNIFE",
+        "weapon_hegrenade": "HE GRENADE",
+        "weapon_flashbang": "FLASHBANG",
+        "weapon_smokegrenade": "SMOKE",
+        "weapon_molotov": "MOLOTOV",
+        "weapon_incgrenade": "INCENDIARY",
+        "weapon_decoy": "DECOY",
+        "weapon_c4": "C4"
+      },
+      "low": {"below": 0.25, "color": "#f2c037"}
+    },
+    {
+      "id": "match",
+      "display": "stats",
+      "name": "This match",
+      "about": "Kills, assists, deaths and MVPs.",
+      "own": true,
+      "label": "THIS MATCH",
+      "items": [
+        {"label": "KILLS", "short": "K", "value": "player.match_stats.kills"},
+        {"label": "ASSISTS", "short": "A", "value": "player.match_stats.assists"},
+        {"label": "DEATHS", "short": "D", "value": "player.match_stats.deaths"},
+        {"label": "MVP", "short": "MVP", "value": "player.match_stats.mvps"}
+      ]
+    },
+    {
+      "id": "round-kills",
+      "display": "line",
+      "name": "This round",
+      "about": "Kills and headshots this round.",
+      "label": "THIS ROUND",
+      "text": "{player.state.round_kills} KILLS · {player.state.round_killhs} HEADSHOTS",
+      "unless": {"path": "map.mode", "is": ["deathmatch"]}
+    },
+    {
+      "id": "equipment",
+      "display": "numbers",
+      "name": "Equipment value",
+      "about": "What is being carried, as the buy menu counts it.",
+      "on": false,
+      "unless": {"path": "map.mode", "is": ["deathmatch"]},
+      "items": [{"label": "EQUIPMENT", "value": "player.state.equip_value", "prefix": "$", "color": "#8fd16b"}]
+    }
+  ]
+}

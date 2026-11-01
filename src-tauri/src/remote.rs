@@ -55,9 +55,10 @@ const SILENT_FOR: Duration = Duration::from_secs(60);
 const POLL: Duration = Duration::from_millis(100);
 /// Not for remote eyes: this server's own settings, key included, an update a
 /// remote panel could not install anyway, the host's monitors and window,
-/// which a browser has no part in, whether anyone is at the host's desk, and
-/// the host's log.
-const PRIVATE_TOPICS: [&str; 7] = [
+/// which a browser has no part in, whether anyone is at the host's desk, the
+/// host's log, where its games are and the widget files in its folder. A
+/// game's own state is not here: a tablet shows its tile like any other.
+const PRIVATE_TOPICS: [&str; 9] = [
     TOPIC,
     "app:update",
     "app:displays",
@@ -65,6 +66,8 @@ const PRIVATE_TOPICS: [&str; 7] = [
     "os:presence",
     "app:log",
     "app:log-copy",
+    "game:setup",
+    "widgets:local",
 ];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;
@@ -167,8 +170,9 @@ impl Shared {
 }
 
 /// Compares in time that does not depend on where the inputs first differ, so
-/// the key cannot be found a byte at a time by timing refusals.
-fn same(a: &[u8], b: &[u8]) -> bool {
+/// the key cannot be found a byte at a time by timing refusals. The games'
+/// keys are checked with it too.
+pub(crate) fn same(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 

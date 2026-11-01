@@ -7,9 +7,13 @@ import type { Section } from '../settings/SettingsScreen';
  */
 export interface Nav {
   openSettings: (section: Section) => void;
+  /** The game widget shown full screen, if one is. */
+  full: string | null;
+  /** Shows a game widget full screen, or the layout again with null. */
+  setFull: (widget: string | null) => void;
 }
 
-const NavContext = createContext<Nav>({ openSettings: () => undefined });
+const NavContext = createContext<Nav>({ openSettings: () => undefined, full: null, setFull: () => undefined });
 
 export const NavProvider = NavContext.Provider;
 

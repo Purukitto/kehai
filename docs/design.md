@@ -168,6 +168,12 @@ Thirteen is the whole vocabulary: three backgrounds, one inset, two line weights
 three text weights, two accents, a danger and an ok. Anything a widget needs that is
 not in that list is a sign the widget is over-designed.
 
+A game widget is the one exception. It may bring its game's own colours and light its
+tile's edge, as RGB lighting does for the same game, because a player already reads
+those colours without thinking: their side, health going red. The lighting only moves
+while something is happening in the match, which keeps to the rule above, and a
+player can always put the theme's colours back.
+
 ## Responsiveness is per-tile
 
 There are no viewport breakpoints. A widget branches on the size of *its own grid

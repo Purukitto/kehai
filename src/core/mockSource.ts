@@ -1,4 +1,5 @@
 import { bus } from './bus';
+import { startMockGame } from './mockGame';
 import type {
   AgentsPayload,
   ArtPayload,
@@ -533,6 +534,9 @@ export function startMockSource(options: MockOptions = {}): () => void {
   pubLog();
   lookPresence();
 
+  // Everything the game widgets read, unless the engine owns all of it.
+  const stopGame = skip.has('game:cs2') ? () => undefined : startMockGame(pub);
+
   tick();
   slowTick();
   timers.push(window.setInterval(tick, 1000));
@@ -550,6 +554,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
     unsubUpdate();
     unsubPresence();
     unsubShown();
+    stopGame();
     INPUT.forEach((type) => window.removeEventListener(type, onInput, { capture: true }));
     timers.forEach((id) => window.clearInterval(id));
   };

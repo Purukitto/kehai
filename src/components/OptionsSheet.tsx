@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { registry } from '../widgets/registry';
+import { registry, useRegistry } from '../widgets/registry';
+import { GameIcon } from './GameSetup';
 
 /** Which widget's options are open, and the tile they were opened from. */
 export interface Held {
@@ -33,6 +34,8 @@ export function OptionsSheet({
   onArrange: () => void;
   inSettings?: boolean;
 }) {
+  // Widgets from the folder join after the first render.
+  useRegistry();
   const spec = registry[held.widget];
   const Options = spec?.options;
   const name = spec?.name ?? held.widget;
@@ -97,6 +100,7 @@ export function OptionsSheet({
             borderBottom: '1px solid var(--cc-line)',
           }}
         >
+          <GameIcon path={spec?.game?.source.icon ?? null} color="var(--cc-accent)" />
           <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2em' }}>{name.toUpperCase()}</span>
           <span className="cc-label">OPTIONS</span>
           <div style={{ flex: 1 }} />

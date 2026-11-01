@@ -1,3 +1,5 @@
+import { GameFormatError, parseGame } from './game';
+import type { GameWidget } from './game';
 import { SOURCES, isSourceId } from './sources';
 import type { SourceId } from './sources';
 
@@ -9,6 +11,9 @@ import type { SourceId } from './sources';
  * says what the widget is called, what it shows, the smallest tile it fits
  * and the sources it reads; the code that draws it is found by its id. JSON
  * imports widen tuples to arrays, so even the files that ship go through here.
+ *
+ * A widget that reads a game brings its own source instead, and readings drawn
+ * by displays Kehai has, so it needs no code of its own: see `game.ts`.
  */
 
 export class WidgetError extends Error {}
@@ -24,8 +29,10 @@ export interface WidgetDescription {
   about: string;
   /** Minimum size in grid cells, [cols, rows]. */
   min: [number, number];
-  /** The sources it reads, by id. */
+  /** The sources it reads, by id. None for a widget that brings its own. */
   sources: SourceId[];
+  /** For a widget that reads a game: its source and readings. */
+  game?: GameWidget;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -44,13 +51,22 @@ export function parseWidget(input: unknown): WidgetDescription {
   if (!Array.isArray(min) || min.length !== 2 || !min.every((n) => Number.isInteger(n) && n >= 1 && n <= 16)) {
     throw new WidgetError(`${id}: min must be [cols, rows], each 1-16`);
   }
+  const description = { id, name, about, min: [min[0], min[1]] as [number, number] };
+  if (input.source !== undefined) {
+    try {
+      return { ...description, sources: [], game: parseGame(input, id) };
+    } catch (err) {
+      throw err instanceof GameFormatError ? new WidgetError(err.message) : err;
+    }
+  }
   if (!Array.isArray(sources) || !sources.length) throw new WidgetError(`${id}: sources must name at least one source`);
   const unknown = sources.find((s) => !isSourceId(s));
   if (unknown !== undefined) throw new WidgetError(`${id}: there is no source called ${String(unknown)}`);
-  return { id, name, about, min: [min[0], min[1]], sources: [...new Set(sources as SourceId[])] };
+  return { ...description, sources: [...new Set(sources as SourceId[])] };
 }
 
 /** Every topic a widget's sources publish on, in the order its sources are listed. */
 export function topicsOf(widget: WidgetDescription): string[] {
+  if (widget.game) return [`game:${widget.id}`];
   return [...new Set(widget.sources.flatMap((s) => SOURCES[s].topics))];
 }
