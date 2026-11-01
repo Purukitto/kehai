@@ -24,6 +24,11 @@ const AUTO_INTERVAL: Duration = Duration::from_secs(24 * 60 * 60);
 /// The plugin sets no timeout of its own, and a connection that hangs would
 /// wedge this thread for good.
 const CHECK_TIMEOUT: Duration = Duration::from_secs(20);
+/// For opening a connection, shared out across every address a name resolves
+/// to. GitHub serves release files from four, and from some networks one of
+/// them never answers; without this the first attempt waits on it until the
+/// check times out, and the next address is never tried.
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Covers the whole transfer, not just the connect.
 const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(600);
 /// The chunk callback fires per network read; the renderer needs far fewer.
@@ -130,7 +135,10 @@ fn describe(err: &UpdaterError) -> String {
 }
 
 fn updater(app: &AppHandle) -> tauri_plugin_updater::Result<Updater> {
-    let mut builder = app.updater_builder().timeout(CHECK_TIMEOUT);
+    let mut builder = app
+        .updater_builder()
+        .timeout(CHECK_TIMEOUT)
+        .configure_client(|client| client.connect_timeout(CONNECT_TIMEOUT));
     if let Ok(endpoint) = std::env::var(ENDPOINT_ENV) {
         eprintln!("poller.update: checking {endpoint} instead of the release feed");
         builder = builder.endpoints(vec![Url::parse(&endpoint)?])?;
