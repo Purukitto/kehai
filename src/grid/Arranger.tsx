@@ -2,7 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { SHAPES, SHAPE_ASPECT, firstFree, overlaps, withGrid, withTiles, withoutTile } from '../core/layout';
 import { PRESETS, findLayout, isPreset, useSettings } from '../core/settings';
 import type { Area, Arrangement, Shape, Tile } from '../core/types';
-import { registry } from '../widgets/registry';
+import { registry, useRegistry } from '../widgets/registry';
 
 type Mode = 'move' | 'resize';
 
@@ -69,6 +69,8 @@ export function Arranger({
   initialShape: Shape;
   onDone: () => void;
 }) {
+  // Widgets from the folder join after the first render.
+  useRegistry();
   const { settings, editArrangement } = useSettings();
   // Follows the copy once the first edit to a preset has made one.
   const [target, setTarget] = useState(layoutId);

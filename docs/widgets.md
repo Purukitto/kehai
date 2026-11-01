@@ -3,6 +3,8 @@
 [Documentation](README.md) › Widgets and sources
 
 - [Widgets](#widgets)
+- [Game widgets](#game-widgets)
+- [Writing a game widget](#writing-a-game-widget)
 - [Sources by platform](#sources-by-platform)
 - [When a source is unavailable](#when-a-source-is-unavailable)
 
@@ -19,6 +21,7 @@
 | **Notifications** `notify` | System notification feed, dismissable | notifications |
 | **Clock** `clock` | Time and date; hours over minutes in a tall tile | clock |
 | **Focus timer** `sprint` | Start, pause, skip, reset | focus timer |
+| **Counter-Strike 2** `cs2` | Your health, armour, money, weapon, the score and your match, while you play | Counter-Strike 2, sent by the game to this PC |
 
 Every widget lays itself out for the size of its tile, so the same widget is a full
 pane in one layout and a single row in another.
@@ -77,6 +80,103 @@ has been open for half a minute but never claims it is waiting on you.
 
 What these read, and what they never read, is in [Privacy](privacy.md).
 
+## Game widgets
+
+A game widget shows what a game sends to Kehai on this PC, through a route its
+publisher offers. Kehai never reads a game's memory, injects into it or watches its
+screen, and a game widget shows only what the game already shows you.
+
+### Counter-Strike 2
+
+Uses Valve's game state integration, the route Valve describes for lighting, overlays
+and peripherals on the player's PC.
+
+1. Put the **Counter-Strike 2** tile on a layout, from **Settings → Layout → On this
+   layout** or the arranger.
+2. Press **Set up** on the tile, or under **Settings → Widgets**. Kehai finds CS2
+   through Steam's list of library folders, or asks for its folder, and shows the file
+   it will write, what it asks the game for and what it never asks for.
+3. **Write the file** puts `gamestate_integration_kehai_cs2.cfg` in
+   `game\csgo\cfg`. Start CS2, or restart it: it reads the file when it starts.
+
+The tile then shows the score and round, LIVE or BOMB PLANTED, who won each round,
+your health and armour (red under 30), money, the weapon in your hands with its ammo,
+and your kills, assists, deaths and MVPs. Dead and watching a teammate, it shows theirs
+and says so, while **This match** stays yours. Between matches it keeps the last
+match's result. Deathmatch has no rounds or money, so those go. A small tile keeps the
+first readings in that list and drops the rest; the tile's options turn any of them
+off.
+
+It never shows other players, where anyone is, or the bomb's timer: CS2 does not send
+when the bomb was planted, and a countdown made from it is an aid some leagues ban.
+
+It wears CS2's own colours, the way RGB lighting for the game does, so it reads from
+the corner of your eye: each side in its colour, health green above 60, amber above 29
+and red below, armour steel blue, money green, and the ammo amber when the magazine is
+nearly empty. The tile's edge lights up too: your side's colour at buy time, the
+winner's when a round ends, orange while you burn, and red, breathing, while your
+health is low or the bomb is down. A flash washes the tile white as it fades on your
+screen, and smoke grey. **Colours** in its options switch to the theme's, and
+**Lighting** turns the edge and the washes off. Nothing breathes with reduced motion
+turned on in Windows.
+
+A tap on the tile shows it full screen, and another tap, or the header's button, goes
+back. **When a match goes live**, in its options, can do either for you: put a layout
+of your choice on screen, or the tile full screen, and go back when the match ends or
+after two minutes in the menu. Nothing unless you choose. Picking a layout yourself
+during the match keeps that one.
+
+**Remove**, in the options, deletes Kehai's file. Other programs' files in that folder,
+such as Overwolf's, are left as they are.
+
+FACEIT lists game config files as safe, but has not said whether its anti-cheat minds
+another program running alongside. If you play there, one match settles it.
+
+## Writing a game widget
+
+A game widget is a single `.widget.json` file: data, never code. Put it in the widgets
+folder (**Settings → Widgets → Your widgets folder → Open folder**) and Kehai checks it
+within a few seconds. A file that does not pass is listed with why, and never half
+loaded. `src/widgets/cs2.widget.json` is a complete example.
+
+Beside the usual `kehai`, `id`, `name`, `about` and `min`, it has:
+
+| Field | What it says |
+| --- | --- |
+| `source` | Where the state comes from. `kind` is `valve-gsi`, the only kind so far, with `steamApp` (the game's Steam app id), `cfgDir` (its settings folder, inside the game's), `data` (the blocks to ask for, as the game names them), `game` and `short` (its names), `icon` (an SVG path on a 16 × 16 grid, one colour, never a game's own logo unless its publisher allows), and `asks` and `never`, which SET UP shows |
+| `match` | `in`: a value present only during a match. `title`: what the header says, with `{path}` for values. `phase` and `over`: when the match has ended |
+| `subject` | Optional. `self` and `who`: the player's id and the id the state is about. When they differ the tile says `tag` and whose state it is, by `name` |
+| `lighting` | Optional. `edge`: rules in order, each `when` (a condition), `color` (`#rrggbb`, `you` for the player's side, or `winner`), `pulse` and `tone` (the theme colour to use instead). `overlays`: washes, each `path`, `max`, `color` and `tone` |
+| `readings` | 1 to 12, in order of importance, each drawn by one of Kehai's displays |
+
+Each reading has an `id`, a `name` and an `about` for its options, and can say `on:
+false` to wait to be turned on, `when` or `unless` (`{ "path", "is": [values] }`, or
+`"below"` and `"above"` for a number) to apply only sometimes, and `own: true` to stay
+the player's while they watch someone. Colours are the game's own, as `#rrggbb`: a
+side's `hex`, a meter's `color` or `ramp` (steps of `above` and `color`), a number's
+`color`, and an item's `low` (`below`, a share of `max`, and `color`). A player can
+always switch them to the theme's.
+The displays:
+
+| `display` | Draws | Fields |
+| --- | --- | --- |
+| `teams` | Two sides' scores, the round, its phase and who won each round | `you`, `sides` (two, each `label`, `is`, `score`, `color`, `wins`), `round`, `history`, `phase`, `alert` |
+| `meters` | Values out of a maximum, as ten blocks | `items`: `label`, `value`, `max`, `low`, `tag` |
+| `numbers` | Plain values | `items`: `label`, `value`, `prefix` |
+| `item` | One thing in hand, with a count | `label`, `item`, `names`, `strip`, `count`, `max`, `rest` |
+| `stats` | A row of small values | `label`, `items`: `label`, `short`, `value` |
+| `line` | A line of text | `label`, `text` with `{path}` for values |
+
+A value is found by path: keys joined by dots (`player.state.health`), `*` for any one
+key's value, and `*[key=value]` for the one whose `key` is `value`
+(`player.weapons.*[state=active].name`). Kehai asks the game only for the `data` blocks
+the file names and drops anything else it sends, so a widget only ever sees what its
+file asked for.
+
+Before writing one for a game, read the game's terms and what its publisher offers:
+a widget should use only a route the publisher documents or plainly allows, and show
+only what the game already shows you.
+
 ## Sources by platform
 
 | Source | Windows | Linux | macOS |
@@ -90,6 +190,7 @@ What these read, and what they never read, is in [Privacy](privacy.md).
 | Agent sessions | optional — the same transcripts | same | same |
 | Focus timer | kept by the engine | same | same |
 | Whether you are at the computer | time since the last input, and the lock | not wired | not wired |
+| A game's state | sent by the game to `127.0.0.1` once set up; Steam found through the registry | the same; Steam found in your home folder | not wired |
 
 ## When a source is unavailable
 

@@ -149,7 +149,8 @@ header on a touchscreen. [Using Kehai](docs/using.md) covers the rest.
 - The only request it makes is the update check, and only when you ask for one or turn
   on daily checks.
 - It listens for nothing until you turn on the remote panel, and then only shows data
-  to a device holding the key.
+  to a device holding the key. A game you set up reaches it on this PC only, with a key
+  of its own.
 - It reads no notifications until you press **Allow**, and no prompt or response text
   from agent transcripts, ever.
 

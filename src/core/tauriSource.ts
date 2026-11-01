@@ -38,6 +38,9 @@ export const ENGINE_TOPICS = [
   'app:log',
   'app:log-copy',
   'os:presence',
+  'game:setup',
+  'game:cs2',
+  'widgets:local',
 ];
 
 /** Topics that travel renderer → engine. The only write path in the app. */
@@ -54,6 +57,8 @@ export const COMMAND_TOPICS = [
   'window:command',
   'log:command',
   'log:context',
+  'game:command',
+  'widgets:command',
 ];
 
 export async function startTauriSource(): Promise<() => void> {

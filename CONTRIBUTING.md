@@ -77,6 +77,12 @@ topics on a bus, and consumed by widgets that subscribe to topics. Nothing else 
 4. Reference it by id from a layout in `src/layouts/`, or turn it on from
    **Settings → Layout → On this layout** at runtime.
 
+A widget that reads a game needs no component: its file brings a `source` and
+`readings` instead of `sources`, and `src/widgets/Game.tsx` draws it. Add the file to
+`BUNDLED` in the registry, or drop it in the widgets folder to try it. [Writing a game
+widget](docs/widgets.md#writing-a-game-widget) has the format. Read the game's terms
+first, and use only a route its publisher documents or plainly allows.
+
 Use the shared chrome in `src/widgets/chrome.tsx` (`Pane`, `Meter`, `Awaiting`) rather
 than rolling your own. `Pane` must keep `flex: 1` or the grid cell shows through behind
 it.

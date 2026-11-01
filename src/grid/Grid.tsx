@@ -1,7 +1,7 @@
 import { HOLD_MS, RING_AFTER_MS, useHold } from '../core/hold';
 import { TileSizeProvider } from '../core/TileSize';
 import type { Arrangement, WidgetSpec } from '../core/types';
-import { registry } from '../widgets/registry';
+import { registry, useRegistry } from '../widgets/registry';
 
 /** The ring that fills under a finger while a tile is held. */
 function HoldRing({ x, y }: { x: number; y: number }) {
@@ -67,6 +67,8 @@ export function Grid({
   /** The tile's place in the arrangement, and the tile itself. */
   onHold?: (tile: number, el: HTMLElement) => void;
 }) {
+  // Widgets from the folder join after the first render.
+  useRegistry();
   return (
     <div
       className="cc-tiles"

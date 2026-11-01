@@ -9,6 +9,36 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- A **Counter-Strike 2** widget: your health, armour, money, the weapon in your hands
+  and its ammo, the score and round, who won each round, BOMB PLANTED, and your kills,
+  assists, deaths and MVPs, while you play. Dead and watching a teammate, it shows
+  theirs and says so. Between matches it keeps the last match's result. It fits itself
+  to any tile, from one row to the whole panel, and tablets show it too.
+- **Set up** for CS2, on its tile or under **Settings → Widgets**, finds the game
+  through Steam and writes one file into its settings folder, the route Valve
+  documents for overlays and peripherals. It shows you where first, what it asks the
+  game for and what it never does: other players, where anyone is, or the bomb's
+  timer. **Remove** takes the file out again, and other programs' files are left alone.
+- The CS2 tile wears CS2's own colours, as RGB lighting does: each side's colour,
+  health from green to red, money green. Its edge lights up in your side's colour at
+  buy time, red while the bomb is down or your health is low, and orange while you
+  burn, and a flash or smoke washes over it. Its options can use the theme's colours
+  instead, or turn the lighting off.
+- Tap the CS2 tile to show it full screen, and tap again to go back.
+- In the CS2 tile's options, choose which readings it shows, and what happens when a
+  match goes live: nothing, a layout of your choice, or the tile full screen. Nothing
+  unless you choose.
+- A widgets folder for game widgets you write yourself, as one `.widget.json` file
+  each: data, never code. **Settings → Widgets** lists each file, and why one did not
+  load. `docs/widgets.md` says how to write one.
+
+### Changed
+
+- Kehai now also listens on `127.0.0.1`, for a game you have set up and only while one
+  is. Nothing on your network can reach it, and a game's post needs the key in its file.
+
 ## [0.10.0] - 2026-11-01
 
 ### Added

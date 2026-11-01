@@ -38,7 +38,8 @@ surface is what it reads and what it exposes:
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
   `notify:command`, `notify:rules`, `flow:command`, `quota:command`, `update:command`,
-  `remote:command`, `display:command` and `presence:command`. `notify:rules` says which
+  `remote:command`, `display:command`, `presence:command`, `game:command` and
+  `widgets:command`. `notify:rules` says which
   apps' notifications reach the panel and what remote panels see; a remote panel can
   never send it, and until it arrives remote panels are shown none. `media:command` drives
   the player and this computer's volume, with positions and levels the engine puts in
@@ -50,8 +51,12 @@ surface is what it reads and what it exposes:
   with are compiled in. `remote:command` turns the remote panel on or off, picks its
   port and whether remote panels may press buttons, or replaces its key.
   `display:command` picks the display Kehai is for, and `presence:command` how long
-  without input counts as away. A path that lets renderer content reach anything else
-  in the engine is in scope.
+  without input counts as away. `game:command` finds a game through Steam, opens a
+  folder picker, writes or removes Kehai's own file in that game's cfg folder, or shows
+  that folder; the engine checks the widget's source again before writing, keeps the
+  folder inside the game's, and writes only block names. `widgets:command` opens the
+  widgets folder. A path that lets renderer content reach anything else in the engine
+  is in scope.
 - **Network requests.** Kehai makes none other than, when you ask for it, the update
   check and download. The font is bundled. While the remote panel is on, it announces
   this computer's name and port over mDNS on the local network, and nothing else. A
@@ -64,6 +69,13 @@ surface is what it reads and what it exposes:
   command, or getting the engine to touch a file or a URL through this server is in
   scope. Its traffic being readable on the network is not: it is plain HTTP, and
   [the remote panel's documentation](docs/remote-panel.md#security) says so.
+- **Game state.** While a game is set up, `pollers/game.rs` listens on `127.0.0.1`
+  only, and keeps a post only if it carries the key written into that game's file,
+  without the key and without any block the widget did not ask for. Reaching it from
+  another machine, getting a post accepted without the key, getting the key onto the
+  bus or a remote panel, or getting Kehai to write anywhere but its own file in the
+  game's cfg folder is in scope. A widget file is data: one that gets the panel to run
+  code is in scope.
 - **Updates.** An installer is only run if its minisign signature verifies against the
   public key in the build, and the signature names the version it was made for, so a
   tampered `latest.json` cannot pair a new version number with an older installer.

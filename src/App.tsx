@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { createElement, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { displayLabel } from './components/DisplayMap';
 import { HideSheet } from './components/HideSheet';
@@ -36,15 +36,18 @@ import type {
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
 import { HideText } from './core/quiet';
-import { useSettings } from './core/settings';
+import { useMatchLayout } from './core/matchLayout';
+import { findLayout, useSettings } from './core/settings';
 import type { QuietShow } from './core/settings';
 import { SOURCES, SOURCE_IDS } from './core/sources';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
+import { TileSizeProvider } from './core/TileSize';
 import { useTopic } from './core/useTopic';
 import { useWindowShape } from './core/useWindowShape';
 import { Arranger } from './grid/Arranger';
 import { Grid } from './grid/Grid';
 import { SettingsScreen } from './settings/SettingsScreen';
+import { registry } from './widgets/registry';
 import type { Section } from './settings/SettingsScreen';
 import { Setup } from './setup/Setup';
 
@@ -202,6 +205,7 @@ export default function App() {
   const shell = useTopic<WindowPayload>('app:window');
   const logState = useTopic<LogPayload>('app:log');
   const [hiding, setHiding] = useState(false);
+  const { full, setFull } = useMatchLayout();
 
   useEffect(() => {
     if (!remoteNote) return;
@@ -460,6 +464,7 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
       }
 
       if (e.key === 'Escape') {
+        setFull(null);
         setMode('dashboard');
         setHiding(false);
       }
@@ -621,6 +626,21 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         <span className="cc-mini" style={{ fontSize: 10 }} title={source.title}>
           {source.label}
         </span>
+        {full && registry[full] && (
+          <button
+            className="cc-chip"
+            style={{ padding: '5px 10px', marginRight: 4, color: 'var(--cc-accent-2)', borderColor: 'var(--cc-accent-2)', whiteSpace: 'nowrap' }}
+            onClick={() => setFull(null)}
+          >
+            {(registry[full].game?.source.short ?? registry[full].name).toUpperCase()} FULL SCREEN · BACK TO {layout.name.toUpperCase()}
+          </button>
+        )}
+        {settings.matchLayout && settings.layoutId === settings.matchLayout.to && (
+          // The second accent, as for the game's own side: this is the game's doing, not an agent's.
+          <span className="cc-mini" style={{ color: 'var(--cc-accent-2)', marginRight: 4, whiteSpace: 'nowrap' }}>
+            FOR THIS MATCH · BACK TO {(findLayout(settings, settings.matchLayout.from)?.name ?? 'YOURS').toUpperCase()} AFTER
+          </span>
+        )}
         <LayoutSwitcher
           onManage={() => {
             setSettingsAt('LAYOUT');
@@ -678,6 +698,8 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
               setSettingsAt(section);
               setMode('settings');
             },
+            full,
+            setFull,
           }}
         >
           {/* Every tile dims while the host is away: what they show is as old as the header says. */}
@@ -696,6 +718,14 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
               }}
             />
           </div>
+          {/* A game tile over the whole panel, with the props of its tile on this layout. */}
+          {full && registry[full] && (
+            <TileSizeProvider style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
+              {createElement(registry[full].component, {
+                props: layout.shapes[shape].tiles.find((t) => t.widget === full)?.props ?? {},
+              })}
+            </TileSizeProvider>
+          )}
         </NavProvider>
         {stale && <Stale heard={stale.heard} retryAt={stale.state === 'offline' ? stale.retryAt : null} />}
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}

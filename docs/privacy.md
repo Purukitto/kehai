@@ -9,7 +9,7 @@ read.
 - [What it writes](#what-it-writes)
 - [What it sends](#what-it-sends)
 - [What it listens for](#what-it-listens-for)
-- [Four sources worth stating plainly](#four-sources-worth-stating-plainly)
+- [Five sources worth stating plainly](#five-sources-worth-stating-plainly)
 
 ## What it writes
 
@@ -21,6 +21,13 @@ All in its own app-data folder:
 | `display.json` | Which display Kehai is for | So it opens there, before the window is shown |
 | `remote.json` | The remote panel's key, once you turn the remote panel on | So paired devices stay paired |
 | `window.json` | Whether Kehai has a taskbar button, and whether it shows the panel when it starts | So both apply before the window is shown |
+| `games.json` | Each game you set up: where it is, the key in its file, and the port | So the game still reaches Kehai after a restart |
+| `widgets\` | Widget files you add yourself, if you open the folder | Read, never run |
+
+Outside that folder, Kehai writes one file and only when you ask: **SET UP** for a game
+widget puts `gamestate_integration_kehai_<widget>.cfg` in the game's own settings folder,
+after showing you where. **REMOVE** deletes it again, and Kehai never touches another
+program's file there.
 
 Settings, layouts and themes are kept by the renderer, in its own browser storage.
 
@@ -54,8 +61,15 @@ press Create there. The log itself stays on your PC.
 
 ## What it listens for
 
-Nothing, unless you turn on **Settings → Remote**. Then it accepts connections on one
-port from your network, and shows the panel's data only to a device holding the key.
+Nothing, unless you turn on **Settings → Remote** or set up a game.
+
+With the remote panel on, it accepts connections on one port from your network, and
+shows the panel's data only to a device holding the key.
+
+With a game set up, it listens on `127.0.0.1`, so only programs on this PC can reach it,
+on one port it picks the first time (41730 unless that is taken). It accepts only posts
+carrying the key written into that game's file, and drops anything in them the widget's
+file did not ask for. It stops listening once no game is set up.
 
 While it serves, it also announces itself on your local network over mDNS, the way
 printers and speakers are found: this computer's name and the port, never the key, so
@@ -63,7 +77,7 @@ a paired tablet can find it again after the router hands it a new address. The
 pairing link and code carry the same name. Turn the remote panel off and the
 announcement stops. More in [Remote panel](remote-panel.md).
 
-## Four sources worth stating plainly
+## Five sources worth stating plainly
 
 ### Notifications
 
@@ -110,3 +124,14 @@ For the quiet panel, the engine asks Windows once a second how long it has been 
 the last keyboard, mouse, pen or touch input, and whether the session is locked: a
 duration and a yes or no, never what was pressed or where. Neither is kept, and
 neither reaches a remote panel.
+
+### Games
+
+A game widget reads only what the game sends to Kehai on this PC through the
+publisher's own route. For Counter-Strike 2 that is Valve's game state integration,
+which Valve describes for lighting, overlays and peripherals on the player's PC. Kehai
+asks only for what a player gets while playing: their own health, armour, money,
+weapons, kills and the score. It never asks for other players, positions or the
+bomb's timer, and never reads the game's memory or touches the game itself. What the
+game sends is not kept on disk. A remote panel shows the tile as this PC does; the key
+in the game's file never leaves this PC.

@@ -460,3 +460,65 @@ export type LogCommand =
 export interface LogContext {
   text: string;
 }
+
+/**
+ * Engine → renderer on `game:<widget>`: what a set-up game last said. Mirrors
+ * `GamePayload` in `pollers/game.rs`. Remote panels get it too; the key never
+ * reaches it.
+ */
+export interface GamePayload {
+  /** `none` once removed, `waiting` until the game first sends, `set` after, `gone` when Kehai's file is gone. */
+  setup: 'none' | 'waiting' | 'set' | 'gone';
+  heardMs: number | null;
+  /** Heard from within the last heartbeat and a half. */
+  live: boolean;
+  /** The game's last post, only the blocks its widget's file asked for. */
+  data: Record<string, unknown> | null;
+}
+
+/** Where a game was found for SET UP, or why not. Mirrors `Found` in `pollers/game.rs`. */
+export interface GameFound {
+  widget: string;
+  folder: string | null;
+  by: 'steam' | 'chosen';
+  /** Where Kehai's file would go. */
+  file: string | null;
+  /** Other programs' game state files in that folder, left as they are. */
+  others: string[];
+  reason: string | null;
+}
+
+/** Engine → local renderer on `game:setup`. Mirrors `SetupPayload` in `pollers/game.rs`. */
+export interface GameSetupPayload {
+  supported: boolean;
+  port: number | null;
+  listening: boolean;
+  error: string | null;
+  games: { widget: string; name: string; folder: string; file: string; writtenMs: number }[];
+  found: GameFound | null;
+}
+
+/** What the engine needs of a widget's game source. Mirrors `Source` in `pollers/game.rs`. */
+export interface GameSourceSpec {
+  kind: 'valve-gsi';
+  steamApp: number;
+  cfgDir: string;
+  data: string[];
+}
+
+/** Renderer → engine on `game:command`. Mirrors `Command` in `pollers/game.rs`. */
+export type GameCommand =
+  | { action: 'find'; widget: string; source: GameSourceSpec }
+  | { action: 'choose'; widget: string; source: GameSourceSpec }
+  | { action: 'setup'; widget: string; name: string; source: GameSourceSpec; folder: string }
+  | { action: 'remove'; widget: string }
+  | { action: 'open'; widget: string };
+
+/** Engine → local renderer on `widgets:local`: the files in the widgets folder. */
+export interface LocalWidgetsPayload {
+  folder: string;
+  files: { name: string; text: string | null; error: string | null }[];
+}
+
+/** Renderer → engine on `widgets:command`. */
+export type WidgetsCommand = { action: 'open' };

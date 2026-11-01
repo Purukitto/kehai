@@ -71,4 +71,6 @@ export interface WidgetSpec extends WidgetDescription {
   component: ComponentType<WidgetProps>;
   /** Its options, for the ones that have any. */
   options?: ComponentType<OptionsProps>;
+  /** From the widgets folder rather than bundled with Kehai. */
+  local: boolean;
 }
