@@ -8,6 +8,9 @@ import type {
   DisplayCommand,
   DisplaysPayload,
   FlowCommand,
+  LogCommand,
+  LogCopyPayload,
+  LogPayload,
   MediaCommand,
   MediaPayload,
   MemPayload,
@@ -25,6 +28,8 @@ import type {
   UpdateCommand,
   UpdatePayload,
   VolumePayload,
+  WindowCommand,
+  WindowPayload,
 } from './payloads';
 
 /**
@@ -459,9 +464,73 @@ export function startMockSource(options: MockOptions = {}): () => void {
     pub<RemotePayload>('app:remote', 'mock.remote', { ...remote });
   });
 
+  // Sits in a pretend tray, so Settings → Window and the hide sheet can be
+  // built without the engine. Hiding a browser tab does nothing.
+  const shell: WindowPayload = { taskbar: false, start: 'panel', tray: true };
+  const pubShell = () => pub<WindowPayload>('app:window', 'mock.shell', { ...shell });
+  const unsubShell = bus.subscribe('window:command', (e) => {
+    const command = e.data as WindowCommand;
+    if (command.action === 'set_taskbar') shell.taskbar = command.on;
+    if (command.action === 'set_start') shell.start = command.start;
+    pubShell();
+  });
+
+  // A log with something in it, and a crash to dismiss, for Settings → About
+  // and the line under the header.
+  const minutes = (n: number) => Date.now() - n * 60_000;
+  const log: LogPayload = {
+    file: 'C:\\Users\\you\\AppData\\Local\\dev.purukitto.kehai\\logs\\kehai.log',
+    detail: false,
+    problems: [
+      {
+        atMs: minutes(12),
+        src: 'poller.update',
+        level: 'warn',
+        what: 'Checking for updates failed. Could not reach GitHub.',
+        then: 'Press Check to try again.',
+        detail: 'error sending request for url (https://github.com/Purukitto/kehai/releases/latest/download/latest.json)',
+        count: 2,
+      },
+      {
+        atMs: minutes(140),
+        src: 'poller.notify',
+        level: 'warn',
+        what: "Notifications can't be read.",
+        then: 'Settings → Sources says why.',
+        detail: 'Windows refused access.',
+        count: 1,
+      },
+      {
+        atMs: minutes(60 * 22),
+        src: 'kehai',
+        level: 'error',
+        what: 'Kehai closed unexpectedly.',
+        then: 'The log has what happened.',
+        detail: 'panicked on main at src\\pollers\\display.rs:391: no monitor',
+        count: 1,
+      },
+    ],
+    crashedAtMs: minutes(60 * 22),
+  };
+  const pubLog = () => pub<LogPayload>('app:log', 'mock.log', { ...log });
+  const unsubLog = bus.subscribe('log:command', (e) => {
+    const command = e.data as LogCommand;
+    if (command.action === 'detail') log.detail = command.on;
+    if (command.action === 'dismiss_crash') log.crashedAtMs = null;
+    if (command.action === 'copy') {
+      pub<LogCopyPayload>('app:log-copy', 'mock.log', {
+        text: '2026-11-01 21:14:03.120 WARN  poller.update  Checking for updates failed.',
+        atMs: Date.now(),
+      });
+    }
+    pubLog();
+  });
+
   pub<ArtPayload>('media:art', 'mock.media', { dataUrl: null });
   pubUpdate();
   pubDisplays();
+  pubShell();
+  pubLog();
   lookPresence();
 
   tick();
@@ -476,6 +545,8 @@ export function startMockSource(options: MockOptions = {}): () => void {
     unsubDisplay();
     unsubFlow();
     unsubRemote();
+    unsubShell();
+    unsubLog();
     unsubUpdate();
     unsubPresence();
     unsubShown();

@@ -144,7 +144,8 @@ header on a touchscreen. [Using Kehai](docs/using.md) covers the rest.
 
 ## Privacy, in short
 
-- Nothing Kehai reads is uploaded, logged to disk or phoned home.
+- Nothing Kehai reads is uploaded or phoned home. Its log, on your PC, says what Kehai
+  did and never what it read.
 - The only request it makes is the update check, and only when you ask for one or turn
   on daily checks.
 - It listens for nothing until you turn on the remote panel, and then only shows data

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-type Action = 'minimize' | 'toggle' | 'close';
+type Action = 'toggle' | 'close';
 
 interface Light {
   action: Action;
@@ -13,11 +13,15 @@ interface Light {
  * Traffic-light controls, top right.
  *
  * The window is undecorated, so the panel draws its own. Colour carries the
- * meaning and the glyphs only appear on hover, which keeps three controls from
+ * meaning and the glyphs only appear on hover, which keeps the controls from
  * competing with the readouts they sit above — the whole point of the panel is
  * that nothing on it is noise.
+ *
+ * There is no minimise: with no taskbar button it would only hide the panel,
+ * which close does. Close hides it in the tray, where there is one; the
+ * caller decides, and says so the first time.
  */
-export function WindowControls() {
+export function WindowControls({ onClose, closeLabel }: { onClose: () => void; closeLabel: string }) {
   const [maximized, setMaximized] = useState(true);
 
   useEffect(() => {
@@ -34,25 +38,24 @@ export function WindowControls() {
   }, []);
 
   const run = async (action: Action) => {
+    if (action === 'close') {
+      onClose();
+      return;
+    }
     const { getCurrentWindow } = await import('@tauri-apps/api/window');
     const win = getCurrentWindow();
-    if (action === 'minimize') await win.minimize();
-    if (action === 'close') await win.close();
-    if (action === 'toggle') {
-      await win.toggleMaximize();
-      setMaximized(await win.isMaximized());
-    }
+    await win.toggleMaximize();
+    setMaximized(await win.isMaximized());
   };
 
   const lights: Light[] = [
-    { action: 'minimize', label: 'Minimise', color: 'var(--cc-accent)', glyph: 'M2 6h8' },
     {
       action: 'toggle',
       label: maximized ? 'Restore' : 'Maximise',
       color: 'var(--cc-ok)',
       glyph: maximized ? 'M2.5 6h7M6 2.5v7' : 'M2.5 2.5h7v7h-7z',
     },
-    { action: 'close', label: 'Close', color: 'var(--cc-danger)', glyph: 'M3 3l6 6M9 3l-6 6' },
+    { action: 'close', label: closeLabel, color: 'var(--cc-danger)', glyph: 'M3 3l6 6M9 3l-6 6' },
   ];
 
   return (

@@ -39,9 +39,12 @@ source is live is visible rather than assumed.
 ### Debug builds behave differently on purpose
 
 `main.rs` gates `windows_subsystem = "windows"` on `not(debug_assertions)`, so a
-**debug build is console-subsystem**: it keeps a terminal, prints every poller's
-diagnostics to it, and exits when that terminal is closed. That is the point of it.
-Release is GUI-subsystem and silent.
+**debug build is console-subsystem**: it keeps a terminal, prints the log to it as it
+writes `kehai.log`, and exits when that terminal is closed. That is the point of it.
+Release is GUI-subsystem and writes only the file.
+
+A debug build also leaves out the single-instance check, so it runs beside an installed
+copy. The two share an identifier, and so the same app-data folder and log.
 
 A bare `cargo build` also loads the frontend from the Vite dev server instead of the
 embedded bundle — convenient while iterating, useless once that server stops. It also

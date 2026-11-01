@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener};
 
 use crate::bus;
+use crate::log;
 
 const TOPIC: &str = "os:presence";
 const SRC: &str = "poller.presence";
@@ -95,7 +96,7 @@ pub fn spawn(app: AppHandle) {
             Ok(command) => {
                 let _ = command_tx.send(command);
             }
-            Err(err) => eprintln!("poller.presence: ignored a command: {err}"),
+            Err(err) => log::warn("poller.presence", format!("ignored a command: {err}")),
         },
     );
 

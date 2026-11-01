@@ -9,6 +9,7 @@ use tauri::AppHandle;
 
 use super::transcripts::{self, now_ms, parse_iso, transcript_root, Transcripts};
 use crate::bus;
+use crate::log;
 
 const INTERVAL: Duration = Duration::from_millis(30_000);
 /// The length of a usage block, and of the history the sparkline covers.
@@ -125,19 +126,22 @@ pub fn spawn(app: AppHandle) {
             };
 
             if said != last_said {
-                eprintln!("poller.quota: {said}");
+                log::info("poller.quota", &said);
                 if payload.available {
-                    eprintln!(
-                        "poller.quota: {} block, {} requests, {} in / {} out tokens, {} models",
-                        if payload.block_start_ms.is_some() {
-                            "in a"
-                        } else {
-                            "no active"
-                        },
-                        payload.requests,
-                        payload.tokens_in,
-                        payload.tokens_out,
-                        payload.models.len()
+                    log::info(
+                        "poller.quota",
+                        format!(
+                            "{} block, {} requests, {} in / {} out tokens, {} models",
+                            if payload.block_start_ms.is_some() {
+                                "in a"
+                            } else {
+                                "no active"
+                            },
+                            payload.requests,
+                            payload.tokens_in,
+                            payload.tokens_out,
+                            payload.models.len()
+                        ),
                     );
                 }
                 last_said = said;

@@ -11,6 +11,7 @@ use tauri::AppHandle;
 
 use super::transcripts::{self, now_ms, parse_iso, transcript_root, Transcripts};
 use crate::bus;
+use crate::log;
 
 /// How often the transcripts already followed are read on. An agent that has
 /// stopped to wait should say so about as soon as a glance would catch it.
@@ -289,7 +290,7 @@ pub fn spawn(app: AppHandle) {
                     Err(reason) => reason.clone(),
                 };
                 if said != last_said {
-                    eprintln!("poller.agents: {said}");
+                    log::info("poller.agents", &said);
                     last_said = said;
                 }
                 unavailable = walked.err();

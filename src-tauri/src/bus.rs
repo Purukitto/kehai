@@ -1,10 +1,12 @@
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, SyncSender, TrySendError};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter};
+
+use crate::log;
 
 /// The one shape everything on the bus takes, whatever the source.
 ///
@@ -21,6 +23,8 @@ pub struct Envelope<T> {
 /// How far a tap may fall behind before it is cut off. A remote panel on a
 /// stalled connection would otherwise hold every envelope published since.
 const TAP_BACKLOG: usize = 512;
+/// With More detail on, how often the log hears what each topic published.
+const COUNT_EVERY: Duration = Duration::from_secs(60);
 
 #[derive(Default)]
 struct State {
@@ -33,8 +37,37 @@ struct State {
     /// renderer's bus retains last values for exactly this reason; the gap was
     /// that the retention stopped at the IPC boundary.
     retained: HashMap<String, serde_json::Value>,
-    /// Everyone else listening: the remote panels.
+    /// Everyone else listening: the remote panels, and the tray.
     taps: Vec<SyncSender<serde_json::Value>>,
+    /// With More detail on: how many times each topic published, and since when.
+    counts: HashMap<String, u32>,
+    counting_since: Option<Instant>,
+}
+
+impl State {
+    /// A source that stalls or floods shows here. Returns a line for the log
+    /// once a minute.
+    fn count(&mut self, topic: &str) -> Option<String> {
+        if !log::detailed() {
+            self.counts.clear();
+            self.counting_since = None;
+            return None;
+        }
+        *self.counts.entry(topic.to_string()).or_default() += 1;
+        let since = *self.counting_since.get_or_insert_with(Instant::now);
+        if since.elapsed() < COUNT_EVERY {
+            return None;
+        }
+        let mut counts: Vec<_> = self.counts.drain().collect();
+        counts.sort();
+        self.counting_since = Some(Instant::now());
+        let counts: Vec<String> = counts.iter().map(|(t, n)| format!("{t} {n}")).collect();
+        Some(format!(
+            "published in {} s: {}",
+            since.elapsed().as_secs(),
+            counts.join(", ")
+        ))
+    }
 }
 
 static STATE: Mutex<Option<State>> = Mutex::new(None);
@@ -58,6 +91,7 @@ pub fn publish<T: Serialize + Clone>(app: &AppHandle, topic: &str, src: &str, da
 
     match serde_json::to_value(&envelope) {
         Ok(value) => {
+            let mut counted = None;
             if let Ok(mut guard) = STATE.lock() {
                 let state = guard.get_or_insert_with(State::default);
                 state.retained.insert(topic.to_string(), value.clone());
@@ -67,12 +101,17 @@ pub fn publish<T: Serialize + Clone>(app: &AppHandle, topic: &str, src: &str, da
                     Ok(()) => true,
                     Err(TrySendError::Full(_) | TrySendError::Disconnected(_)) => false,
                 });
+                counted = state.count(topic);
+            }
+            // Outside the lock: the log publishes too.
+            if let Some(line) = counted {
+                log::detail("bus", || line);
             }
             if let Err(err) = app.emit("bus", value) {
-                eprintln!("bus: dropped {topic}: {err}");
+                log::warn("bus", format!("dropped {topic}: {err}"));
             }
         }
-        Err(err) => eprintln!("bus: {topic} did not serialise: {err}"),
+        Err(err) => log::warn("bus", format!("{topic} did not serialise: {err}")),
     }
 }
 
@@ -84,7 +123,7 @@ pub fn replay(app: &AppHandle) {
     for value in &values {
         let _ = app.emit("bus", value.clone());
     }
-    eprintln!("bus: replayed {} retained topics", values.len());
+    log::info("bus", format!("replayed {} retained topics", values.len()));
 }
 
 /// The last value of every topic.

@@ -96,8 +96,8 @@ body:
     attributes:
       label: Diagnostics
       description: >
-        A debug build (`bunx tauri build --debug --no-bundle`) keeps a terminal and
-        prints every poller's diagnostics to it. Paste anything relevant, plus the
+        Settings → About → Report a bug fills this in. Otherwise Settings → About →
+        Log → Copy gives the log's last lines: paste anything relevant, plus the
         browser console if this is a renderer issue.
       render: text
 

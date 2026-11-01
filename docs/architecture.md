@@ -52,9 +52,10 @@ subscribed and the engine replays every retained topic in reply.
 ## Commands
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for nine command topics — `media:command`, `notify:command`,
+read-only except for twelve command topics — `media:command`, `notify:command`,
 `notify:rules`, `flow:command`, `quota:command`, `update:command`, `remote:command`,
-`display:command` and `presence:command`. The UI states an intent; the engine owns the
+`display:command`, `presence:command`, `window:command`, `log:command` and
+`log:context`. The UI states an intent; the engine owns the
 side effect and runs it off the event thread, so a wedged media player cannot freeze
 the panel and a slow download cannot either.
 
@@ -79,6 +80,7 @@ checks every one again.
 | `src/components/DisplayMap.tsx` | The displays as the system arranges them, for setup and Settings |
 | `src/components/QrCode.tsx` | The pairing code in Settings → Remote |
 | `src/components/Stale.tsx` | What a remote panel shows over its tiles when the host goes away |
+| `src/components/HideSheet.tsx` | What closing the panel says the first time |
 | `src/grid/Grid.tsx` | Renders a layout onto a CSS grid |
 | `src/grid/Arranger.tsx` | The tile arranger |
 | `src/widgets/` | One module per widget, beside its description file, `<id>.widget.json` |
@@ -88,6 +90,8 @@ checks every one again.
 | `src/layouts/*.layout.json` | The three shipped presets |
 | `src/styles/tokens.css` | Thirteen custom properties per theme |
 | `src-tauri/src/bus.rs` | Mints envelopes, retains them, emits them |
+| `src-tauri/src/shell.rs` | The tray icon and its menu, the taskbar button, hiding rather than closing |
+| `src-tauri/src/log.rs` | The log file, the last problems, the crash record, the bug-report link |
 | `src-tauri/src/pollers/` | One thread per source |
 | `src-tauri/src/pollers/media.rs` | Now playing, seek and the system volume |
 | `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |

@@ -3,7 +3,8 @@
 [Documentation](README.md) › Privacy
 
 Kehai reads local sources and publishes them to its own in-process bus. Nothing it
-reads is uploaded, logged to disk or phoned home.
+reads is uploaded or phoned home, and its log records what Kehai did, never what it
+read.
 
 - [What it writes](#what-it-writes)
 - [What it sends](#what-it-sends)
@@ -19,8 +20,21 @@ All in its own app-data folder:
 | `flow.json` | How long the focus timer has run today | So the total survives a restart |
 | `display.json` | Which display Kehai is for | So it opens there, before the window is shown |
 | `remote.json` | The remote panel's key, once you turn the remote panel on | So paired devices stay paired |
+| `window.json` | Whether Kehai has a taskbar button, and whether it shows the panel when it starts | So both apply before the window is shown |
 
 Settings, layouts and themes are kept by the renderer, in its own browser storage.
+
+The log is in the local app-data folder, under `logs`:
+
+| File | Holds | Why |
+| --- | --- | --- |
+| `kehai.log` | What Kehai started, what failed and why, with the time. At 1 MB it becomes `kehai.1.log`, and three files are kept | So a failure in a build with no console still has a reason |
+| `problems.json` | The last five problems Settings → About lists, and whether Kehai last closed by crashing | So they are still there after a restart |
+
+The log holds versions, displays, folder paths Kehai was given, ports, and the errors
+the system returned. It never holds notification text, anything from an agent
+transcript, what is playing, the remote key or a pairing link. **More detail** adds how
+often each source published, and turns itself off when Kehai restarts.
 
 ## What it sends
 
@@ -32,6 +46,11 @@ copy of Kehai asked — nothing more. Installing downloads the installer from th
 release.
 
 **About → Support Kehai** opens a page in your browser. Kehai itself sends nothing.
+
+**Report a bug**, in About and in the tray's menu, opens a new issue on GitHub in your
+browser. The version, Windows, your displays, which sources report and the last
+problems are in the link, and the form shows them. Nothing reaches GitHub unless you
+press Create there. The log itself stays on your PC.
 
 ## What it listens for
 
