@@ -24,7 +24,7 @@ All in its own app-data folder:
 | `games.json` | Each game you set up: where it is, the key in its file, and the port | So the game still reaches Kehai after a restart |
 | `widgets\` | Widget files you add yourself, if you open the folder | Read, never run |
 
-Outside that folder, Kehai writes one file and only when you ask: **SET UP** for a game
+Outside that folder, Kehai writes one file and only when you ask: **Set up** for a game
 widget puts `gamestate_integration_kehai_<widget>.cfg` in the game's own settings folder,
 after showing you where. **REMOVE** deletes it again, and Kehai never touches another
 program's file there.
@@ -130,8 +130,12 @@ neither reaches a remote panel.
 A game widget reads only what the game sends to Kehai on this PC through the
 publisher's own route. For Counter-Strike 2 that is Valve's game state integration,
 which Valve describes for lighting, overlays and peripherals on the player's PC. Kehai
-asks only for what a player gets while playing: their own health, armour, money,
-weapons, kills and the score. It never asks for other players, positions or the
-bomb's timer, and never reads the game's memory or touches the game itself. What the
-game sends is not kept on disk. A remote panel shows the tile as this PC does; the key
+asks only for the map, the score and rounds, whose view the game is showing, and the
+player's own kills, assists, deaths and MVPs. It never asks for their health, money or
+weapons, other players, positions or the bomb's timer, and never reads the game's
+memory or touches the game itself. What the game sends is not kept on disk, except
+how each match ended: the map, when, the score and the player's own figures, the last
+60 matches, in the panel's own storage on this PC, for the tile's list of tonight's
+matches. **Forget them**, in the tile's options, clears them. A remote panel keeps
+its own list, in its browser, of the matches it saw. A remote panel shows the tile as this PC does; the key
 in the game's file never leaves this PC.

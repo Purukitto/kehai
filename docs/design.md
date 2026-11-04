@@ -17,6 +17,35 @@ A panel you look at sideways cannot ask for attention. Chrome stays at a low
 contrast, the hairlines are one pixel of `--cc-line`, and nothing animates unless the
 underlying value is genuinely moving.
 
+## How it looks
+
+Something you would keep on a desk, not a terminal. Until 0.12 Kehai dressed as one:
+labels in tracked capitals, outlined badges in four colours, a decorative equaliser
+and a glowing edge on the game tile. Each of those is a stock move, and together they
+read as a dashboard nobody designed. Now it is obsidian glass:
+
+- **Charcoal and champagne.** A near-black page with one faint glow from above, in the
+  theme's accent, and nothing else in the way of gradient. The accent is a warm,
+  quiet champagne rather than a signal colour, so it can carry a chart line or a key
+  number without shouting.
+- **Glass tiles.** Each tile is its own rounded card, white at three per cent over the
+  glow, with a one-pixel edge and a soft shadow beneath. Sheets and menus are the same
+  glass, blurred over what they cover.
+- **One typeface, JetBrains Mono, light.** Everything you read is in it, at a light
+  weight; the few numbers and titles that lead, the time, the main readout, the score,
+  a screen's name, are the same face large, thin and drawn a little tighter. Every
+  figure is the same width, so a clock that changes does not move.
+- **Sentence case.** A label is quieter than its value, never louder: no capitals. A
+  button says what it does in the words of the sentence around it. The header is the
+  exception: it is the panel's frame, so the ◇ KEHAI wordmark and the square chips
+  beside it keep their spaced capitals.
+- **Pills.** Buttons and the chosen one of a set are rounded pills; the one thing a
+  screen asks you to do is filled in champagne.
+- **One glow, earned.** An agent waiting on you lights the main readout from inside.
+  Nothing else glows, and nothing pulses.
+- **Nothing pretends.** The equaliser was not the music, so it went. Motion is a value
+  changing, or a sheet arriving.
+
 ## Presets
 
 Three layouts ship, and they differ **only** in `tiles[].area` and `tiles[].props`.
@@ -160,19 +189,42 @@ nothing else. Swapping the class re-themes the whole app with no React re-render
 
 | Theme | Character |
 | --- | --- |
-| **Amber** | Warm near-black, amber accent, cyan secondary. The default. |
-| **Phosphor** | Green monochrome, in the spirit of a P1 CRT. |
-| **Ice** | Cool blue-grey with a violet secondary. |
+| **Obsidian** | Charcoal with a champagne accent and a pale steel secondary. The default; its id is still `amber`, so a stored choice finds it. |
+| **Phosphor** | The same glass, tinted green, in the spirit of a P1 CRT without the glow. |
+| **Ice** | The same glass, tinted blue, with a sand secondary. |
+
+The dim text colour in each passes 4.5 : 1 on a tile, so the smallest notes stay
+readable.
 
 Thirteen is the whole vocabulary: three backgrounds, one inset, two line weights,
 three text weights, two accents, a danger and an ok. Anything a widget needs that is
 not in that list is a sign the widget is over-designed.
 
-A game widget is the one exception. It may bring its game's own colours and light its
-tile's edge, as RGB lighting does for the same game, because a player already reads
-those colours without thinking: their side, health going red. The lighting only moves
-while something is happening in the match, which keeps to the rule above, and a
-player can always put the theme's colours back.
+A game widget is the one exception. It may bring its game's own colours for each side,
+because a player already reads those without thinking. A player can always put the
+theme's back.
+
+## While you play
+
+The question about a second screen during a game is why you would look at it at all.
+In the middle of a round you should not, and anything that moves at the edge of your
+eye is working against you. 0.11 got this wrong: the CS2 tile copied the HUD, health,
+armour, money and ammo, which the game already shows where you are looking, and lit
+its edge and flashed white with the game, which pulled the eye to the one place it
+should not go.
+
+So while you are in play the panel goes still: dark, nothing moving or changing
+colour, the score dimly, and how many things it is holding. Notifications and agents
+waiting are kept, not shown. The game widget's file says when the player is in play
+(`match.still`), and a player watching a teammate is not. The panel opens by itself
+in the gaps: when you die, at half time, after the match, a few seconds after you are
+out so a quick respawn does not flash it. A touch opens it sooner, until the next
+round.
+
+What the tile shows is for those gaps, and only what the game does not keep: the
+match so far, round by round, your figures while you watch a teammate, and between
+matches, tonight's matches with how each went. A game widget lists none of the HUD.
+
 
 ## Responsiveness is per-tile
 

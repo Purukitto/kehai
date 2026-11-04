@@ -107,17 +107,18 @@ export interface Settings {
 }
 
 export interface GameSettings {
-  /** What happens when a match goes live: nothing, another layout, or the tile full screen. */
-  onMatch: 'stay' | 'layout' | 'full';
+  /**
+   * What the panel does during a match: goes still while the player is in
+   * play and holds what comes in, stays as it is, or shows another layout.
+   */
+  onMatch: 'still' | 'stay' | 'layout';
   /** The layout for `layout`. */
   switchTo: string | null;
   /** The game's own colours, or the theme's. */
   colours: 'game' | 'theme';
-  /** The tile's edge lit, and flashes and smoke washed over it, as RGB lighting does. */
-  lighting: boolean;
 }
 
-export const GAME_DEFAULTS: GameSettings = { onMatch: 'stay', switchTo: null, colours: 'game', lighting: true };
+export const GAME_DEFAULTS: GameSettings = { onMatch: 'still', switchTo: null, colours: 'game' };
 
 export interface MatchLayout {
   widget: string;
@@ -331,10 +332,10 @@ function games(raw: unknown): Record<string, GameSettings> {
       const g = (value ?? {}) as Partial<Record<keyof GameSettings, unknown>>;
       const switchTo = typeof g.switchTo === 'string' ? g.switchTo : null;
       out[id] = {
-        onMatch: g.onMatch === 'full' ? 'full' : g.onMatch === 'layout' && switchTo ? 'layout' : 'stay',
+        // Full screen, from 0.11, was the nearest thing to going still.
+        onMatch: g.onMatch === 'stay' ? 'stay' : g.onMatch === 'layout' && switchTo ? 'layout' : 'still',
         switchTo,
         colours: g.colours === 'theme' ? 'theme' : 'game',
-        lighting: g.lighting !== false,
       };
     }
   }

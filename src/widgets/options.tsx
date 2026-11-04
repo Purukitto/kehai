@@ -8,23 +8,23 @@ import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
 import { Group, Row, Seg } from '../settings/controls';
 
-const RULE_NAME: Record<NotifyRule, string> = { show: 'SHOW', name: 'NAME ONLY', hide: 'HIDE' };
-const REMOTE_NAME: Record<NotifyRemote, string> = { same: 'SAME AS HERE', name: 'NAME ONLY', nothing: 'NOTHING' };
+const RULE_NAME: Record<NotifyRule, string> = { show: 'Show', name: 'Name only', hide: 'Hide' };
+const REMOTE_NAME: Record<NotifyRemote, string> = { same: 'Same as here', name: 'Name only', nothing: 'Nothing' };
 const REMOTE_DESC: Record<NotifyRemote, string> = {
   same: 'Tablets and browsers see what this panel does, text and all.',
   name: 'Each app and how many, never what they say.',
   nothing: 'No notifications at all. The tile there says they stay on this PC.',
 };
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-/** The time today, YESTERDAY, or the date. */
+/** The time today, yesterday, or the date. */
 function when(ms: number): string {
   if (!ms) return '--';
   const d = new Date(ms);
   const day = (t: Date) => new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime();
   const days = Math.round((day(new Date()) - day(d)) / 86_400_000);
   if (days <= 0) return `${p2(d.getHours())}:${p2(d.getMinutes())}`;
-  if (days === 1) return 'YESTERDAY';
+  if (days === 1) return 'yesterday';
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
@@ -56,10 +56,10 @@ function NotifyOptions(_: OptionsProps) {
         </div>
       )}
 
-      <Group label="APPS" note="FOR THIS PC AND EVERY TABLET · NEWEST FIRST" />
+      <Group label="Apps" note="For this PC and every tablet · newest first" />
       {listed.length === 0 ? (
         <div className="cc-mini" style={{ lineHeight: 1.6 }}>
-          None yet. An app joins this list with its first notification, and starts at SHOW.
+          None yet. An app joins this list with its first notification, and starts at Show.
         </div>
       ) : (
         listed.map(([id, app]) => {
@@ -70,8 +70,8 @@ function NotifyOptions(_: OptionsProps) {
               label={app.name}
               desc={
                 <>
-                  {fresh.has(id) && <span style={{ color: 'var(--cc-accent-2)' }}>NEW · </span>}
-                  {n ? `${n} IN THE WINDOWS LIST` : 'NONE IN THE LIST'} · LAST {when(app.lastMs)}
+                  {fresh.has(id) && <span style={{ color: 'var(--cc-accent-2)' }}>New · </span>}
+                  {n ? `${n} in the Windows list` : 'None in the list'} · last {when(app.lastMs)}
                 </>
               }
             >
@@ -86,19 +86,19 @@ function NotifyOptions(_: OptionsProps) {
         })
       )}
       <div className="cc-mini" style={{ marginTop: 10, lineHeight: 1.6 }}>
-        NAME ONLY shows the app and how many. HIDE shows nothing, here or on a tablet. The Windows list itself is left as it
+        Name only shows the app and how many. Hide shows nothing, here or on a tablet. The Windows list itself is left as it
         is.
       </div>
 
-      <Group label="QUIET" note="A COUNT, NEVER WHO OR WHAT" />
+      <Group label="Quiet" note="A count, never who or what" />
       <Row label="During a focus block" desc="Only how many, until the break.">
-        <Seg options={['OFF', 'ON']} value={quietFocus ? 'ON' : 'OFF'} onPick={(v) => setNotify({ quietFocus: v === 'ON' })} />
+        <Seg options={['Off', 'On']} value={quietFocus ? 'On' : 'Off'} onPick={(v) => setNotify({ quietFocus: v === 'On' })} />
       </Row>
       <div className="cc-mini" style={{ marginTop: 10, lineHeight: 1.6 }}>
         While you are away, as Settings → Appearance says.
       </div>
 
-      <Group label="ON TABLETS" note="AND BROWSERS ON OTHER MACHINES" />
+      <Group label="On tablets" note="And browsers on other machines" />
       <Row label="Remote panels see" desc={REMOTE_DESC[remote]}>
         <Seg<NotifyRemote>
           options={['same', 'name', 'nothing']}
@@ -119,7 +119,7 @@ function MediaOptions({ tile }: OptionsProps) {
 
   if (tile === null || t?.widget !== 'media') {
     return (
-      <div style={{ padding: '22px 0', fontSize: 12, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
+      <div style={{ padding: '24px 0', fontSize: 13, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
         Now playing is not on this layout. Its options are kept with each tile, so hold the tile once it is.
       </div>
     );
@@ -128,22 +128,14 @@ function MediaOptions({ tile }: OptionsProps) {
   const set = (key: string, value: unknown) => editArrangement(settings.layoutId, shape, (a) => withTileProp(a, tile, key, value));
   return (
     <>
-      <Group label="THIS TILE" note={`ON ${layout.name.toUpperCase()} ONLY`} />
+      <Group label="This tile" note={`On ${layout.name} only`} />
       {isPreset(settings.layoutId) && (
         <div className="cc-mini" style={{ marginBottom: 6, lineHeight: 1.6 }}>
           {layout.name} is a preset, so a change here saves a copy of it under Yours.
         </div>
       )}
       <Row label="Album art" desc="Shown beside the track when the player provides one.">
-        <Seg options={['OFF', 'ON']} value={t.props?.art === false ? 'OFF' : 'ON'} onPick={(v) => set('art', v === 'ON')} />
-      </Row>
-      <Row label="Equaliser" desc="A horizontal bar that freezes when playback pauses.">
-        <Seg
-          options={['off', 'bar']}
-          value={t.props?.equaliser === 'off' ? 'off' : 'bar'}
-          format={(v) => v.toUpperCase()}
-          onPick={(v) => set('equaliser', v)}
-        />
+        <Seg options={['Off', 'On']} value={t.props?.art === false ? 'Off' : 'On'} onPick={(v) => set('art', v === 'On')} />
       </Row>
     </>
   );
@@ -153,15 +145,15 @@ function StageOptions(_: OptionsProps) {
   const { settings, setFollowAttention } = useSettings();
   return (
     <>
-      <Group label="EVERY LAYOUT" note="ONE SETTING FOR THE WHOLE PANEL" />
+      <Group label="Every layout" note="One setting for the whole panel" />
       <Row
         label="Follows attention"
         desc="Shows Agents while one waits on you, and goes back to your tab once none does. Picking a tab yourself keeps it until another agent starts waiting."
       >
         <Seg
-          options={['OFF', 'ON']}
-          value={settings.followAttention ? 'ON' : 'OFF'}
-          onPick={(v) => setFollowAttention(v === 'ON')}
+          options={['Off', 'On']}
+          value={settings.followAttention ? 'On' : 'Off'}
+          onPick={(v) => setFollowAttention(v === 'On')}
         />
       </Row>
     </>

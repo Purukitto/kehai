@@ -6,19 +6,20 @@ import type { CpuPayload, DiskPayload, MemPayload, NetPayload } from '../core/pa
 import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
+/** A thread is only worth a colour when it is pinned. */
 function threadColor(v: number): string {
   if (v > 82) return 'var(--cc-danger)';
-  if (v > 40) return 'var(--cc-accent)';
+  if (v > 40) return 'var(--cc-muted)';
   return 'var(--cc-line-2)';
 }
 
 function Section({ label, right, children }: { label: string; right?: string; children?: React.ReactNode }) {
   return (
-    <div style={{ padding: '12px 14px', borderTop: '1px solid var(--cc-line)', flex: 'none' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span className="cc-label" style={{ fontSize: 9 }}>{label}</span>
+    <div style={{ padding: '12px 16px', borderTop: '1px solid var(--cc-line)', flex: 'none' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+        <span className="cc-label">{label}</span>
         {right && (
-          <span style={{ fontSize: 11, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>{right}</span>
+          <span style={{ fontSize: 13, color: 'var(--cc-text)', whiteSpace: 'nowrap' }}>{right}</span>
         )}
       </div>
       {children}
@@ -51,19 +52,19 @@ export function Telemetry(_: WidgetProps) {
   const showGraph = size.h > 270;
 
   return (
-    <Pane label="MACHINE" padded={false}>
-      <div style={{ padding: '12px 14px', flex: 'none' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-          <span className="cc-label" style={{ fontSize: 9 }}>
-            CPU{cpu ? ` / ${cpu.threads.length}T` : ''}
+    <Pane label="Machine" padded={false}>
+      <div style={{ padding: '8px 16px 12px', flex: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <span className="cc-label">
+            CPU{cpu ? ` · ${cpu.threads.length} threads` : ''}
           </span>
-          <span style={{ fontSize: 11, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
+          <span style={{ fontSize: 13, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
             {cpu ? (
               <>
-                <b style={{ color: 'var(--cc-accent)', fontWeight: 500 }}>{cpu.pct}%</b>
-                {' '}
-                {cpu.clockGhz.toFixed(2)}GHz{' '}
-                <span style={{ color: cpu.tempC === null ? 'var(--cc-line-2)' : 'var(--cc-muted)' }}>
+                <b style={{ color: 'var(--cc-text)', fontWeight: 500 }}>{cpu.pct}%</b>
+                {' · '}
+                {cpu.clockGhz.toFixed(2)} GHz{' · '}
+                <span style={{ color: cpu.tempC === null ? 'var(--cc-dim)' : 'var(--cc-muted)' }}>
                   {cpu.tempC === null ? '--°C' : cpu.tempC.toFixed(0) + '°C'}
                 </span>
               </>
@@ -73,10 +74,10 @@ export function Telemetry(_: WidgetProps) {
           </span>
         </div>
 
-        <div style={{ display: 'flex', gap: 3, alignItems: 'flex-end', height: 46, marginTop: 9 }}>
+        <div style={{ display: 'flex', gap: 2, alignItems: 'flex-end', height: 44, marginTop: 8 }}>
           {(cpu?.threads ?? Array.from({ length: 16 }, () => 0)).map((v, i) => (
-            <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', background: 'var(--cc-inset)' }}>
-              <div style={{ width: '100%', height: `${v}%`, background: threadColor(v) }} />
+            <div key={i} style={{ flex: 1, height: '100%', display: 'flex', alignItems: 'flex-end', background: 'var(--cc-inset)', borderRadius: 1 }}>
+              <div style={{ width: '100%', height: `${v}%`, background: threadColor(v), borderRadius: 1 }} />
             </div>
           ))}
         </div>
@@ -90,22 +91,22 @@ export function Telemetry(_: WidgetProps) {
             style={{ marginTop: 10, display: 'block', borderBottom: '1px solid var(--cc-line)' }}
           >
             <path d="M0 35h436" stroke="var(--cc-line)" strokeWidth="1" strokeDasharray="2 5" />
-            <path d={cpuPath + ' L436 70 L0 70 Z'} fill="var(--cc-accent)" opacity="0.12" />
-            <path d={cpuPath} fill="none" stroke="var(--cc-accent)" strokeWidth="1.3" />
+            <path d={cpuPath + ' L436 70 L0 70 Z'} fill="var(--cc-muted)" opacity="0.1" />
+            <path d={cpuPath} fill="none" stroke="var(--cc-muted)" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
           </svg>
         )}
       </div>
 
       <Section
-        label="MEMORY"
-        right={mem ? `${mem.usedGib.toFixed(1)} / ${mem.totalGib.toFixed(1)} GiB` : '--'}
+        label="Memory"
+        right={mem ? `${mem.usedGib.toFixed(1)} of ${mem.totalGib.toFixed(1)} GiB` : '--'}
       >
-        <div style={{ display: 'flex', height: 12, marginTop: 9, border: '1px solid var(--cc-line)', background: 'var(--cc-inset)' }}>
-          <div style={{ width: `${memPct}%`, background: 'var(--cc-accent)' }} />
+        <div style={{ display: 'flex', height: 4, marginTop: 8, borderRadius: 2, overflow: 'hidden', background: 'var(--cc-line)' }}>
+          <div style={{ width: `${memPct}%`, background: 'var(--cc-muted)' }} />
         </div>
         {mem && mem.swapTotalGib > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-            <span className="cc-mini">SWAP</span>
+            <span className="cc-mini">Swap</span>
             <span className="cc-mini">
               {mem.swapUsedGib.toFixed(1)} / {mem.swapTotalGib.toFixed(1)} GiB
             </span>
@@ -115,8 +116,8 @@ export function Telemetry(_: WidgetProps) {
 
       {showNet && (
         <Section
-          label="NETWORK"
-          right={net ? `RX ${rate(net.rxBytesPerSec)}  TX ${rate(net.txBytesPerSec)}` : '--'}
+          label="Network"
+          right={net ? `↓ ${rate(net.rxBytesPerSec)}   ↑ ${rate(net.txBytesPerSec)}` : '--'}
         >
           {rxHistory.length > 1 ? (
             <svg
@@ -126,13 +127,13 @@ export function Telemetry(_: WidgetProps) {
               preserveAspectRatio="none"
               style={{ marginTop: 9, display: 'block', borderBottom: '1px solid var(--cc-line)' }}
             >
-              <path d={rxPath + ' L436 64 L0 64 Z'} fill="var(--cc-accent-2)" opacity="0.12" />
-              <path d={rxPath} fill="none" stroke="var(--cc-accent-2)" strokeWidth="1.3" />
-              <path d={txPath} fill="none" stroke="var(--cc-accent)" strokeWidth="1.3" strokeDasharray="3 2" />
+              <path d={rxPath + ' L436 64 L0 64 Z'} fill="var(--cc-muted)" opacity="0.1" />
+              <path d={rxPath} fill="none" stroke="var(--cc-muted)" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+              <path d={txPath} fill="none" stroke="var(--cc-dim)" strokeWidth="1.25" strokeDasharray="3 2" vectorEffect="non-scaling-stroke" />
             </svg>
           ) : (
             <div style={{ height: 64, display: 'flex', alignItems: 'center' }}>
-              <span className="cc-mini">SAMPLING</span>
+              <span className="cc-mini">Measuring</span>
             </div>
           )}
           {net?.active[0] && (
@@ -147,19 +148,19 @@ export function Telemetry(_: WidgetProps) {
       )}
 
       {showDisk && (
-        <Section label="DISK" right={disk ? `${disk.volumes.length} VOLUMES` : '--'}>
+        <Section label="Disks" right={disk ? `${disk.volumes.length} volume${disk.volumes.length === 1 ? '' : 's'}` : '--'}>
           {(disk?.volumes ?? []).slice(0, 3).map((v) => {
             const pct = v.totalBytes > 0 ? (v.usedBytes / v.totalBytes) * 100 : 0;
             return (
-              <div key={v.mount} style={{ marginTop: 9 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--cc-muted)', gap: 10 }}>
+              <div key={v.mount} style={{ marginTop: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--cc-muted)', gap: 8 }}>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v.mount}</span>
                   <span style={{ color: 'var(--cc-text)', whiteSpace: 'nowrap' }}>
                     {bytes(v.usedBytes)} / {bytes(v.totalBytes)}
                   </span>
                 </div>
-                <div style={{ height: 5, background: 'var(--cc-inset)', marginTop: 4, border: '1px solid var(--cc-line)' }}>
-                  <div style={{ height: '100%', width: `${pct}%`, background: pct > 90 ? 'var(--cc-danger)' : 'var(--cc-accent)' }} />
+                <div style={{ height: 4, background: 'var(--cc-line)', marginTop: 4, borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: `${pct}%`, background: pct > 90 ? 'var(--cc-danger)' : 'var(--cc-muted)' }} />
                 </div>
               </div>
             );

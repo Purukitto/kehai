@@ -93,22 +93,17 @@ export function LayoutSwitcher({ onManage }: { onManage: () => void }) {
           width: '100%',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
-          padding: '0 14px',
+          gap: 8,
+          padding: '0 12px',
           border: 0,
-          borderBottom: '1px solid var(--cc-line)',
-          background: on ? 'var(--cc-pane-2)' : 'transparent',
-          boxShadow: on ? 'inset 2px 0 0 var(--cc-accent)' : 'none',
-          color: on ? 'var(--cc-accent)' : 'var(--cc-text)',
+          borderRadius: 12,
+          background: on ? 'var(--cc-line)' : 'transparent',
+          color: 'var(--cc-text)',
           textAlign: 'left',
         }}
       >
-        <span style={{ fontSize: 11, letterSpacing: '0.14em', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {name.toUpperCase()}
-        </span>
-        <span className="cc-mini" style={{ fontSize: 9 }}>
-          {on ? 'IN USE' : kind}
-        </span>
+        <span style={{ fontSize: 14, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+        <span className="cc-mini">{on ? 'In use' : kind}</span>
       </button>
     );
   };
@@ -120,14 +115,14 @@ export function LayoutSwitcher({ onManage }: { onManage: () => void }) {
         // Remounts on every change of layout, which replays the flash: a swipe
         // that landed says where it landed.
         key={layout.id}
-        className="cc-chip cc-flash"
+        className="cc-barchip cc-flash"
         aria-haspopup="menu"
         aria-expanded={anchor !== null}
         title="Change layout. On a touchscreen, swipe along the header."
         onClick={toggle}
-        style={{ gap: 7, padding: '0 10px', maxWidth: 220 }}
+        style={{ maxWidth: 220 }}
       >
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{layout.name.toUpperCase()}</span>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{layout.name}</span>
         <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" style={{ flex: 'none' }}>
           <path d="M1 2.5h6L4 6Z" />
         </svg>
@@ -138,6 +133,7 @@ export function LayoutSwitcher({ onManage }: { onManage: () => void }) {
             <div onClick={() => setAnchor(null)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
             <div
               role="menu"
+              className="cc-glass"
               style={{
                 position: 'fixed',
                 top: anchor.top,
@@ -146,14 +142,14 @@ export function LayoutSwitcher({ onManage }: { onManage: () => void }) {
                 width: 260,
                 maxHeight: `calc(100vh - ${anchor.top + 12}px)`,
                 overflowY: 'auto',
-                background: 'var(--cc-pane)',
-                border: '1px solid var(--cc-line-2)',
+                padding: 6,
+                borderRadius: 18,
               }}
             >
               {order.map((id) => {
                 const preset = PRESETS[id];
                 const mine = settings.layouts.find((l) => l.id === id);
-                return preset ? row(id, preset.name, 'PRESET') : mine ? row(id, mine.name, 'YOURS') : null;
+                return preset ? row(id, preset.name, 'Preset') : mine ? row(id, mine.name, 'Yours') : null;
               })}
               <button
                 onClick={() => {
@@ -163,16 +159,17 @@ export function LayoutSwitcher({ onManage }: { onManage: () => void }) {
                 style={{
                   height: 40,
                   width: '100%',
-                  padding: '0 14px',
+                  padding: '0 12px',
+                  marginTop: 4,
                   border: 0,
-                  background: 'var(--cc-inset)',
+                  borderTop: '1px solid var(--cc-line)',
+                  background: 'transparent',
                   color: 'var(--cc-muted)',
-                  fontSize: 10,
-                  letterSpacing: '0.14em',
+                  fontSize: 14,
                   textAlign: 'left',
                 }}
               >
-                MANAGE LAYOUTS…
+                Manage layouts…
               </button>
             </div>
           </>,

@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 
 /**
- * The shell every tile shares: pane background, optional header, no radius.
- * The header names what the tile shows; which bus topic feeds it is for the
- * code, not for the panel.
+ * The shell every tile shares: pane background and an optional title. The
+ * title names what the tile shows, quietly, in the corner; which bus topic
+ * feeds it is for the code, not for the panel. A tile whose content says what
+ * it is, a clock, goes without one.
  */
 export function Pane({
   label,
@@ -33,19 +34,20 @@ export function Pane({
       {label && (
         <div
           style={{
-            height: 26,
+            height: HEADER,
             flex: 'none',
             display: 'flex',
-            alignItems: 'center',
+            alignItems: 'flex-end',
             gap: 8,
-            padding: '0 12px',
-            background: 'var(--cc-pane-2)',
-            borderBottom: '1px solid var(--cc-line)',
+            padding: '0 16px',
+            minWidth: 0,
           }}
         >
-          <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.15em' }}>{label}</span>
+          <span className="cc-label" style={{ whiteSpace: 'nowrap' }}>{label}</span>
           <div style={{ flex: 1 }} />
-          {right}
+          <span className="cc-mini" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>
+            {right}
+          </span>
         </div>
       )}
       <div
@@ -54,7 +56,7 @@ export function Pane({
           minHeight: 0,
           display: 'flex',
           flexDirection: 'column',
-          padding: padded ? 18 : 0,
+          padding: padded ? 16 : 0,
         }}
       >
         {children}
@@ -63,27 +65,14 @@ export function Pane({
   );
 }
 
-/** Segmented meter. The gradient overlay punches the terminal-block gaps. */
-export function Meter({ pct, color, height = 12 }: { pct: number; color: string; height?: number }) {
+/** How tall a pane's title is, for a tile that works out what fits under it. */
+export const HEADER = 28;
+
+/** A plain bar: how much of something there is. */
+export function Meter({ pct, color, height = 4 }: { pct: number; color: string; height?: number }) {
   return (
-    <div
-      style={{
-        position: 'relative',
-        height,
-        background: 'var(--cc-inset)',
-        border: '1px solid var(--cc-line)',
-        flex: 'none',
-      }}
-    >
-      <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          backgroundImage:
-            'repeating-linear-gradient(90deg, transparent 0 5px, var(--cc-pane) 5px 6px)',
-        }}
-      />
+    <div style={{ height, background: 'var(--cc-line)', borderRadius: height / 2, overflow: 'hidden', flex: 'none' }}>
+      <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, background: color, borderRadius: height / 2 }} />
     </div>
   );
 }
@@ -92,8 +81,8 @@ export function Awaiting({ label }: { label: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, justifyContent: 'center', flex: 1 }}>
       <span className="cc-label">{label}</span>
-      <span style={{ fontSize: 30, fontWeight: 200, color: 'var(--cc-line-2)' }}>--</span>
-      <span className="cc-mini" style={{ fontSize: 10 }}>AWAITING FIRST EVENT</span>
+      <span style={{ fontSize: 30, fontWeight: 300, color: 'var(--cc-line-2)' }}>--</span>
+      <span className="cc-mini">Nothing heard yet</span>
     </div>
   );
 }

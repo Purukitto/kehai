@@ -6,8 +6,8 @@
 
 <p align="center">
   A companion dashboard for a secondary display. System telemetry, coding agents and
-  their token usage, media and notifications, in a terminal-inspired panel you read out
-  of the corner of your eye.
+  their token usage, media and notifications, in a quiet panel you read out of the
+  corner of your eye.
 </p>
 
 <p align="center">
@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/stage.png" alt="Kehai's Stage preset in the Amber theme: a large token-usage readout with a five-hour history, and clock, now playing and CPU, memory and unread tiles along the bottom">
+  <img src="docs/screenshots/stage.png" alt="Kehai's Stage preset in the Obsidian theme: a large token-usage readout with a five-hour history, and clock, now playing and CPU, memory, unread and agents tiles along the bottom">
 </p>
 
 ---
@@ -88,10 +88,10 @@ local, and stays out of the way.
 
 <p align="center">
   <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: CPU load, temperature and per-thread usage" width="32%">
-  <img src="docs/screenshots/panel.png" alt="Panel preset in the Amber theme: clock, token quota, sprint timer, now playing, notifications and a vitals strip, evenly weighted" width="32%">
-  <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock with token usage, now playing, CPU and memory below it" width="32%">
+  <img src="docs/screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, the focus timer, notifications and a vitals strip, evenly weighted" width="32%">
+  <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock with agents, token usage, now playing, CPU and memory below it" width="32%">
   <br>
-  <sub>Stage in Phosphor · Panel in Amber · Ambient in Ice. Any preset takes any theme.</sub>
+  <sub>Stage in Phosphor · Panel in Obsidian · Ambient in Ice. Any preset takes any theme.</sub>
 </p>
 
 ## Download

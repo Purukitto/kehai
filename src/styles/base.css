@@ -1,6 +1,5 @@
 * {
   box-sizing: border-box;
-  border-radius: 0;
 }
 
 html,
@@ -14,15 +13,56 @@ body,
   transition: filter 0.6s ease;
 }
 
+/* The page is the one thing allowed a gradient: a faint glow from above, in the
+   theme's accent, so the glass tiles have something to sit over. It never moves. */
 body {
   margin: 0;
   overflow: hidden;
-  background: var(--cc-bg);
+  background:
+    radial-gradient(ellipse 90% 60% at 50% -12%, color-mix(in srgb, var(--cc-accent) 9%, transparent), transparent 70%),
+    linear-gradient(180deg, color-mix(in srgb, var(--cc-bg) 82%, #2a2c31) 0%, var(--cc-bg) 70%);
+  background-color: var(--cc-bg);
   color: var(--cc-text);
   font-family: var(--cc-font);
+  font-size: 13px;
+  font-weight: 300;
+  line-height: 1.5;
   font-variant-ligatures: none;
   font-variant-numeric: tabular-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* The few numbers and titles that lead a screen: the same face, large and thin,
+   drawn a little tighter. Every figure is the same width, so a clock that
+   changes does not move. */
+.cc-display {
+  font-weight: 250;
+  letter-spacing: -0.04em;
+}
+
+/* A tile: glass over the page's glow, rounded, lifted a little. */
+.cc-card {
+  background: var(--cc-pane);
+  border: 1px solid var(--cc-line);
+  border-radius: 20px;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.4);
+}
+
+/* Something waiting on you. The one glow the panel has, and it does not move. */
+.cc-glow {
+  border-color: color-mix(in srgb, var(--cc-accent) 30%, transparent);
+  box-shadow:
+    0 0 40px color-mix(in srgb, var(--cc-accent) 14%, transparent),
+    inset 0 0 60px color-mix(in srgb, var(--cc-accent) 7%, transparent);
+}
+
+/* What floats over the panel: sheets, menus, notes. */
+.cc-glass {
+  background: color-mix(in srgb, var(--cc-bg) 78%, transparent);
+  -webkit-backdrop-filter: blur(40px) saturate(120%);
+  backdrop-filter: blur(40px) saturate(120%);
+  border: 1px solid var(--cc-line);
+  box-shadow: 0 16px 48px rgb(0 0 0 / 0.5);
 }
 
 button {
@@ -31,6 +71,18 @@ button {
   background: transparent;
   border: 1px solid var(--cc-line);
   cursor: pointer;
+}
+
+/* One focus ring for everything a keyboard can reach, in the second accent:
+   the first is kept for something waiting on you. */
+:focus-visible {
+  outline: 2px solid var(--cc-accent-2);
+  outline-offset: 2px;
+}
+
+code,
+.cc-code {
+  font-family: var(--cc-code);
 }
 
 .cc-traffic {
@@ -85,85 +137,144 @@ button {
   }
 }
 
+/* What a value is. Quieter than the value, never louder: no capitals, no tracking. */
 .cc-label {
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
-  color: var(--cc-dim);
-  text-transform: uppercase;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.3;
+  color: var(--cc-muted);
 }
 
+/* A note beside or under something. */
 .cc-mini {
-  font-size: 10px;
-  letter-spacing: 0.06em;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--cc-dim);
-}
-
-/* Horizontal segment equaliser. Freezes rather than hides when playback stops. */
-@keyframes cc-eq {
-  from {
-    opacity: 0.16;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.cc-eq {
-  display: flex;
-  gap: 2px;
-  align-items: stretch;
-  background: var(--cc-inset);
-  padding: 3px;
-}
-
-.cc-eq > span {
-  flex: 1;
-  min-width: 2px;
-  background: var(--cc-accent-2);
-  animation-name: cc-eq;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  animation-direction: alternate;
-}
-
-.cc-eq[data-playing='false'] > span {
-  animation-play-state: paused;
-  opacity: 0.16;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cc-eq > span {
-    animation: none;
-    opacity: 0.55;
-  }
 }
 
 /*
  * 28px is the smallest thing on the panel a finger has to hit, with a mouse or
  * without one. Centred with flex so a chip grown to the floor keeps its label
- * in the middle.
+ * in the middle. Filled, not outlined: a button is a surface you press, and an
+ * outline is kept for the one that is selected.
  */
 .cc-chip {
-  font-size: 9px;
-  letter-spacing: 0.12em;
-  padding: 3px 6px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.2;
+  padding: 4px 14px;
   min-height: 28px;
   min-width: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   border: 1px solid var(--cc-line);
-  color: var(--cc-muted);
-  background: transparent;
+  border-radius: 999px;
+  color: var(--cc-text);
+  background: var(--cc-pane-2);
   flex: none;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.cc-chip:hover {
+  background: var(--cc-line);
+  border-color: var(--cc-line-2);
+}
+
+.cc-chip:active {
+  background: var(--cc-line-2);
+}
+
+.cc-chip:disabled {
+  cursor: default;
+  color: var(--cc-dim);
+  background: transparent;
+  border-color: var(--cc-line);
+}
+
+/* The selected one of a set. */
+.cc-chip-on,
+.cc-chip-on:hover {
+  color: var(--cc-text);
+  background: var(--cc-line-2);
+  border-color: transparent;
+}
+
+/* The one thing a screen is asking you to do. At most one per screen. */
+.cc-primary,
+.cc-primary:hover {
+  color: var(--cc-bg);
+  background: var(--cc-accent);
+  border-color: transparent;
+  font-weight: 500;
+}
+
+.cc-primary:active {
+  filter: brightness(0.92);
+}
+
+/* Something that will take a thing away. */
+.cc-danger {
+  color: var(--cc-danger);
+}
+
+/* No chrome at all: a tab, a link-like action in a row. */
+.cc-bare,
+.cc-bare:hover,
+.cc-bare:active {
+  background: transparent;
+  border-color: transparent;
+}
+
+.cc-bare:hover {
+  color: var(--cc-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cc-chip {
+    transition: none;
+  }
+}
+
+/* The header's own chips: square and spaced out in capitals, like the wordmark
+   beside them. The header is the panel's frame, not something to read. */
+.cc-barchip {
+  font: inherit;
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: none;
+  border: 1px solid var(--cc-line-2);
+  border-radius: 0;
+  background: transparent;
+  color: var(--cc-muted);
+  white-space: nowrap;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.cc-barchip:hover {
+  color: var(--cc-text);
+  border-color: var(--cc-muted);
+}
+
+.cc-barnote {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cc-dim);
+  white-space: nowrap;
 }
 
 /* Played once when the header's layout button appears, as it does on every change of layout. */
 @keyframes cc-flash {
   from {
-    border-color: var(--cc-accent);
-    color: var(--cc-accent);
+    background-color: var(--cc-line-2);
   }
 }
 .cc-flash {
@@ -182,27 +293,16 @@ button {
   }
 }
 
-.cc-chip:hover {
-  border-color: var(--cc-line-2);
-  color: var(--cc-text);
-}
-
-.cc-chip-on {
-  color: var(--cc-bg);
-  background: var(--cc-accent);
-  border-color: var(--cc-accent);
-  font-weight: 600;
-}
-
-/* Text entry sits beside chips, so it borrows their hairline rather than the
-   platform's rounded field and focus glow. */
+/* Text entry sits beside chips, so it borrows their surface rather than the
+   platform's field and focus glow. */
 .cc-field {
   font: inherit;
-  font-size: 11px;
-  padding: 7px 10px;
+  font-size: 13px;
+  padding: 6px 10px;
   color: var(--cc-text);
   background: var(--cc-inset);
   border: 1px solid var(--cc-line);
+  border-radius: 12px;
   outline: none;
 }
 
@@ -210,8 +310,9 @@ button {
   color: var(--cc-dim);
 }
 
-.cc-field:focus {
-  border-color: var(--cc-accent);
+.cc-field:focus,
+.cc-field:focus-visible {
+  border-color: var(--cc-accent-2);
 }
 
 /* Dismiss stays out of the way until you go looking for it: the sink is
@@ -223,6 +324,7 @@ button {
   margin: -4px -6px -4px 0;
   flex: none;
   border: 0;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -341,31 +443,19 @@ button {
   -webkit-touch-callout: none;
 }
 
-/*
- * A game tile's edge, lit as RGB lighting does for the same game. The colour is
- * the game's, set on the element; it breathes only while something is happening.
- */
-.cc-edge {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  box-shadow:
-    inset 0 0 0 2px var(--cc-edge),
-    inset 0 0 48px -12px var(--cc-edge);
-}
-@keyframes cc-edge {
+/* The panel going still for a round, and back. Slow enough that the change is
+   not itself something moving at the edge of your eye. */
+@keyframes cc-fade-in {
   from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0.3;
+    opacity: 0;
   }
 }
-.cc-edge-pulse {
-  animation: cc-edge 900ms ease-in-out infinite alternate;
+.cc-fade-in {
+  animation: cc-fade-in 600ms ease-out;
 }
 @media (prefers-reduced-motion: reduce) {
-  .cc-edge-pulse {
+  .cc-fade-in {
     animation: none;
   }
 }
+

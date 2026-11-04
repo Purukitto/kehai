@@ -53,9 +53,12 @@ function Tile({
   );
 }
 
+/** The stored gap steps 0, 1, 2 and 4; on screen they are gutters of 4 to 28 px. */
+export const gutter = (gap: number) => 4 + gap * 6;
+
 /**
- * Renders one shape of a layout. The gutters are the grid gap showing the page
- * background through, which is why tiles carry no borders of their own.
+ * Renders one shape of a layout. Each tile is a rounded card of glass over the
+ * page's glow, and the layout's gap sets the gutter between them.
  *
  * Holding a tile, or right-clicking it, asks for that widget's options.
  */
@@ -77,9 +80,8 @@ export function Grid({
         display: 'grid',
         gridTemplateColumns: `repeat(${arrangement.grid.cols}, minmax(0, 1fr))`,
         gridTemplateRows: `repeat(${arrangement.grid.rows}, minmax(0, 1fr))`,
-        gap: arrangement.grid.gap,
-        // Uncovered cells must read as empty, not as gutter.
-        background: 'var(--cc-bg)',
+        gap: gutter(arrangement.grid.gap),
+        padding: gutter(arrangement.grid.gap),
       }}
     >
       {arrangement.tiles.map((tile, i) => {
@@ -92,15 +94,17 @@ export function Grid({
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          // Hairline per tile rather than a gutter-coloured backdrop, so the
-          // separation survives however sparse the arrangement is.
-          boxShadow: '0 0 0 1px var(--cc-line)',
+          // The card's edge; the widget inside paints its glass.
+          border: '1px solid var(--cc-line)',
+          borderRadius: 20,
+          boxShadow: '0 4px 24px rgb(0 0 0 / 0.4)',
+          isolation: 'isolate',
         };
 
         if (!spec) {
           return (
             <div key={i} style={{ ...style, background: 'var(--cc-pane)', alignItems: 'center', justifyContent: 'center' }}>
-              <span className="cc-mini">UNKNOWN WIDGET: {tile.widget}</span>
+              <span className="cc-mini">No widget called {tile.widget}</span>
             </div>
           );
         }

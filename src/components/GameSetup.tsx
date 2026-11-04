@@ -67,13 +67,13 @@ export function GameSetup({ widget, onClose }: { widget: GameDescription; onClos
 
   const ready = found?.folder && found.file && !found.reason;
   const row = (label: string, value: string, right?: ReactNode, color?: string) => (
-    <div style={{ padding: '11px 0', borderTop: '1px solid var(--cc-line)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 28 }}>
+    <div style={{ padding: '12px 0', borderTop: '1px solid var(--cc-line)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minHeight: 28 }}>
         <span className="cc-label">{label}</span>
         <span style={{ flex: 1 }} />
         {right}
       </div>
-      <div style={{ fontSize: 12, marginTop: 6, color: color ?? 'var(--cc-text)', wordBreak: 'break-all', lineHeight: 1.5 }}>{value}</div>
+      <div className="cc-code" style={{ marginTop: 4, color: color ?? 'var(--cc-text)', wordBreak: 'break-all', lineHeight: 1.5 }}>{value}</div>
     </div>
   );
 
@@ -93,79 +93,79 @@ export function GameSetup({ widget, onClose }: { widget: GameDescription; onClos
           zIndex: 61,
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--cc-pane-2)',
-          border: '1px solid var(--cc-line-2)',
+          borderRadius: 24,
+          overflow: 'hidden',
         }}
+        className="cc-glass"
       >
-        <div style={{ height: 52, flex: 'none', display: 'flex', alignItems: 'center', gap: 11, padding: '0 20px', borderBottom: '1px solid var(--cc-line)' }}>
-          <GameIcon path={source.icon} color="var(--cc-accent)" />
-          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2em' }}>{source.game.toUpperCase()}</span>
-          <span className="cc-label">SET UP</span>
+        <div style={{ height: 56, flex: 'none', display: 'flex', alignItems: 'center', gap: 12, padding: '0 16px 0 24px', borderBottom: '1px solid var(--cc-line)' }}>
+          <GameIcon path={source.icon} color="var(--cc-muted)" />
+          <span className="cc-display" style={{ fontSize: 22 }}>Set up {source.game}</span>
           <span style={{ flex: 1 }} />
-          <button className="cc-chip" style={{ padding: '7px 16px' }} onClick={onClose}>
-            CANCEL
+          <button className="cc-chip cc-bare" style={{ color: 'var(--cc-muted)' }} onClick={onClose}>
+            Cancel
           </button>
         </div>
 
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 22px 10px' }}>
-          <div style={{ fontSize: 13, lineHeight: 1.65 }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '16px 24px 12px' }}>
+          <div style={{ fontSize: 14, lineHeight: 1.6, maxWidth: '68ch' }}>
             {short} can tell programs on this PC what its HUD shows. Valve made this for lighting, overlays and panels like this
             one. Kehai writes one small file into {short}’s settings folder, then listens for {short} on this PC only.
           </div>
           <div style={{ marginTop: 12 }}>
             {row(
-              found?.by === 'chosen' ? 'THE FOLDER YOU CHOSE' : 'FOUND THROUGH STEAM',
+              found?.by === 'chosen' ? 'The folder you chose' : 'Found through Steam',
               !found ? 'Looking…' : (found.folder ?? found.reason ?? ''),
-              <button className="cc-chip" style={{ padding: '6px 12px' }} onClick={() => send({ action: 'choose', widget: widget.id, source: spec })}>
-                {found?.folder ? 'CHOOSE ANOTHER FOLDER' : 'CHOOSE THE FOLDER'}
+              <button className="cc-chip" onClick={() => send({ action: 'choose', widget: widget.id, source: spec })}>
+                {found?.folder ? 'Choose another folder' : 'Choose the folder'}
               </button>,
               found && !found.folder ? 'var(--cc-danger)' : undefined
             )}
             {found?.folder && found.reason && (
-              <div style={{ fontSize: 12, color: 'var(--cc-danger)', paddingBottom: 10, lineHeight: 1.5 }}>{found.reason}</div>
+              <div style={{ fontSize: 13, color: 'var(--cc-danger)', paddingBottom: 12, lineHeight: 1.5 }}>{found.reason}</div>
             )}
-            {found?.file && row('THE FILE KEHAI WRITES', found.file)}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 20, padding: '11px 0', borderTop: '1px solid var(--cc-line)' }}>
+            {found?.file && row('The file Kehai writes', found.file)}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 24, padding: '12px 0', borderTop: '1px solid var(--cc-line)' }}>
               <div>
-                <div className="cc-label">IT ASKS {short} FOR</div>
+                <div className="cc-label">It asks {short} for</div>
                 {source.asks.map((a) => (
-                  <div key={a} style={{ fontSize: 12, marginTop: 7 }}>
+                  <div key={a} style={{ fontSize: 14, marginTop: 8 }}>
                     {a}
                   </div>
                 ))}
               </div>
               <div>
-                <div className="cc-label">NEVER</div>
+                <div className="cc-label">Never</div>
                 {source.never.map((a) => (
-                  <div key={a} style={{ fontSize: 12, marginTop: 7, color: 'var(--cc-muted)' }}>
+                  <div key={a} style={{ fontSize: 14, marginTop: 8, color: 'var(--cc-muted)' }}>
                     {a}
                   </div>
                 ))}
               </div>
             </div>
             {found && found.others.length > 0 && (
-              <div style={{ padding: '11px 0', borderTop: '1px solid var(--cc-line)' }}>
-                <div className="cc-label">ALREADY IN THAT FOLDER · LEFT AS THEY ARE</div>
+              <div style={{ padding: '12px 0', borderTop: '1px solid var(--cc-line)' }}>
+                <div className="cc-label">Already in that folder, left as they are</div>
                 {found.others.map((f) => (
-                  <div key={f} style={{ fontSize: 12, marginTop: 7, color: 'var(--cc-muted)', wordBreak: 'break-all' }}>
+                  <div key={f} style={{ fontSize: 13, marginTop: 8, color: 'var(--cc-muted)', wordBreak: 'break-all' }}>
                     {f} · {whose(f)}
                   </div>
                 ))}
               </div>
             )}
           </div>
-          <div className="cc-mini" style={{ lineHeight: 1.7, paddingTop: 4 }}>
-            KEHAI LISTENS ON 127.0.0.1{setup?.port ? `:${setup.port}` : ''}, THIS PC ONLY, AND ONLY FOR {short} SENDING THE KEY IN THE FILE.
-            REMOVE TAKES THE FILE OUT AGAIN.
+          <div className="cc-mini" style={{ lineHeight: 1.6, paddingTop: 4 }}>
+            Kehai listens on <span className="cc-code">127.0.0.1{setup?.port ? `:${setup.port}` : ''}</span>, this PC only, and only for {short} sending
+            the key in the file. Remove takes the file out again.
           </div>
         </div>
 
-        <div style={{ minHeight: 58, flex: 'none', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 20px', borderTop: '1px solid var(--cc-line)', background: 'var(--cc-inset)' }}>
-          <span className="cc-mini">NEXT: START {short}, OR RESTART IT IF IT’S OPEN</span>
+        <div style={{ minHeight: 64, flex: 'none', display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px 8px 24px', borderTop: '1px solid var(--cc-line)' }}>
+          <span className="cc-mini">Next: start {short}, or restart it if it’s open</span>
           <span style={{ flex: 1 }} />
           <button
-            className={`cc-chip${ready && !writing ? ' cc-chip-on' : ''}`}
-            style={{ padding: '10px 22px', opacity: ready ? 1 : 0.5 }}
+            className={`cc-chip${ready && !writing ? ' cc-primary' : ''}`}
+            style={{ padding: '8px 20px' }}
             disabled={!ready || writing}
             onClick={() => {
               if (!found?.folder) return;
@@ -173,7 +173,7 @@ export function GameSetup({ widget, onClose }: { widget: GameDescription; onClos
               send({ action: 'setup', widget: widget.id, name: source.game, source: spec, folder: found.folder });
             }}
           >
-            {writing ? 'WRITING…' : 'WRITE THE FILE'}
+            {writing ? 'Writing…' : 'Write the file'}
           </button>
         </div>
       </div>
