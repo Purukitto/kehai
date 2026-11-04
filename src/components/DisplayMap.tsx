@@ -3,7 +3,7 @@ import type { DisplayInfo } from '../core/payloads';
 
 /** What a display is called on the panel: its own name, or its number. */
 export function displayLabel(d: { name: string | null; number: number | null }): string {
-  return d.name ? d.name.toUpperCase() : `DISPLAY ${d.number ?? '?'}`;
+  return d.name ?? `Display ${d.number ?? '?'}`;
 }
 
 /** Margin around the arrangement inside the map. */
@@ -99,6 +99,7 @@ export function DisplayMap({
                 height: h,
                 background: on ? 'var(--cc-pane-2)' : 'var(--cc-pane)',
                 border: on ? '2px solid var(--cc-accent)' : '1px solid var(--cc-line-2)',
+                borderRadius: 16,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -118,18 +119,18 @@ export function DisplayMap({
                     width: Math.min(64, w * 0.25),
                     height: Math.min(40, h * 0.2),
                     border: `1px solid ${on ? 'var(--cc-accent)' : 'var(--cc-text)'}`,
+                    borderRadius: 2,
                     background: 'var(--cc-bg)',
                   }}
                 />
               )}
-              <span style={{ fontSize: digits, fontWeight: 200, lineHeight: 0.9, color: on ? 'var(--cc-accent)' : 'var(--cc-muted)' }}>
+              <span style={{ fontSize: digits, fontWeight: 300, lineHeight: 0.9, color: on ? 'var(--cc-text)' : 'var(--cc-muted)' }}>
                 {d.number}
               </span>
               {roomy && (
                 <span
                   style={{
-                    fontSize: 10,
-                    letterSpacing: '0.1em',
+                    fontSize: 12,
                     color: on ? 'var(--cc-text)' : 'var(--cc-muted)',
                     maxWidth: '100%',
                     overflow: 'hidden',
@@ -143,8 +144,8 @@ export function DisplayMap({
               )}
               {tags && (d.primary || here || (on && hint)) && (
                 <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {d.primary && <Tag color="var(--cc-muted)">MAIN</Tag>}
-                  {here && <Tag color={on ? 'var(--cc-accent)' : 'var(--cc-text)'}>KEHAI IS HERE</Tag>}
+                  {d.primary && <Tag color="var(--cc-muted)">Main</Tag>}
+                  {here && <Tag color="var(--cc-text)">Kehai is here</Tag>}
                   {on && hint && <Tag color="var(--cc-accent-2)">{hint}</Tag>}
                 </span>
               )}
@@ -157,7 +158,7 @@ export function DisplayMap({
 
 function Tag({ color, children }: { color: string; children: string }) {
   return (
-    <span style={{ fontSize: 9, letterSpacing: '0.1em', padding: '2px 6px', border: '1px solid currentColor', color, flex: 'none' }}>
+    <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: 'var(--cc-line)', color, flex: 'none' }}>
       {children}
     </span>
   );

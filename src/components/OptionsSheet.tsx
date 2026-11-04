@@ -69,6 +69,7 @@ export function OptionsSheet({
             height: rect.height,
             zIndex: 51,
             pointerEvents: 'none',
+            borderRadius: 20,
             boxShadow: '0 0 0 2px var(--cc-accent), 0 0 0 100vmax rgba(0, 0, 0, 0.62)',
           }}
         />
@@ -76,36 +77,37 @@ export function OptionsSheet({
       <div
         role="dialog"
         aria-label={`${name} options`}
+        className="cc-glass"
         style={{
           position: 'fixed',
-          top: 0,
-          bottom: 0,
-          [onLeft ? 'left' : 'right']: 0,
-          width,
+          top: 12,
+          bottom: 12,
+          [onLeft ? 'left' : 'right']: 12,
+          width: width - 12,
           zIndex: 52,
           display: 'flex',
           flexDirection: 'column',
-          background: 'var(--cc-pane-2)',
-          [onLeft ? 'borderRight' : 'borderLeft']: '1px solid var(--cc-line-2)',
+          borderRadius: 24,
+          overflow: 'hidden',
         }}
       >
         <div
           style={{
-            height: 52,
+            height: 56,
             flex: 'none',
             display: 'flex',
             alignItems: 'center',
-            gap: 11,
-            padding: '0 20px',
+            gap: 12,
+            padding: '0 16px 0 24px',
             borderBottom: '1px solid var(--cc-line)',
           }}
         >
-          <GameIcon path={spec?.game?.source.icon ?? null} color="var(--cc-accent)" />
-          <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2em' }}>{name.toUpperCase()}</span>
-          <span className="cc-label">OPTIONS</span>
+          <GameIcon path={spec?.game?.source.icon ?? null} color="var(--cc-muted)" />
+          <span className="cc-display" style={{ fontSize: 22 }}>{name}</span>
+          <span className="cc-mini">Options</span>
           <div style={{ flex: 1 }} />
-          <button className="cc-chip cc-chip-on" style={{ padding: '8px 22px' }} onClick={onClose}>
-            DONE
+          <button className="cc-chip" style={{ padding: '6px 20px' }} onClick={onClose}>
+            Done
           </button>
         </div>
 
@@ -114,7 +116,7 @@ export function OptionsSheet({
             flex: 1,
             minHeight: 0,
             overflowY: 'auto',
-            padding: '4px 20px 16px',
+            padding: '0 24px 16px',
             scrollbarWidth: 'thin',
             scrollbarColor: 'var(--cc-line-2) transparent',
           }}
@@ -122,7 +124,7 @@ export function OptionsSheet({
           {Options ? (
             <Options tile={held.tile} />
           ) : (
-            <div style={{ padding: '22px 0', fontSize: 12, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
+            <div style={{ padding: '24px 0', fontSize: 13, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
               Nothing to set for {name}.
             </div>
           )}
@@ -130,20 +132,19 @@ export function OptionsSheet({
 
         <div
           style={{
-            height: 46,
+            height: 52,
             flex: 'none',
             display: 'flex',
             alignItems: 'center',
             gap: 12,
-            padding: '0 20px',
+            padding: '0 16px 0 24px',
             borderTop: '1px solid var(--cc-line)',
-            background: 'var(--cc-inset)',
           }}
         >
-          {!inSettings && <span className="cc-mini">ALSO UNDER SETTINGS → WIDGETS</span>}
+          {!inSettings && <span className="cc-mini">Also under Settings → Widgets</span>}
           <div style={{ flex: 1 }} />
-          <button className="cc-chip" style={{ padding: '7px 13px' }} onClick={onArrange}>
-            ARRANGE THIS LAYOUT
+          <button className="cc-chip" onClick={onArrange}>
+            Arrange this layout
           </button>
         </div>
       </div>

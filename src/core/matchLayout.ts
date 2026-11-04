@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { bus } from './bus';
 import { get, text } from './game';
 import type { GamePayload } from './payloads';
@@ -10,34 +10,20 @@ import { registry } from '../widgets/registry';
 const MENU_GRACE_MS = 2 * 60_000;
 
 /**
- * What a live match does to the panel, as each game's options say: nothing,
- * another layout on screen, or the game's tile full screen. Either goes back
- * when the match ends, or after two minutes in the menu. A layout picked, or
- * full screen left, by hand during the match stays as chosen, and that match
- * does not switch again.
- *
- * Also the game tile full screen by hand: a tap on it. That one stays until
- * it is tapped again.
+ * Another layout on screen for a live match, for a game whose options ask for
+ * one. It goes back when the match ends, or after two minutes in the menu. A
+ * layout picked by hand during the match stays as chosen, and that match does
+ * not switch again. Going still while the player is in play is `useGames`.
  */
-export function useMatchLayout(): { full: string | null; setFull: (widget: string | null) => void } {
+export function useMatchLayout(): void {
   const { settings, setMatchLayout } = useSettings();
   const now = useRef(settings);
   now.current = settings;
   const set = useRef(setMatchLayout);
   set.current = setMatchLayout;
-  const [full, setFullState] = useState<string | null>(null);
-  const fullNow = useRef(full);
-  fullNow.current = full;
-  /** The game whose match put its tile full screen, as against a tap. */
-  const auto = useRef<string | null>(null);
   // Matches already switched for, so one changed back by hand is left alone.
   const done = useRef(new Set<string>());
   const leftAt = useRef(new Map<string, number>());
-
-  const setFull = useCallback((widget: string | null) => {
-    auto.current = null;
-    setFullState(widget);
-  }, []);
 
   useEffect(() => {
     const check = (widget: string, payload: GamePayload) => {
@@ -46,7 +32,6 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
       const s = now.current;
       const choice = s.games[widget];
       const to = choice?.onMatch === 'layout' ? (choice.switchTo ?? null) : null;
-      const wantsFull = choice?.onMatch === 'full';
       const data = payload.live ? payload.data : null;
       const phase = g.match.phase ? text(data, g.match.phase) : undefined;
       const over = data !== null && phase !== undefined && g.match.over.includes(phase);
@@ -62,22 +47,13 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
         if (to && playing) set.current({ widget, to, from: active.from });
         return;
       }
-      if (auto.current === widget && !wantsFull) {
-        auto.current = null;
-        setFullState(null);
-      }
-
-      const ours = s.matchLayout?.widget === widget || auto.current === widget;
+      const ours = s.matchLayout?.widget === widget;
       if (playing) {
         leftAt.current.delete(widget);
         if (done.current.has(match)) return;
         if (to && !s.matchLayout) {
           done.current.add(match);
           if (s.layoutId !== to) set.current({ widget, to, from: s.layoutId });
-        } else if (wantsFull && fullNow.current === null) {
-          done.current.add(match);
-          auto.current = widget;
-          setFullState(widget);
         }
         return;
       }
@@ -87,10 +63,6 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
       }
       const back = () => {
         if (s.matchLayout?.widget === widget) set.current(null);
-        if (auto.current === widget) {
-          auto.current = null;
-          setFullState(null);
-        }
         done.current.clear();
         leftAt.current.delete(widget);
       };
@@ -105,7 +77,7 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
       if (Date.now() - since >= MENU_GRACE_MS) back();
     };
 
-    // A remote panel's options are its host's, so it only goes full screen by hand.
+    // A remote panel's layouts are its own, and its host's options are not.
     if (REMOTE_PANEL) return;
     const stop = bus.subscribe('game:*', (e) => {
       if (e.topic === 'game:setup') return;
@@ -113,7 +85,7 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
     });
     // The menu's grace runs out with nothing new to say.
     const id = window.setInterval(() => {
-      const widget = now.current.matchLayout?.widget ?? auto.current;
+      const widget = now.current.matchLayout?.widget;
       const last = widget ? bus.peek<GamePayload>(`game:${widget}`)?.data : undefined;
       if (widget && last) check(widget, last);
     }, 15_000);
@@ -122,6 +94,4 @@ export function useMatchLayout(): { full: string | null; setFull: (widget: strin
       window.clearInterval(id);
     };
   }, []);
-
-  return { full, setFull };
 }

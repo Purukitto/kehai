@@ -15,10 +15,13 @@
  *
  * The readings come in order of importance: a small tile keeps the first.
  *
- * A game widget may bring its game's own colours, as hex, and light its tile's
- * edge the way RGB lighting does for the same game: the team's colour in buy
- * time, red while the bomb is down. Its options can swap them for the theme's
- * colours, or turn the lighting off.
+ * A player is never meant to read the panel while they play. The file says
+ * when that is (`match.still`), and the panel goes still and holds what comes
+ * in until it is over. The readings are for the gaps, so a widget lists what
+ * the game itself does not show, never a copy of its HUD.
+ *
+ * A game widget may bring its game's own colours for its sides, as hex. Its
+ * options can swap them for the theme's.
  */
 
 import type { GameSourceSpec } from './payloads';
@@ -56,31 +59,11 @@ export interface Condition {
 /** A colour as `#rrggbb`. */
 export type Hex = string;
 
-/** Which of the theme's colours stands in for a game's, when the theme's are chosen. */
-export type Tone = 'first' | 'second' | 'danger' | 'ok' | 'text' | 'muted';
 
 /** The first step a value is above gives its colour. */
 export interface Ramp {
   above: number;
   color: Hex;
-}
-
-/** One way the tile's edge lights up; the first that holds wins. */
-export interface EdgeRule {
-  when: Condition;
-  /** A colour, or the player's side's (`you`), or the side that won the round (`winner`). */
-  color: Hex | 'you' | 'winner';
-  /** Breathes slowly rather than staying lit. */
-  pulse: boolean;
-  tone: Tone;
-}
-
-/** A wash over the tile, as strong as the value is out of `max`: a flash, smoke. */
-export interface Overlay {
-  path: string;
-  max: number;
-  color: Hex;
-  tone: Tone;
 }
 
 interface ReadingBase {
@@ -193,12 +176,15 @@ export type Reading = TeamsReading | MetersReading | NumbersReading | ItemReadin
 
 export interface GameWidget {
   source: GameSource;
-  /** When the game is in a match, what its header says, and when it is over. */
-  match: { in: string; title: string; phase?: string; over: string[] };
+  /**
+   * When the game is in a match, what its header says, and when it is over.
+   * `still` is when the player is in play: while it holds, and the state is
+   * their own, the panel goes still. Without it, the whole match is.
+   */
+  match: { in: string; title: string; phase?: string; over: string[]; still?: Condition };
   /** Who the state is about, when the game can show someone else's. */
   subject?: { self: string; who: string; name: string; tag: string };
   readings: Reading[];
-  lighting: { edge: EdgeRule[]; overlays: Overlay[] };
 }
 
 /** The source kinds Kehai has. A file asking for another is listed, not loaded. */
@@ -250,7 +236,7 @@ export function fill(template: string, data: unknown): string | undefined {
   const out = template.replace(/\{([^}]+)\}/g, (_, path: string) => {
     const v = text(data, path);
     if (v === undefined) missing = true;
-    return (v ?? '').toUpperCase();
+    return v ?? '';
   });
   return missing ? undefined : out;
 }
@@ -329,7 +315,6 @@ function condition(v: unknown, id: string, what: string): Condition | undefined 
 }
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
-const TONES: Tone[] = ['first', 'second', 'danger', 'ok', 'text', 'muted'];
 
 function hex(v: unknown, id: string, what: string): Hex {
   if (typeof v !== 'string' || !HEX.test(v)) fail(id, `${what} must be a colour such as #e8a43c`);
@@ -337,12 +322,6 @@ function hex(v: unknown, id: string, what: string): Hex {
 }
 
 const optHex = (v: unknown, id: string, what: string): Hex | undefined => (v === undefined ? undefined : hex(v, id, what));
-
-function tone(v: unknown, id: string, what: string, fallback: Tone): Tone {
-  if (v === undefined) return fallback;
-  if (typeof v !== 'string' || !TONES.includes(v as Tone)) fail(id, `${what} must be one of ${TONES.join(', ')}`);
-  return v as Tone;
-}
 
 function ramps(v: unknown, id: string, what: string): Ramp[] {
   if (v === undefined) return [];
@@ -352,37 +331,6 @@ function ramps(v: unknown, id: string, what: string): Ramp[] {
       ? { above: r.above, color: hex(r.color, id, `${what}[${i}].color`) }
       : fail(id, `${what}[${i}] must be { "above", "color" }`)
   );
-}
-
-function lighting(v: unknown, id: string): GameWidget['lighting'] {
-  if (v === undefined) return { edge: [], overlays: [] };
-  if (!isRecord(v)) fail(id, 'lighting must be { "edge", "overlays" }');
-  const list = (x: unknown, what: string) => {
-    if (x === undefined) return [];
-    if (!Array.isArray(x) || x.length > 12) fail(id, `lighting.${what} must list up to 12`);
-    return x.map((r, i) => (isRecord(r) ? r : fail(id, `lighting.${what}[${i}] must be an object`)));
-  };
-  return {
-    edge: list(v.edge, 'edge').map((r, i) => {
-      const where = `lighting.edge[${i}]`;
-      const color = r.color === 'you' || r.color === 'winner' ? r.color : hex(r.color, id, `${where}.color`);
-      return {
-        when: condition(r.when, id, `${where}.when`) ?? fail(id, `${where}.when is needed`),
-        color,
-        pulse: r.pulse === true,
-        tone: tone(r.tone, id, `${where}.tone`, 'second'),
-      };
-    }),
-    overlays: list(v.overlays, 'overlays').map((r, i) => {
-      const where = `lighting.overlays[${i}]`;
-      return {
-        path: path(r.path, id, `${where}.path`),
-        max: isNumber(r.max) && r.max > 0 ? r.max : fail(id, `${where}.max must be a number above 0`),
-        color: hex(r.color, id, `${where}.color`),
-        tone: tone(r.tone, id, `${where}.tone`, 'text'),
-      };
-    }),
-  };
 }
 
 function source(v: unknown, id: string): GameSource {
@@ -571,6 +519,7 @@ export function parseGame(input: Record<string, unknown>, id: string): GameWidge
       title: str(m.title, id, 'match.title', 80),
       phase: optPath(m.phase, id, 'match.phase'),
       over: m.over === undefined ? [] : strings(m.over, id, 'match.over'),
+      still: condition(m.still, id, 'match.still'),
     },
     subject:
       s === undefined
@@ -584,7 +533,6 @@ export function parseGame(input: Record<string, unknown>, id: string): GameWidge
             }
           : fail(id, 'subject must be { "self", "who", "name", "tag" }'),
     readings,
-    lighting: lighting(input.lighting, id),
   };
 }
 

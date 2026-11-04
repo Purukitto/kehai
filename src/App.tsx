@@ -1,4 +1,4 @@
-import { createElement, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { displayLabel } from './components/DisplayMap';
 import { HideSheet } from './components/HideSheet';
@@ -6,6 +6,7 @@ import { LayoutSwitcher, useLayoutSwipe } from './components/LayoutSwitcher';
 import { OptionsSheet } from './components/OptionsSheet';
 import type { Held } from './components/OptionsSheet';
 import { PairPrompt } from './components/PairPrompt';
+import { Playing } from './components/Playing';
 import { Quiet } from './components/Quiet';
 import { Stale, hhmmAt } from './components/Stale';
 import { WindowControls } from './components/WindowControls';
@@ -36,18 +37,17 @@ import type {
 import { REMOTE_PANEL as REMOTE, startRemoteSource } from './core/remoteSource';
 import type { RemoteLink } from './core/remoteSource';
 import { HideText } from './core/quiet';
+import { useGames } from './core/gameSession';
 import { useMatchLayout } from './core/matchLayout';
 import { findLayout, useSettings } from './core/settings';
 import type { QuietShow } from './core/settings';
 import { SOURCES, SOURCE_IDS } from './core/sources';
 import { ENGINE_TOPICS, isTauri, startTauriSource } from './core/tauriSource';
-import { TileSizeProvider } from './core/TileSize';
 import { useTopic } from './core/useTopic';
 import { useWindowShape } from './core/useWindowShape';
 import { Arranger } from './grid/Arranger';
 import { Grid } from './grid/Grid';
 import { SettingsScreen } from './settings/SettingsScreen';
-import { registry } from './widgets/registry';
 import type { Section } from './settings/SettingsScreen';
 import { Setup } from './setup/Setup';
 
@@ -85,11 +85,11 @@ function dayAt(ms: number): string {
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
   const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
   const day = same(d, today)
-    ? 'TODAY'
+    ? 'today'
     : same(d, yesterday)
-      ? 'YESTERDAY'
-      : 'ON ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase();
-  return `${day} AT ${hhmmAt(ms)}`;
+      ? 'yesterday'
+      : 'on ' + d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  return `${day} at ${hhmmAt(ms)}`;
 }
 
 /**
@@ -140,21 +140,22 @@ function CrashLine({ at, onReport, onDismiss }: { at: number; onReport: () => vo
         alignItems: 'center',
         flexWrap: 'wrap',
         gap: 12,
-        padding: '4px 10px 4px 16px',
-        background: 'var(--cc-pane-2)',
-        borderBottom: '1px solid var(--cc-line)',
-        boxShadow: 'inset 2px 0 0 var(--cc-danger)',
+        margin: '0 10px',
+        padding: '4px 8px 4px 16px',
+        background: 'color-mix(in srgb, var(--cc-danger) 8%, transparent)',
+        border: '1px solid color-mix(in srgb, var(--cc-danger) 24%, transparent)',
+        borderRadius: 999,
       }}
     >
-      <span style={{ width: 7, height: 7, flex: 'none', background: 'var(--cc-danger)' }} />
-      <span style={{ fontSize: 11, letterSpacing: '0.14em' }}>KEHAI CLOSED UNEXPECTEDLY {dayAt(at)}.</span>
-      <span className="cc-mini">THE LOG HAS WHAT HAPPENED.</span>
+      <span style={{ width: 8, height: 8, borderRadius: '50%', flex: 'none', background: 'var(--cc-danger)' }} />
+      <span style={{ fontSize: 13 }}>Kehai closed unexpectedly {dayAt(at)}.</span>
+      <span className="cc-mini">The log has what happened.</span>
       <span style={{ flex: 1 }} />
-      <button className="cc-chip" style={{ padding: '6px 14px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }} onClick={onReport}>
-        REPORT IT
+      <button className="cc-chip cc-primary" onClick={onReport}>
+        Report it
       </button>
-      <button className="cc-chip" style={{ padding: '6px 14px' }} onClick={onDismiss}>
-        DISMISS
+      <button className="cc-chip cc-bare" onClick={onDismiss}>
+        Dismiss
       </button>
     </div>
   );
@@ -164,21 +165,20 @@ function CrashLine({ at, onReport, onDismiss }: { at: number; onReport: () => vo
 function RemoteNote() {
   return (
     <div
+      className="cc-glass"
       style={{
         position: 'absolute',
         left: '50%',
         bottom: 24,
         transform: 'translateX(-50%)',
-        padding: '10px 16px',
-        background: 'var(--cc-pane-2)',
-        border: '1px solid var(--cc-line-2)',
-        fontSize: 11,
-        letterSpacing: '0.12em',
+        padding: '8px 20px',
+        borderRadius: 999,
+        fontSize: 13,
         color: 'var(--cc-muted)',
         pointerEvents: 'none',
       }}
     >
-      OPTIONS ARE ON THE PC KEHAI RUNS ON
+      Options are on the PC Kehai runs on
     </div>
   );
 }
@@ -205,7 +205,10 @@ export default function App() {
   const shell = useTopic<WindowPayload>('app:window');
   const logState = useTopic<LogPayload>('app:log');
   const [hiding, setHiding] = useState(false);
-  const { full, setFull } = useMatchLayout();
+  useMatchLayout();
+  const inPlay = useGames();
+  // Opened by hand during play: stays open until the player is next in play.
+  const [openedFor, setOpenedFor] = useState<number | null>(null);
 
   useEffect(() => {
     if (!remoteNote) return;
@@ -442,6 +445,9 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         : null;
   const quietRef = useRef(quiet);
   quietRef.current = quiet;
+  const still = mode === 'dashboard' && !quiet && inPlay && openedFor !== inPlay.since ? inPlay : null;
+  const stillRef = useRef(still);
+  stillRef.current = still;
 
   // Opening settings from the update badge lands on About. Every other way in,
   // including back from the arranger, starts where it always has.
@@ -462,9 +468,12 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         setWoken(true);
         return;
       }
+      if (stillRef.current) {
+        setOpenedFor(stillRef.current.since);
+        return;
+      }
 
       if (e.key === 'Escape') {
-        setFull(null);
         setMode('dashboard');
         setHiding(false);
       }
@@ -531,22 +540,22 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
   // because it can be up and still not be showing anything real.
   const source = REMOTE
     ? remote.state === 'live'
-      ? { live: true, label: remote.control ? 'REMOTE' : 'REMOTE · VIEW ONLY', title: 'Showing ' + location.host }
+      ? { live: true, label: remote.control ? 'Remote' : 'Remote · view only', title: 'Showing ' + location.host }
       : remote.state === 'unpaired'
-        ? { live: false, label: 'NOT PAIRED', title: remote.reason }
+        ? { live: false, label: 'Not paired', title: remote.reason }
         : {
             live: false,
             label:
               remote.heard !== null
-                ? `REMOTE · OFFLINE SINCE ${hhmmAt(remote.heard)}`
+                ? `Remote · offline since ${hhmmAt(remote.heard)}`
                 : remote.state === 'offline'
-                  ? 'REMOTE · OFFLINE'
-                  : 'REMOTE · CONNECTING',
+                  ? 'Remote · offline'
+                  : 'Remote · connecting',
             title: 'Reaching ' + location.host,
           }
     : engine
-      ? { live: true, label: 'ENGINE', title: 'Rust engine connected' }
-      : { live: false, label: 'MOCK', title: 'Mock source' };
+      ? { live: true, label: 'Engine', title: 'Reading this PC' }
+      : { live: false, label: 'Mock', title: 'No engine: the panel shows made-up readings' };
 
   // Close hides the panel in the tray, and says so the first time. Where there
   // is no tray it quits, as it always has.
@@ -580,10 +589,13 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
           alignItems: 'center',
           gap: 9,
           padding: '0 0 0 18px',
-          background: 'var(--cc-pane)',
+          // A strip of its own over the page, more solid when it slides over the tiles.
+          background: autoHide ? 'color-mix(in srgb, var(--cc-bg) 70%, transparent)' : 'var(--cc-pane)',
+          backdropFilter: autoHide ? 'blur(24px)' : undefined,
           borderBottom: '1px solid var(--cc-line)',
         }}
       >
+        {/* The wordmark: the one place capitals are spaced out, because it is a mark, not a label. */}
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--cc-accent)" strokeWidth="1.8" strokeLinejoin="round">
           <path d="M8 1.4 14.6 8 8 14.6 1.4 8Z" />
         </svg>
@@ -592,8 +604,8 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         {displays?.missing && (
           // In the second accent: the first is kept for an agent waiting on you.
           <button
-            className="cc-chip"
-            style={{ padding: '5px 10px', marginRight: 4, gap: 8, color: 'var(--cc-accent-2)', borderColor: 'var(--cc-accent-2)' }}
+            className="cc-barchip"
+            style={{ marginRight: 4, color: 'var(--cc-accent-2)', borderColor: 'var(--cc-accent-2)' }}
             onClick={() => {
               setSettingsAt('WINDOW');
               setMode('settings');
@@ -601,44 +613,31 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
             title="Kehai moves back by itself once it is connected again"
           >
             <span style={{ width: 5, height: 5, background: 'var(--cc-accent-2)' }} />
-            {displayLabel({ name: displays.chosenName, number: displays.chosenNumber })} IS NOT CONNECTED · SHOWING HERE
+            {displayLabel({ name: displays.chosenName, number: displays.chosenNumber })} isn’t connected · showing here
           </button>
         )}
         {update?.state === 'available' && (
           // Waits to be noticed rather than asking: a panel read sideways has no
           // business flashing for attention.
           <button
-            className="cc-chip"
-            style={{ padding: '5px 10px', marginRight: 4, color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+            className="cc-barchip"
+            style={{ marginRight: 4, color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
             onClick={() => {
               setSettingsAt('ABOUT');
               setMode('settings');
             }}
             title={`Version ${update.latest} is available`}
           >
-            UPDATE
+            Update
           </button>
         )}
-        <span
-          style={{ width: 5, height: 5, flex: 'none', background: source.live ? 'var(--cc-ok)' : 'var(--cc-line-2)' }}
-          title={source.title}
-        />
-        <span className="cc-mini" style={{ fontSize: 10 }} title={source.title}>
+        <span className="cc-barnote" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginRight: 4 }} title={source.title}>
+          <span style={{ width: 5, height: 5, flex: 'none', background: source.live ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
           {source.label}
         </span>
-        {full && registry[full] && (
-          <button
-            className="cc-chip"
-            style={{ padding: '5px 10px', marginRight: 4, color: 'var(--cc-accent-2)', borderColor: 'var(--cc-accent-2)', whiteSpace: 'nowrap' }}
-            onClick={() => setFull(null)}
-          >
-            {(registry[full].game?.source.short ?? registry[full].name).toUpperCase()} FULL SCREEN · BACK TO {layout.name.toUpperCase()}
-          </button>
-        )}
         {settings.matchLayout && settings.layoutId === settings.matchLayout.to && (
-          // The second accent, as for the game's own side: this is the game's doing, not an agent's.
-          <span className="cc-mini" style={{ color: 'var(--cc-accent-2)', marginRight: 4, whiteSpace: 'nowrap' }}>
-            FOR THIS MATCH · BACK TO {(findLayout(settings, settings.matchLayout.from)?.name ?? 'YOURS').toUpperCase()} AFTER
+          <span className="cc-barnote" style={{ marginRight: 4 }}>
+            For this match · back to {findLayout(settings, settings.matchLayout.from)?.name ?? 'yours'} after
           </span>
         )}
         <LayoutSwitcher
@@ -648,8 +647,8 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
           }}
         />
         <button
-          className="cc-chip"
-          style={{ height: 32, width: 40, border: 0, borderLeft: '1px solid var(--cc-line)' }}
+          className="cc-chip cc-bare"
+          style={{ height: 32, width: 40, borderRadius: 0, borderLeft: '1px solid var(--cc-line)', color: 'var(--cc-muted)' }}
           onClick={() => setMode('settings')}
           title="Settings (S)"
           aria-label="Settings"
@@ -674,7 +673,7 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        background: 'var(--cc-bg)',
+        background: 'transparent',
         position: 'relative',
       }}
     >
@@ -698,8 +697,6 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
               setSettingsAt(section);
               setMode('settings');
             },
-            full,
-            setFull,
           }}
         >
           {/* Every tile dims while the host is away: what they show is as old as the header says. */}
@@ -718,19 +715,12 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
               }}
             />
           </div>
-          {/* A game tile over the whole panel, with the props of its tile on this layout. */}
-          {full && registry[full] && (
-            <TileSizeProvider style={{ position: 'absolute', inset: 0, zIndex: 5, display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
-              {createElement(registry[full].component, {
-                props: layout.shapes[shape].tiles.find((t) => t.widget === full)?.props ?? {},
-              })}
-            </TileSizeProvider>
-          )}
         </NavProvider>
         {stale && <Stale heard={stale.heard} retryAt={stale.state === 'offline' ? stale.retryAt : null} />}
         {REMOTE && remote.state === 'unpaired' && <PairPrompt reason={remote.reason} />}
         {remoteNote && <RemoteNote />}
       </div>
+      {still && <Playing inPlay={still} onOpen={() => setOpenedFor(still.since)} />}
       {held && (
         <OptionsSheet
           held={held}

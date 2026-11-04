@@ -14,10 +14,10 @@ import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } 
 
 /** What each tab is called on screen. The ids are what layouts store. */
 const TAB_NAMES: Record<string, string> = {
-  quota: 'TOKENS',
-  agents: 'AGENTS',
-  machine: 'MACHINE',
-  sprint: 'FOCUS',
+  quota: 'Tokens',
+  agents: 'Agents',
+  machine: 'Machine',
+  sprint: 'Focus',
 };
 
 interface Hero {
@@ -92,21 +92,21 @@ export function Stage({ props }: WidgetProps) {
     const status = budgetStatus(pct);
     const blockMs = quota.windowHours * 3_600_000;
     const elapsed = quota.blockStartMs === null ? 0 : Math.min(blockMs, Math.max(0, now - quota.blockStartMs));
-    const resets = 'RESETS IN ~' + humanDuration(quota.resetsInMs).toUpperCase();
+    const resets = 'resets in about ' + humanDuration(quota.resetsInMs);
     const budget = settings.budgetTokens ?? quota.budgetTokens;
     hero = {
-      label: 'TOKEN USAGE · ' + quota.windowHours + 'H BLOCK',
+      label: 'Token usage · ' + quota.windowHours + '-hour block',
       value: pct === null ? compact(totalTokens(quota)) : pct + '%',
       // A missing budget is not an alarm. Say where to set one, quietly.
       status:
         pct === null ? (
           <button
             className="cc-chip"
-            style={{ padding: '6px 12px', alignSelf: 'center', color: 'var(--cc-muted)' }}
+            style={{ alignSelf: 'center', color: 'var(--cc-muted)' }}
             onClick={() => openSettings('SOURCES')}
             title="Settings → Sources → Token budget"
           >
-            SET A BUDGET
+            Set a budget
           </button>
         ) : (
           status.label
@@ -124,36 +124,36 @@ export function Stage({ props }: WidgetProps) {
       // a second thing worth measuring against.
       meter:
         pct !== null && budget
-          ? { pct, label: 'BUDGET · ' + compact(totalTokens(quota)) + ' OF ' + compact(budget), note: resets }
+          ? { pct, label: 'Budget · ' + compact(totalTokens(quota)) + ' of ' + compact(budget), note: resets }
           : quota.blockStartMs === null
-            ? { pct: 0, label: 'NO BLOCK RUNNING', note: 'THE NEXT REQUEST STARTS ONE' }
+            ? { pct: 0, label: 'No block running', note: 'the next request starts one' }
             : {
                 pct: (elapsed / blockMs) * 100,
-                label: 'BLOCK ELAPSED · ' + humanDuration(elapsed).toUpperCase() + ' OF ' + quota.windowHours + 'H',
+                label: 'Block so far · ' + humanDuration(elapsed) + ' of ' + quota.windowHours + 'h',
                 note: resets,
               },
       color: status.color,
       series: quota.history,
-      chartLabel: 'TOKENS · LAST ' + quota.windowHours + 'H',
-      axisA: '-' + quota.windowHours + 'H',
-      axisB: 'NOW',
+      chartLabel: 'Tokens over the last ' + quota.windowHours + ' hours',
+      axisA: quota.windowHours + 'h ago',
+      axisB: 'Now',
     };
   } else if (tab === 'agents' && agents?.available) {
     const total = agents.sessions.length;
     const top = agents.sessions[0];
     hero = {
-      label: 'AGENTS · ' + total + (total === 1 ? ' SESSION' : ' SESSIONS') + ' IN THE LAST HOUR',
+      label: 'Agents · ' + total + (total === 1 ? ' session' : ' sessions') + ' in the last hour',
       value: String(waiting),
-      status: waiting > 0 ? 'WAITING ON YOU' : total > 0 ? 'ALL AT WORK' : 'IDLE',
+      status: waiting > 0 ? 'waiting on you' : total > 0 ? 'all at work' : 'idle',
       sub: top ? agentSentence(top, now) : 'No session has written anything in the last hour.',
-      meter: { pct: total > 0 ? (waiting / total) * 100 : 0, label: 'WAITING ON YOU · ' + waiting + ' OF ' + total },
+      meter: { pct: total > 0 ? (waiting / total) * 100 : 0, label: 'Waiting on you · ' + waiting + ' of ' + total },
       // An error outranks a finished reply: both are yours, one is bad news.
       color: top?.state === 'error' ? 'var(--cc-danger)' : waiting > 0 ? 'var(--cc-accent)' : 'var(--cc-muted)',
       series: [],
       axisA: '',
       axisB: '',
       controls: (
-        <div style={{ borderTop: '1px solid var(--cc-line)' }}>
+        <div style={{ borderBottom: '1px solid var(--cc-line)', margin: '0 -16px' }}>
           {agents.sessions.slice(0, 3).map((session) => (
             <AgentRow key={session.id} session={session} now={now} />
           ))}
@@ -162,9 +162,9 @@ export function Stage({ props }: WidgetProps) {
     };
   } else if (tab === 'machine' && cpu) {
     hero = {
-      label: 'PROCESSOR · ' + cpu.threads.length + ' THREADS',
+      label: 'Processor · ' + cpu.threads.length + ' threads',
       value: cpu.pct + '%',
-      status: cpu.tempC === null ? 'NO SENSOR' : cpu.tempC.toFixed(0) + '°C',
+      status: cpu.tempC === null ? 'no temperature sensor' : cpu.tempC.toFixed(0) + '°C',
       sub:
         cpu.threads.length +
         ' threads at ' +
@@ -173,27 +173,27 @@ export function Stage({ props }: WidgetProps) {
         (mem ? ' Memory: ' + mem.usedGib.toFixed(1) + ' of ' + mem.totalGib.toFixed(1) + ' GiB in use.' : ''),
       meter: {
         pct: cpu.pct,
-        label: 'PROCESSOR LOAD',
-        note: mem && mem.totalGib > 0 ? 'MEMORY ' + Math.round((mem.usedGib / mem.totalGib) * 100) + '%' : undefined,
+        label: 'Processor load',
+        note: mem && mem.totalGib > 0 ? 'memory ' + Math.round((mem.usedGib / mem.totalGib) * 100) + '%' : undefined,
       },
-      color: 'var(--cc-accent)',
+      color: 'var(--cc-text)',
       series: cpu.threads,
       bars: true,
-      chartLabel: 'LOAD PER THREAD',
-      axisA: 'T0',
-      axisB: 'T' + (cpu.threads.length - 1),
+      chartLabel: 'Load per thread',
+      axisA: 'Thread 0',
+      axisB: 'Thread ' + (cpu.threads.length - 1),
     };
   } else if (tab === 'sprint' && sprint) {
     const elapsedSec = Math.max(0, sprint.lengthSec - sprint.remainingSec);
     hero = {
-      label: (sprint.mode === 'focus' ? 'FOCUS ' : '') + sprintLabel(sprint),
+      label: (sprint.mode === 'focus' ? 'Focus · ' : '') + sprintLabel(sprint),
       value: mmss(sprint.remainingSec),
-      status: sprintStatus(sprint),
+      status: sprintStatus(sprint).toLowerCase(),
       sub: focusedToday(sprint) + ' focused today.',
       meter: {
         pct: sprint.lengthSec > 0 ? (elapsedSec / sprint.lengthSec) * 100 : 0,
-        label: sprint.mode === 'focus' ? 'THIS FOCUS BLOCK' : 'THIS BREAK',
-        note: mmss(elapsedSec) + ' OF ' + mmss(sprint.lengthSec),
+        label: sprint.mode === 'focus' ? 'This focus block' : 'This break',
+        note: mmss(elapsedSec) + ' of ' + mmss(sprint.lengthSec),
       },
       // As on the Sprint tile: a countdown that is not counting is not lit.
       color: sprint.state === 'running' ? sprintColor(sprint) : 'var(--cc-muted)',
@@ -209,13 +209,17 @@ export function Stage({ props }: WidgetProps) {
   // under the value, sentence and meter, and stays out when that is too little
   // to read.
   const valueSize = Math.round(Math.max(48, Math.min(168, size.w ? size.w * 0.14 : 168, size.h ? size.h * 0.32 : 168)));
-  const chartH = Math.min(132, Math.round(size.h - (33 + 56 + 24 + valueSize * 0.9 + 37 + 60 + 42)));
+  const chartH = Math.min(132, Math.round(size.h - (36 + 56 + 24 + valueSize * 0.9 + 37 + 60 + 66)));
+  // A bar or a line in the text colour would outshout the value above it.
+  const quiet = hero && hero.color !== 'var(--cc-text)' ? hero.color : 'var(--cc-accent)';
   const charted = chartH >= 44;
   const path = hero && charted && !hero.bars && hero.series.length > 1 ? sparkPath(hero.series, 1000, chartH) : '';
   const peak = hero?.bars ? Math.max(100, ...hero.series) : 0;
 
   return (
     <div
+      // An agent waiting lights the tile from inside, and nothing else does.
+      className={tab === 'agents' && waiting > 0 ? 'cc-glow' : undefined}
       style={{
         // Fill the tile, as Pane does. Without this the hero is only as tall as
         // its tab's content and the cell shows through beneath it.
@@ -228,48 +232,32 @@ export function Stage({ props }: WidgetProps) {
         overflow: 'hidden',
       }}
     >
-      <div style={{ display: 'flex', flex: 'none', background: 'var(--cc-inset)' }}>
+      <div style={{ display: 'flex', flex: 'none', alignItems: 'center', gap: 4, padding: '16px 24px 0' }}>
         {shown.map((t) => (
           <button
             key={t}
             onClick={() => pick(t)}
+            className={tab === t ? 'cc-chip cc-chip-on' : 'cc-chip cc-bare'}
             style={{
-              height: 33,
-              padding: '0 20px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: 7,
-              fontSize: 10,
-              letterSpacing: '0.16em',
-              border: 0,
-              borderBottom: '1px solid ' + (tab === t ? 'transparent' : 'var(--cc-line)'),
-              background: tab === t ? 'var(--cc-pane)' : 'transparent',
-              color: tab === t ? 'var(--cc-text)' : 'var(--cc-dim)',
-              boxShadow: tab === t ? 'inset 0 2px 0 var(--cc-accent)' : 'none',
+              height: 34,
+              padding: '0 16px',
+              gap: 8,
+              fontSize: 14,
+              color: tab === t ? 'var(--cc-text)' : 'var(--cc-muted)',
             }}
           >
-            {TAB_NAMES[t] ?? t.toUpperCase()}
+            {TAB_NAMES[t] ?? t}
             {t === 'agents' && waiting > 0 && (
               <span style={{ color: 'var(--cc-accent)', fontWeight: 600 }} aria-label={waiting + ' waiting'}>
-                ●{waiting}
+                {waiting}
               </span>
             )}
           </button>
         ))}
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            padding: '0 16px',
-            borderBottom: '1px solid var(--cc-line)',
-            minWidth: 0,
-          }}
-        >
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', minWidth: 0 }}>
           {following && picked !== 'agents' && (
-            <span className="cc-mini" style={{ color: 'var(--cc-accent)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-              MOVED HERE · AN AGENT IS WAITING
+            <span className="cc-mini" style={{ whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              Moved here while an agent waits
             </span>
           )}
         </div>
@@ -278,59 +266,58 @@ export function Stage({ props }: WidgetProps) {
       <div style={{ flex: 1, minHeight: 0, padding: '32px 40px 24px', display: 'flex', flexDirection: 'column' }}>
         {!hero ? (
           <div style={{ margin: 'auto', textAlign: 'center' }}>
-            <div className="cc-label">{TAB_NAMES[tab] ?? tab.toUpperCase()}</div>
-            <div style={{ fontSize: 30, fontWeight: 200, color: 'var(--cc-line-2)', marginTop: 10 }}>--</div>
+            <div className="cc-label">{TAB_NAMES[tab] ?? tab}</div>
+            <div style={{ fontSize: 30, fontWeight: 300, color: 'var(--cc-line-2)', marginTop: 8 }}>--</div>
             <div className="cc-mini" style={{ marginTop: 8 }}>
-              {noSource(tab) ? 'NO SOURCE' : 'AWAITING FIRST EVENT'}
+              {noSource(tab) ? 'Nothing to read on this PC' : 'Nothing heard yet'}
             </div>
           </div>
         ) : (
           <>
-            <span className="cc-label" style={{ fontSize: 11 }}>{hero.label}</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 26, marginTop: 10, flexWrap: 'wrap' }}>
+            <span className="cc-label" style={{ fontSize: 14 }}>{hero.label}</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, marginTop: 8, flexWrap: 'wrap' }}>
               <span
+                className="cc-display"
                 style={{
                   fontSize: valueSize,
-                  fontWeight: 200,
                   lineHeight: 0.9,
-                  letterSpacing: '-0.045em',
-                  color: hero.color,
+                  color: hero.color === 'var(--cc-text)' ? 'var(--cc-text)' : hero.color,
                 }}
               >
                 {hero.value}
               </span>
               {typeof hero.status === 'string' ? (
-                <span style={{ fontSize: 17, letterSpacing: '0.16em', color: hero.color }}>{hero.status}</span>
+                <span style={{ fontSize: 20, color: hero.color === 'var(--cc-text)' ? 'var(--cc-muted)' : hero.color }}>{hero.status}</span>
               ) : (
                 hero.status
               )}
             </div>
-            <span style={{ fontSize: 17, color: 'var(--cc-muted)', marginTop: 20 }}>{hero.sub}</span>
-            <div style={{ marginTop: 22 }}>
+            <span style={{ fontSize: 16, color: 'var(--cc-muted)', marginTop: 16, maxWidth: '68ch' }}>{hero.sub}</span>
+            <div style={{ marginTop: 24 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
                 <span className="cc-label">{hero.meter.label}</span>
                 {hero.meter.note && (
-                  <span className="cc-mini" style={{ color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
+                  <span className="cc-mini" style={{ whiteSpace: 'nowrap' }}>
                     {hero.meter.note}
                   </span>
                 )}
               </div>
-              <Meter pct={hero.meter.pct} color={hero.color} height={14} />
+              <Meter pct={hero.meter.pct} color={quiet ?? 'var(--cc-muted)'} height={6} />
             </div>
             <div style={{ flex: 1 }} />
             {(path || (hero.bars && charted)) && (
               <>
                 {hero.chartLabel && (
-                  <span className="cc-label" style={{ marginBottom: 8 }}>
+                  <span className="cc-label" style={{ marginTop: 24, marginBottom: 8 }}>
                     {hero.chartLabel}
                   </span>
                 )}
                 {hero.bars ? (
-                  <div style={{ height: chartH, display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+                  <div style={{ height: chartH, display: 'flex', alignItems: 'flex-end', gap: 2 }}>
                     {hero.series.map((v, i) => (
                       <div
                         key={i}
-                        style={{ flex: 1, height: `${Math.max(2, (v / peak) * 100)}%`, background: hero.color, opacity: 0.75 }}
+                        style={{ flex: 1, height: `${Math.max(2, (v / peak) * 100)}%`, background: v > 82 ? 'var(--cc-danger)' : 'var(--cc-line-2)', borderRadius: 1 }}
                       />
                     ))}
                   </div>
@@ -342,11 +329,17 @@ export function Stage({ props }: WidgetProps) {
                     preserveAspectRatio="none"
                     style={{ display: 'block' }}
                   >
-                    <path d={path + ` L1000 ${chartH} L0 ${chartH} Z`} fill={hero.color} opacity="0.1" />
-                    <path d={path} fill="none" stroke={hero.color} strokeWidth="1.6" />
+                    <defs>
+                      <linearGradient id="cc-stage-fill" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0" stopColor={quiet ?? 'var(--cc-accent)'} stopOpacity="0.16" />
+                        <stop offset="1" stopColor={quiet ?? 'var(--cc-accent)'} stopOpacity="0" />
+                      </linearGradient>
+                    </defs>
+                    <path d={path + ` L1000 ${chartH} L0 ${chartH} Z`} fill="url(#cc-stage-fill)" />
+                    <path d={path} fill="none" stroke={quiet ?? 'var(--cc-accent)'} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
                   </svg>
                 )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
                   <span className="cc-mini">{hero.axisA}</span>
                   <span className="cc-mini">{hero.axisB}</span>
                 </div>

@@ -9,6 +9,8 @@ import { agentSummary, waitingOnYou } from './Agents';
 /** Below this the rows lay out along one line instead of stacking. */
 const ROW_BELOW = 110;
 
+const NAMES: Record<string, string> = { cpu: 'CPU', mem: 'Memory', net: 'Network', unread: 'Unread', agents: 'Agents' };
+
 export function Vitals({ props }: WidgetProps) {
   const size = useTileSize();
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
@@ -23,18 +25,18 @@ export function Vitals({ props }: WidgetProps) {
   // Toasts in the tray. A refused listener is stated rather than shown as
   // zero: an empty tray and an unreadable one are different facts.
   const counting = notify?.available === true;
-  const unread = !notify ? '--' : counting ? String(notify.items.length) : 'N/A';
+  const unread = !notify ? '--' : counting ? String(notify.items.length) : 'Off';
 
   const values: Record<string, string> = {
     cpu: cpu ? cpu.pct + '%' : '--',
     mem: mem ? mem.usedGib.toFixed(1) + 'G' : '--',
     net: net ? rate(net.rxBytesPerSec) : '--',
     unread,
-    agents: !agents ? '--' : agents.available ? agentSummary(agents).text : 'N/A',
+    agents: !agents ? '--' : agents.available ? agentSummary(agents).text : 'Off',
   };
 
+  // Only an agent waiting on you is lit: everything else here is just a value.
   const lit: Record<string, boolean> = {
-    unread: counting,
     agents: agents?.available === true && waitingOnYou(agents) > 0,
   };
 
@@ -43,12 +45,12 @@ export function Vitals({ props }: WidgetProps) {
       style={{
         flex: 1,
         background: 'var(--cc-pane)',
-        padding: inline ? '0 20px' : 20,
+        padding: inline ? '0 16px' : 16,
         display: 'flex',
         flexDirection: inline ? 'row' : 'column',
         alignItems: 'center',
         justifyContent: inline ? 'flex-start' : 'center',
-        gap: inline ? 26 : 10,
+        gap: inline ? 24 : 8,
         minWidth: 0,
         minHeight: 0,
         overflow: 'hidden',
@@ -67,18 +69,13 @@ export function Vitals({ props }: WidgetProps) {
             minWidth: 0,
           }}
         >
-          <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
-            {key.toUpperCase()}
-          </span>
+          <span className="cc-label">{NAMES[key] ?? key}</span>
           <span
+            className="cc-display"
             style={{
-              fontSize: inline ? 15 : 18,
+              fontSize: inline ? 17 : 22,
               whiteSpace: 'nowrap',
-              color: !lit[key]
-                ? 'var(--cc-muted)'
-                : key === 'agents'
-                  ? 'var(--cc-accent)'
-                  : 'var(--cc-accent-2)',
+              color: lit[key] ? 'var(--cc-accent)' : 'var(--cc-text)',
             }}
           >
             {values[key] ?? '--'}

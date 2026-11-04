@@ -217,7 +217,7 @@ export function Arranger({
   );
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
       <div
         style={{
           height: 48,
@@ -230,29 +230,29 @@ export function Arranger({
           borderBottom: '1px solid var(--cc-line)',
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.16em', color: 'var(--cc-accent)' }}>
-          ARRANGE {layout.name.toUpperCase()}
+        <span style={{ fontSize: 14, fontWeight: 600 }}>
+          Arrange {layout.name}
         </span>
         <span className="cc-mini">
           {swapTarget !== null
-            ? 'RELEASE TO SWAP'
+            ? 'Release to swap'
             : blocked
-              ? 'COVERS MORE THAN ONE TILE'
+              ? 'Covers more than one tile'
               : isPreset(target)
-                ? 'A PRESET: YOUR FIRST CHANGE MAKES A COPY UNDER YOURS'
-                : 'DRAG TO MOVE OR SWAP · CORNER TO RESIZE'}
+                ? 'A preset: your first change makes a copy under Yours'
+                : 'Drag to move or swap · corner to resize'}
         </span>
         {tangled && !drag && (
           <span className="cc-mini" style={{ color: 'var(--cc-danger)' }}>
-            TILES OVERLAP
+            Tiles overlap
           </span>
         )}
         <div style={{ flex: 1 }} />
         {current && (
           <span className="cc-mini">
-            {(registry[current.widget]?.name ?? current.widget).toUpperCase()} · {current.area[3] - current.area[1]}x
+            {registry[current.widget]?.name ?? current.widget} · {current.area[3] - current.area[1]}x
             {current.area[2] - current.area[0]}
-            {spec ? ` · MIN ${spec.min[0]}x${spec.min[1]}` : ''}
+            {spec ? ` · at least ${spec.min[0]}x${spec.min[1]}` : ''}
           </span>
         )}
         {current && (
@@ -266,7 +266,7 @@ export function Arranger({
               setSelected(0);
             }}
           >
-            REMOVE
+            Remove
           </button>
         )}
         <button
@@ -275,10 +275,10 @@ export function Arranger({
           onClick={() => setTiles(tidy(tiles, arrangement.grid.cols, arrangement.grid.rows))}
           title="Pack tiles into free space, keeping their sizes"
         >
-          TIDY
+          Tidy
         </button>
-        <button className="cc-chip cc-chip-on" style={TOOL} onClick={onDone}>
-          DONE
+        <button className="cc-chip cc-primary" style={TOOL} onClick={onDone}>
+          Done
         </button>
       </div>
 
@@ -350,8 +350,7 @@ export function Arranger({
                   </svg>
                   <span
                     style={{
-                      fontSize: 10,
-                      letterSpacing: '0.14em',
+                      fontSize: 12,
                       color: active ? 'var(--cc-accent)' : 'var(--cc-muted)',
                       flex: 1,
                       minWidth: 0,
@@ -360,9 +359,9 @@ export function Arranger({
                       whiteSpace: 'nowrap',
                     }}
                   >
-                    {(registry[tile.widget]?.name ?? tile.widget).toUpperCase()}
+                    {registry[tile.widget]?.name ?? tile.widget}
                   </span>
-                  <span className="cc-mini" style={{ fontSize: 9 }}>
+                  <span className="cc-mini" style={{ fontSize: 12 }}>
                     {c2 - c1}x{r2 - r1}
                   </span>
                 </div>
@@ -383,7 +382,7 @@ export function Arranger({
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M2 5h9l-2.5-2.5M14 11H5l2.5 2.5" />
                     </svg>
-                    <span style={{ fontSize: 10, letterSpacing: '0.18em' }}>SWAP</span>
+                    <span style={{ fontSize: 12 }}>Swap</span>
                   </div>
                 )}
 
@@ -438,26 +437,26 @@ export function Arranger({
             <button
               key={s}
               className={s === shape ? 'cc-chip cc-chip-on' : 'cc-chip'}
-              style={{ height: 36, padding: '0 14px', marginLeft: -1 }}
+              style={{ height: 36, padding: '0 14px', marginLeft: 2 }}
               onClick={() => setShape(s)}
               title={s === initialShape ? 'The shape this window shows' : undefined}
             >
-              {s.toUpperCase()}
-              {s === initialShape ? ' · HERE' : ''}
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {s === initialShape ? ' · here' : ''}
             </button>
           ))}
         </div>
         <div style={{ flex: 1 }} />
-        {stepper('COLUMNS', arrangement.grid.cols, (cols) => edit((a) => withGrid(a, { cols })))}
-        {stepper('ROWS', arrangement.grid.rows, (rows) => edit((a) => withGrid(a, { rows })))}
+        {stepper('Columns', arrangement.grid.cols, (cols) => edit((a) => withGrid(a, { cols })))}
+        {stepper('Rows', arrangement.grid.rows, (rows) => edit((a) => withGrid(a, { rows })))}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span className="cc-mini">GAP</span>
+          <span className="cc-mini">Gap</span>
           <div style={{ display: 'flex' }}>
             {[0, 1, 2, 4].map((gap) => (
               <button
                 key={gap}
                 className={gap === arrangement.grid.gap ? 'cc-chip cc-chip-on' : 'cc-chip'}
-                style={{ width: 40, height: 36, marginLeft: -1 }}
+                style={{ width: 40, height: 36, marginLeft: 2 }}
                 onClick={() => edit((a) => withGrid(a, { gap }))}
               >
                 {gap}

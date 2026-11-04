@@ -25,15 +25,15 @@ export function Stale({ heard, retryAt }: { heard: number; retryAt: number | nul
 
   return (
     <div
+      className="cc-glass"
       style={{
         position: 'absolute',
         left: '50%',
         top: '50%',
         transform: 'translate(-50%, -50%)',
         maxWidth: 'calc(100% - 32px)',
-        background: 'var(--cc-pane)',
-        border: '1px solid var(--cc-line-2)',
-        padding: '18px 26px',
+        borderRadius: 24,
+        padding: '16px 24px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -41,13 +41,11 @@ export function Stale({ heard, retryAt }: { heard: number; retryAt: number | nul
         textAlign: 'center',
       }}
     >
-      <span className="cc-label" style={{ color: 'var(--cc-muted)' }}>
-        Not a live reading
-      </span>
+      <span className="cc-label">Not a live reading</span>
       <span style={{ fontSize: 15 }}>
         Last heard from {remoteHostName()} at {hhmmAt(heard)}
       </span>
-      <span className="cc-mini">{wait > 0 ? `TRYING AGAIN IN ${wait} S` : 'TRYING NOW'}</span>
+      <span className="cc-mini">{wait > 0 ? `Trying again in ${wait} s` : 'Trying now'}</span>
     </div>
   );
 }

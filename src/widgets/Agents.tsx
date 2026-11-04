@@ -12,11 +12,11 @@ import { Awaiting, Pane } from './chrome';
  * transcript cannot tell apart from a slow command, so it is never called one.
  */
 const TOOL_LIT_MS = 30_000;
-const ROW_H = 46;
+const ROW_H = 48;
 /** Below this the tile is one line of counts instead of a list. */
 const LINE_BELOW = 120;
 /** The header and the footer, which the list fits between. */
-const CHROME_H = 26 * 2;
+const CHROME_H = 28 * 2;
 
 /**
  * Now, re-read on the clock's tick. The engine only sends a change of state,
@@ -39,23 +39,23 @@ export function sinceText(ms: number): string {
 export function agentStatus(session: AgentSession, now: number): { label: string; color: string } {
   switch (session.state) {
     case 'error':
-      return { label: 'ERROR', color: 'var(--cc-danger)' };
+      return { label: 'Error', color: 'var(--cc-danger)' };
     case 'waiting':
-      return { label: 'YOUR TURN', color: 'var(--cc-accent)' };
+      return { label: 'Your turn', color: 'var(--cc-accent)' };
     case 'tool':
       // Sub-agents are expected to take a while, so they stay unlit.
       if (session.subagents > 0) {
         return {
-          label: session.subagents + (session.subagents === 1 ? ' SUB-AGENT' : ' SUB-AGENTS'),
+          label: session.subagents + (session.subagents === 1 ? ' sub-agent' : ' sub-agents'),
           color: 'var(--cc-muted)',
         };
       }
       return {
-        label: 'TOOL',
+        label: 'Tool',
         color: now - session.sinceMs >= TOOL_LIT_MS ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
       };
     case 'working':
-      return { label: 'WORKING', color: 'var(--cc-muted)' };
+      return { label: 'Working', color: 'var(--cc-muted)' };
   }
 }
 
@@ -92,32 +92,21 @@ export function AgentRow({ session, now }: { session: AgentSession; now: number 
         display: 'flex',
         alignItems: 'center',
         gap: 12,
-        padding: '0 12px',
-        borderBottom: '1px solid var(--cc-line)',
+        padding: '0 16px',
+        borderTop: '1px solid var(--cc-line)',
         minWidth: 0,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 13, color: 'var(--cc-text)', ...ELLIPSIS }}>{session.project}</div>
+        <div style={{ fontSize: 14, color: 'var(--cc-text)', ...ELLIPSIS }}>{session.project}</div>
         {session.worktree && (
-          <div className="cc-mini" style={{ marginTop: 3, ...ELLIPSIS }}>
+          <div className="cc-mini" style={{ marginTop: 2, ...ELLIPSIS }}>
             {session.worktree}
           </div>
         )}
       </div>
-      <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-        <span
-          style={{
-            fontSize: 9,
-            letterSpacing: '0.1em',
-            padding: '1px 5px',
-            border: '1px solid currentColor',
-            color: status.color,
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {status.label}
-        </span>
+      <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <span style={{ fontSize: 13, fontWeight: 500, color: status.color, whiteSpace: 'nowrap' }}>{status.label}</span>
         <span className="cc-mini">{sinceText(now - session.sinceMs)}</span>
       </div>
     </div>
@@ -127,9 +116,9 @@ export function AgentRow({ session, now }: { session: AgentSession; now: number 
 /** The whole list in two words. With none waiting, how many are busy says they are not stuck. */
 export function agentSummary(agents: AgentsPayload): { text: string; color: string } {
   const waiting = waitingOnYou(agents);
-  if (waiting > 0) return { text: waiting + ' WAITING', color: 'var(--cc-accent)' };
-  if (agents.sessions.length > 0) return { text: agents.sessions.length + ' AT WORK', color: 'var(--cc-muted)' };
-  return { text: 'IDLE', color: 'var(--cc-dim)' };
+  if (waiting > 0) return { text: waiting + ' waiting', color: 'var(--cc-accent)' };
+  if (agents.sessions.length > 0) return { text: agents.sessions.length + ' at work', color: 'var(--cc-muted)' };
+  return { text: 'Idle', color: 'var(--cc-dim)' };
 }
 
 export function Agents({ props }: WidgetProps) {
@@ -142,8 +131,8 @@ export function Agents({ props }: WidgetProps) {
 
   if (!agents) {
     return (
-      <Pane label="AGENTS">
-        <Awaiting label="AGENT SESSIONS" />
+      <Pane label="Agents">
+        <Awaiting label="Agent sessions" />
       </Pane>
     );
   }
@@ -151,14 +140,14 @@ export function Agents({ props }: WidgetProps) {
   // Optional, as the quota widget's source is: out of the danger colour.
   if (!agents.available) {
     return (
-      <Pane label="AGENTS">
+      <Pane label="Agents">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NO AGENT TRANSCRIPTS</div>
+          <div style={{ fontSize: 14, color: 'var(--cc-muted)' }}>No agent transcripts</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
             {agents.reason}
           </div>
-          <div className="cc-mini" style={{ marginTop: 6 }}>
-            THIS SOURCE IS OPTIONAL
+          <div className="cc-mini" style={{ marginTop: 4 }}>
+            This source is optional.
           </div>
         </div>
       </Pane>
@@ -182,12 +171,12 @@ export function Agents({ props }: WidgetProps) {
           overflow: 'hidden',
         }}
       >
-        <span className="cc-mini" style={{ letterSpacing: '0.22em', flex: 'none' }}>
-          AGENTS
+        <span className="cc-label" style={{ flex: 'none' }}>
+          Agents
         </span>
         <span style={{ fontSize: 18, color: head.color, flex: 'none', whiteSpace: 'nowrap' }}>{head.text}</span>
         {top && (
-          <span style={{ fontSize: 12, color: 'var(--cc-muted)', minWidth: 0, ...ELLIPSIS }}>
+          <span style={{ fontSize: 13, color: 'var(--cc-muted)', minWidth: 0, ...ELLIPSIS }}>
             {agentSentence(top, now)}
           </span>
         )}
@@ -201,20 +190,14 @@ export function Agents({ props }: WidgetProps) {
 
   return (
     <Pane
-      label="AGENTS"
+      label="Agents"
       padded={false}
-      right={
-        <span className="cc-mini" style={{ color: head.color }}>
-          {head.text}
-        </span>
-      }
+      right={<span style={{ color: head.color }}>{head.text}</span>}
     >
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {shown.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center' }}>
-            <span className="cc-mini" style={{ color: 'var(--cc-line-2)' }}>
-              NO SESSIONS IN THE LAST HOUR
-            </span>
+            <span className="cc-mini">No sessions in the last hour</span>
           </div>
         ) : (
           shown.map((session) => <AgentRow key={session.id} session={session} now={now} />)
@@ -224,15 +207,14 @@ export function Agents({ props }: WidgetProps) {
         <div
           style={{
             flex: 'none',
-            height: 26,
+            height: 28,
             display: 'flex',
             alignItems: 'center',
-            padding: '0 12px',
-            background: 'var(--cc-inset)',
+            padding: '0 16px',
             borderTop: '1px solid var(--cc-line)',
           }}
         >
-          <span className="cc-mini">+{hidden} MORE</span>
+          <span className="cc-mini">{hidden} more</span>
         </div>
       )}
     </Pane>

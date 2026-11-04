@@ -9,6 +9,35 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Changed
+
+- **The panel goes still while you play.** In a CS2 round it turns dark and quiet,
+  shows the score dimly and how many notifications and agents are waiting, and keeps
+  them for when you are out of the round: when you die, at half time, after the
+  match. A touch opens it sooner. The CS2 tile's options can leave the panel as it is
+  instead, or switch layouts for the match as before.
+- **The CS2 tile no longer copies the HUD.** Health, armour, money and the weapon are
+  gone, since the game already shows them where you are looking. In the gaps it shows
+  the score, who won each round and your match; between matches, **Tonight**: each
+  match, how it ended and how you did, and the time played. Set up now asks CS2 for
+  less; a copy set up with 0.11 can **Remove** and **Set up** again to write the
+  smaller file.
+- **A new look: obsidian glass.** Each tile is a rounded glass card over a charcoal page
+  with a faint glow; JetBrains Mono at a light weight, with the time, the main readout
+  and the score large and thin; plain sentences instead of tracked capitals; pill
+  buttons; a champagne accent, which lights the main readout while an agent waits on
+  you. The default theme is now called Obsidian, and the
+  dimmest text stays readable on every tile. The date reads in words, and the
+  sparklines are curves.
+
+### Removed
+
+- The Now playing equaliser, which was a decoration, not the music.
+- The CS2 tile's lighting, the flash and smoke washes, and showing it full screen:
+  each pulled the eye to the panel in the middle of a round.
+- `lighting` in a game widget's file, which is now ignored. `match.still` says when
+  the player is in play.
+
 ## [0.11.0] - 2026-11-01
 
 ### Added

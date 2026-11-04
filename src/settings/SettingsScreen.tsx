@@ -40,6 +40,16 @@ import { Group, Row, Seg } from './controls';
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
 export type Section = (typeof NAV)[number];
 
+const NAV_NAME: Record<Section, string> = {
+  LAYOUT: 'Layout',
+  WIDGETS: 'Widgets',
+  APPEARANCE: 'Appearance',
+  WINDOW: 'Window',
+  SOURCES: 'Sources',
+  REMOTE: 'Remote',
+  ABOUT: 'About',
+};
+
 const NAV_ICON: Record<Section, string> = {
   LAYOUT: 'M2 2h5v5H2ZM9 2h5v5H9ZM2 9h5v5H2ZM9 9h5v5H9Z',
   WIDGETS: 'M8 1.6 14 5v6l-6 3.4L2 11V5Z',
@@ -88,9 +98,9 @@ export function useAutostart(): [boolean | null, (on: boolean) => void] {
 }
 
 export const THEMES: { id: ThemeId; name: string; swatch: string[] }[] = [
-  { id: 'amber', name: 'AMBER', swatch: ['#161512', '#f0a83c', '#3fc6dc', '#e9e5dc'] },
-  { id: 'phosphor', name: 'PHOSPHOR', swatch: ['#0a100b', '#6cf58a', '#c8ff8f', '#a9f5b4'] },
-  { id: 'ice', name: 'ICE', swatch: ['#121820', '#56cfe1', '#9d8cff', '#dce6f2'] },
+  { id: 'amber', name: 'Obsidian', swatch: ['#121417', '#e8dcc4', '#a9bdd6', '#f5f5f5'] },
+  { id: 'phosphor', name: 'Phosphor', swatch: ['#0f1411', '#b9e6c3', '#dcd9a8', '#e4f2e6'] },
+  { id: 'ice', name: 'Ice', swatch: ['#11141a', '#c9dcf0', '#e3cfa8', '#eef2f8'] },
 ];
 
 /**
@@ -120,11 +130,12 @@ function LayoutCard({
       aria-pressed={selected}
       style={{
         background: 'var(--cc-pane)',
-        border: `1px solid ${inUse ? 'var(--cc-accent)' : selected ? 'var(--cc-accent-2)' : 'var(--cc-line)'}`,
-        padding: 10,
+        border: `1px solid ${selected ? 'var(--cc-muted)' : 'var(--cc-line)'}`,
+        borderRadius: 18,
+        padding: 8,
         display: 'flex',
         flexDirection: 'column',
-        gap: 9,
+        gap: 8,
         minWidth: 0,
       }}
     >
@@ -132,6 +143,7 @@ function LayoutCard({
         style={{
           height: 88,
           width: '100%',
+          borderRadius: 12,
           background: 'var(--cc-inset)',
           display: 'flex',
           alignItems: 'center',
@@ -153,7 +165,8 @@ function LayoutCard({
               key={i}
               style={{
                 gridArea: `${t.area[0]} / ${t.area[1]} / ${t.area[2]} / ${t.area[3]}`,
-                background: inUse ? 'var(--cc-accent)' : 'var(--cc-line-2)',
+                borderRadius: 1,
+                background: inUse ? 'var(--cc-muted)' : 'var(--cc-line-2)',
               }}
             />
           ))}
@@ -162,19 +175,18 @@ function LayoutCard({
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, width: '100%', minWidth: 0 }}>
         <span
           style={{
-            fontSize: 10,
-            letterSpacing: '0.14em',
-            color: inUse ? 'var(--cc-accent)' : selected ? 'var(--cc-accent-2)' : 'var(--cc-muted)',
+            fontSize: 14,
+            color: selected || inUse ? 'var(--cc-text)' : 'var(--cc-muted)',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap',
           }}
         >
-          {layout.name.toUpperCase()}
+          {layout.name}
         </span>
         <div style={{ flex: 1 }} />
-        <span className="cc-mini" style={{ fontSize: 9, flex: 'none' }}>
-          {inUse ? 'IN USE' : `${tiles.length} TILES`}
+        <span className="cc-mini" style={{ fontSize: 12, flex: 'none' }}>
+          {inUse ? 'In use' : `${tiles.length} tiles`}
         </span>
       </div>
     </button>
@@ -213,7 +225,7 @@ function SourceRow({ label, topic, desc }: { label: string; topic: string; desc:
         </div>
       </div>
       <span className="cc-mini" style={{ flex: 'none' }}>
-        {live ? 'REPORTING' : refused ? 'UNAVAILABLE' : 'SILENT'}
+        {live ? 'Reporting' : refused ? 'Unavailable' : 'Silent'}
       </span>
     </div>
   );
@@ -263,7 +275,7 @@ function WidgetRow({
   const live = states.some((s) => s.live);
   const blocked = !live && states.every((s) => s.refused);
   const first = states[0];
-  const status = live ? 'REPORTING' : blocked ? (first.pending ? 'NOT ALLOWED YET' : 'UNAVAILABLE') : 'SILENT';
+  const status = live ? 'Reporting' : blocked ? (first.pending ? 'Not allowed yet' : 'Unavailable') : 'Silent';
   return (
     <div
       style={{
@@ -280,8 +292,8 @@ function WidgetRow({
         <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
           {!blocked ? widget.about : first.pending ? 'Not read until you allow it under Sources.' : (first.reason ?? widget.about)}
         </div>
-        <div className="cc-mini" style={{ marginTop: 4, letterSpacing: '0.12em' }}>
-          READS {widget.sources.map((s) => SOURCES[s].name.toUpperCase()).join(' · ')}
+        <div className="cc-mini" style={{ marginTop: 4 }}>
+          Reads {widget.sources.map((s) => SOURCES[s].name).join(' · ')}
         </div>
       </div>
       <span className="cc-mini" style={{ flex: 'none' }}>
@@ -292,10 +304,10 @@ function WidgetRow({
         <span style={{ width: 96, flex: 'none', display: 'flex', justifyContent: 'flex-end' }}>
           {onOptions ? (
             <button className="cc-chip" style={{ padding: '7px 13px' }} onClick={onOptions}>
-              OPTIONS
+              Options
             </button>
           ) : (
-            <span className="cc-mini">NONE</span>
+            <span className="cc-mini">None</span>
           )}
         </span>
       )}
@@ -306,11 +318,11 @@ function WidgetRow({
 /** What a game widget's row and source say, from what its game last sent. */
 function gameStatus(g: GameDescription, value: GamePayload | undefined): { text: string; color: string } {
   const short = g.game.source.short;
-  if (!value || value.setup === 'none') return { text: 'NOT SET UP', color: 'var(--cc-accent-2)' };
-  if (value.setup === 'gone') return { text: 'FILE GONE', color: 'var(--cc-danger)' };
-  if (value.setup === 'waiting') return { text: `WAITING FOR ${short}`, color: 'var(--cc-accent-2)' };
-  if (!value.live) return { text: `${short} ISN’T RUNNING`, color: 'var(--cc-dim)' };
-  return { text: 'REPORTING', color: 'var(--cc-ok)' };
+  if (!value || value.setup === 'none') return { text: 'Not set up', color: 'var(--cc-accent-2)' };
+  if (value.setup === 'gone') return { text: 'File gone', color: 'var(--cc-danger)' };
+  if (value.setup === 'waiting') return { text: `Waiting for ${short}`, color: 'var(--cc-accent-2)' };
+  if (!value.live) return { text: `${short} isn’t running`, color: 'var(--cc-dim)' };
+  return { text: 'Reporting', color: 'var(--cc-ok)' };
 }
 
 /**
@@ -343,8 +355,8 @@ function GameWidgetRow({
         <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
           {widget.about}
         </div>
-        <div className="cc-mini" style={{ marginTop: 4, letterSpacing: '0.12em' }}>
-          READS {widget.game.source.game.toUpperCase()}, SENT BY THE GAME TO THIS PC
+        <div className="cc-mini" style={{ marginTop: 4 }}>
+          Reads {widget.game.source.game}, sent by the game to this PC
         </div>
       </div>
       <span className="cc-mini" style={{ flex: 'none', color: status.color }}>
@@ -355,14 +367,14 @@ function GameWidgetRow({
           {needsSetUp ? (
             <button
               className="cc-chip"
-              style={{ padding: '7px 13px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+              style={{ padding: '6px 12px' }}
               onClick={onSetUp}
             >
-              SET UP
+              Set up
             </button>
           ) : (
             <button className="cc-chip" style={{ padding: '7px 13px' }} onClick={onOptions}>
-              OPTIONS
+              Options
             </button>
           )}
         </span>
@@ -377,11 +389,11 @@ function GameSourceRow({ widget }: { widget: GameDescription }) {
   const status = gameStatus(widget, value);
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 0', borderBottom: '1px solid var(--cc-line)' }}>
-      <span style={{ width: 6, height: 6, flex: 'none', background: status.text === 'REPORTING' ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
+      <span style={{ width: 6, height: 6, flex: 'none', background: status.text === 'Reporting' ? 'var(--cc-ok)' : 'var(--cc-line-2)' }} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12 }}>{widget.game.source.game}</div>
         <div className="cc-mini" style={{ marginTop: 4 }}>
-          Sent by the game to Kehai on this PC, once SET UP under Widgets has written its file. Only what its HUD shows.
+          Sent by the game to Kehai on this PC, once Set up under Widgets has written its file.
         </div>
       </div>
       <span className="cc-mini" style={{ flex: 'none', color: status.color }}>
@@ -397,7 +409,7 @@ function LocalWidgetRows({ onSetUp, onOptions }: { onSetUp: (id: string) => void
   return (
     <>
       <Group
-        label={`YOUR WIDGETS FOLDER · ${files.length} ${files.length === 1 ? 'FILE' : 'FILES'}`}
+        label={`Your widgets folder · ${files.length} ${files.length === 1 ? 'file' : 'files'}`}
         note="Widgets you add yourself, checked when Kehai starts and whenever the folder changes."
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 12px', background: 'var(--cc-inset)', border: '1px solid var(--cc-line)' }}>
@@ -409,7 +421,7 @@ function LocalWidgetRows({ onSetUp, onOptions }: { onSetUp: (id: string) => void
           style={{ padding: '7px 13px' }}
           onClick={() => bus.publish<WidgetsCommand>('widgets:command', 'panel', { action: 'open' })}
         >
-          OPEN FOLDER
+          Open folder
         </button>
       </div>
       {files.length === 0 && (
@@ -442,7 +454,7 @@ function LocalWidgetRows({ onSetUp, onOptions }: { onSetUp: (id: string) => void
               </div>
             </div>
             <span className="cc-mini" style={{ flex: 'none', color: lacking ? undefined : 'var(--cc-danger)' }}>
-              NOT LOADED
+              Not loaded
             </span>
             <span style={{ width: 96, flex: 'none' }} />
           </div>
@@ -484,8 +496,8 @@ function NotifyRow() {
         </div>
       </div>
       {pending && !REMOTE_PANEL ? (
-        <button className="cc-chip cc-chip-on" style={{ padding: '7px 16px' }} onClick={allowNotifications}>
-          ALLOW
+        <button className="cc-chip cc-primary" style={{ padding: '6px 16px' }} onClick={allowNotifications}>
+          Allow
         </button>
       ) : refused && !REMOTE_PANEL ? (
         <button
@@ -493,11 +505,11 @@ function NotifyRow() {
           style={{ padding: '7px 13px' }}
           onClick={() => bus.publish<NotifyCommand>('notify:command', 'settings', { action: 'listen' })}
         >
-          CHECK AGAIN
+          Check again
         </button>
       ) : (
         <span className="cc-mini" style={{ flex: 'none' }}>
-          {live ? 'REPORTING' : pending ? 'NOT ALLOWED YET' : refused ? 'UNAVAILABLE' : 'SILENT'}
+          {live ? 'Reporting' : pending ? 'Not allowed yet' : refused ? 'Unavailable' : 'Silent'}
         </span>
       )}
     </div>
@@ -516,7 +528,7 @@ function DisplayRows({ state }: { state: DisplaysPayload }) {
   return (
     <>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
-        <span className="cc-label">DISPLAY</span>
+        <span className="cc-label">Display</span>
         <span className="cc-mini">
           {state.missing
             ? `${displayLabel({ name: state.chosenName, number: state.chosenNumber })} is not connected, so Kehai is in a window on the main display until it is.`
@@ -536,10 +548,10 @@ function DisplayRows({ state }: { state: DisplaysPayload }) {
       <div style={{ height: 14 }} />
       <Row label="Fill the display" desc="Fullscreen, with no window edge. F11 switches it at any time.">
         <Seg
-          options={['OFF', 'ON']}
-          value={state.fill ? 'ON' : 'OFF'}
+          options={['Off', 'On']}
+          value={state.fill ? 'On' : 'Off'}
           onPick={(v) => {
-            if (target) show(target, v === 'ON');
+            if (target) show(target, v === 'On');
           }}
         />
       </Row>
@@ -547,7 +559,7 @@ function DisplayRows({ state }: { state: DisplaysPayload }) {
         label="When the display is missing"
         desc="Kehai opens in a window on the main display, says so in the header, and moves back once the display returns."
       >
-        <span className="cc-mini" style={{ flex: 'none' }}>ALWAYS</span>
+        <span className="cc-mini" style={{ flex: 'none' }}>Always</span>
       </Row>
     </>
   );
@@ -604,11 +616,11 @@ export function TranscriptRootRow({ value, onCommit }: { value: string | null; o
         />
         <button
           className={value === null ? 'cc-chip cc-chip-on' : 'cc-chip'}
-          style={{ padding: '7px 13px', marginLeft: -1 }}
+          style={{ padding: '7px 13px', marginLeft: 2 }}
           onClick={() => onCommit(null)}
           title="Read from the default location"
         >
-          DEFAULT
+          Default
         </button>
       </div>
     </div>
@@ -647,10 +659,10 @@ function FocusRows({ focus, onChange }: { focus: FocusSettings; onChange: (next:
   return (
     <>
       <SubRow label="Focus block" desc="A changed length applies from the next block, not the one counting down.">
-        <Seg options={[15, 25, 45, 50, 90]} value={focus.focusMin} format={(v) => `${v}M`} onPick={(focusMin) => onChange({ focusMin })} />
+        <Seg options={[15, 25, 45, 50, 90]} value={focus.focusMin} format={(v) => `${v} min`} onPick={(focusMin) => onChange({ focusMin })} />
       </SubRow>
       <SubRow label="Break" desc="Starts by itself when a focus block runs out. The next block waits for you.">
-        <Seg options={[5, 10, 15]} value={focus.breakMin} format={(v) => `${v}M`} onPick={(breakMin) => onChange({ breakMin })} />
+        <Seg options={[5, 10, 15]} value={focus.breakMin} format={(v) => `${v} min`} onPick={(breakMin) => onChange({ breakMin })} />
       </SubRow>
       <SubRow label="Sprints per round" desc="How many blocks the track shows before it starts again.">
         <Seg options={[2, 3, 4, 6, 8]} value={focus.sprints} onPick={(sprints) => onChange({ sprints })} />
@@ -678,7 +690,7 @@ function TimeStep({ value, onChange, label }: { value: number; onChange: (min: n
   );
 }
 
-const SHOW_NAME: Record<QuietShow, string> = { clock: 'CLOCK', panel: 'DIMMED PANEL', nothing: 'NOTHING' };
+const SHOW_NAME: Record<QuietShow, string> = { clock: 'Clock', panel: 'Dimmed panel', nothing: 'Nothing' };
 const SHOW_DESC: Record<QuietShow, string> = {
   clock: 'The time, and only what is running or waiting on you. Notifications as a count.',
   panel: 'The whole panel, dimmed to half, with what notifications say hidden.',
@@ -699,14 +711,14 @@ function QuietRows() {
 
   return (
     <>
-      <Group label="AT NIGHT" note={REMOTE_PANEL ? 'By this device’s clock.' : 'By this panel’s clock.'} />
+      <Group label="At night" note={REMOTE_PANEL ? 'By this device’s clock.' : 'By this panel’s clock.'} />
       <Row label="Dim at night" desc="Everything Kehai draws turns down between these times.">
-        <Seg options={['OFF', 'ON']} value={night.on ? 'ON' : 'OFF'} onPick={(v) => setNight({ on: v === 'ON' })} />
+        <Seg options={['Off', 'On']} value={night.on ? 'On' : 'Off'} onPick={(v) => setNight({ on: v === 'On' })} />
       </Row>
       <Row label="Between" desc="Fixed hours. Sunset would need your location, and Kehai asks for none.">
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, flex: 'none' }}>
           <TimeStep label="Start" value={night.fromMin} onChange={(fromMin) => setNight({ fromMin })} />
-          <span className="cc-mini">TO</span>
+          <span className="cc-mini">To</span>
           <TimeStep label="End" value={night.toMin} onChange={(toMin) => setNight({ toMin })} />
         </div>
       </Row>
@@ -724,7 +736,7 @@ function QuietRows() {
 
       {!REMOTE_PANEL && (
         <>
-          <Group label="WHEN YOU’RE AWAY" note="No keyboard, mouse or touch on this computer." />
+          <Group label="When you’re away" note="No keyboard, mouse or touch on this computer." />
           {presence && !presence.available ? (
             <Row label="Not available here" desc={presence.reason ?? 'This system does not say when you are away.'} />
           ) : (
@@ -733,7 +745,7 @@ function QuietRows() {
                 <Seg
                   options={after}
                   value={away.afterMin ?? 0}
-                  format={(v) => (v === 0 ? 'NEVER' : `${v} MIN`)}
+                  format={(v) => (v === 0 ? 'Never' : `${v} min`)}
                   onPick={(v) => setAway({ afterMin: v === 0 ? null : v })}
                 />
               </Row>
@@ -864,11 +876,11 @@ function PairBlock({ status, onNote }: { status: RemotePayload; onNote: (note: s
             <QrCode text={address.link} size={CODE_SIZE} />
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span className="cc-mini" style={{ color: 'var(--cc-accent-2)' }}>
-                HIDES IN {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}, OR WHEN SETTINGS CLOSES
+                Hides in {Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}, or when Settings closes
               </span>
               <span style={{ flex: 1 }} />
               <button className="cc-chip" style={{ padding: '0 12px' }} onClick={() => setUntil(null)}>
-                HIDE
+                Hide
               </button>
             </div>
           </>
@@ -889,23 +901,23 @@ function PairBlock({ status, onNote }: { status: RemotePayload; onNote: (note: s
               }}
             >
               <span className="cc-mini" style={{ textAlign: 'center', lineHeight: 1.7, color: 'var(--cc-muted)' }}>
-                THE CODE HOLDS THE KEY,
+                The code holds the key,
                 <br />
-                SO IT STAYS COVERED
+                So it stays covered
               </span>
               <button
-                className="cc-chip cc-chip-on"
-                style={{ height: 40, minWidth: 150, fontSize: 10 }}
+                className="cc-chip cc-primary"
+                style={{ height: 40, minWidth: 150 }}
                 onClick={() => {
                   const t = Date.now();
                   setNow(t);
                   setUntil(t + CODE_SHOWS_MS);
                 }}
               >
-                SHOW CODE
+                Show code
               </button>
             </div>
-            <span className="cc-mini">SHOWS FOR TWO MINUTES</span>
+            <span className="cc-mini">Shows for two minutes</span>
           </>
         )}
       </div>
@@ -925,18 +937,18 @@ function PairBlock({ status, onNote }: { status: RemotePayload; onNote: (note: s
                 justifyContent: 'flex-start',
                 gap: 10,
                 padding: '0 14px',
-                borderColor: on ? 'var(--cc-accent)' : 'var(--cc-line-2)',
-                color: on ? 'var(--cc-accent)' : 'var(--cc-dim)',
+                background: on ? 'var(--cc-line-2)' : undefined,
+                color: on ? 'var(--cc-text)' : 'var(--cc-dim)',
               }}
             >
               <span style={{ width: 6, height: 6, flex: 'none', background: on ? 'var(--cc-accent)' : 'var(--cc-line-2)' }} />
-              <span style={{ fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {a.adapter.toUpperCase()}
+              <span style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {a.adapter}
               </span>
               <span style={{ flex: 1 }} />
               <span style={{ fontSize: 12, letterSpacing: 0, color: on ? 'var(--cc-text)' : 'var(--cc-dim)' }}>{a.ip}</span>
               {a.virtual && (
-                <span style={{ fontSize: 9, padding: '2px 6px', border: '1px solid currentColor' }}>VIRTUAL</span>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: 'var(--cc-line)' }}>Virtual</span>
               )}
             </button>
           );
@@ -964,7 +976,7 @@ function PairBlock({ status, onNote }: { status: RemotePayload; onNote: (note: s
             {masked(address.link)}
           </span>
           <button className="cc-chip" style={{ padding: '0 14px', height: 32 }} onClick={() => void copy()}>
-            COPY LINK
+            Copy link
           </button>
         </div>
         <span className="cc-mini" style={{ lineHeight: 1.6, marginTop: 'auto' }}>
@@ -997,16 +1009,16 @@ function RemoteHostRows({
           label="Serve a remote panel"
           desc="Lets a browser on a tablet, phone or another computer on your network show this panel. While it serves, Kehai tells the network its name and port, so a paired tablet finds it again. Windows may ask whether to let Kehai through its firewall the first time."
         >
-          <Seg options={['OFF', 'ON']} value={remote.on ? 'ON' : 'OFF'} onPick={(v) => onChange({ on: v === 'ON' })} />
+          <Seg options={['Off', 'On']} value={remote.on ? 'On' : 'Off'} onPick={(v) => onChange({ on: v === 'On' })} />
         </Row>
         <Row
           label="Allow control"
           desc="Remote panels can press the media, notification and focus-timer buttons. Never anything else, whatever this says."
         >
           <Seg
-            options={['OFF', 'ON']}
-            value={remote.control ? 'ON' : 'OFF'}
-            onPick={(v) => onChange({ control: v === 'ON' })}
+            options={['Off', 'On']}
+            value={remote.control ? 'On' : 'Off'}
+            onPick={(v) => onChange({ control: v === 'On' })}
           />
         </Row>
         <Row
@@ -1046,7 +1058,7 @@ function RemoteHostRows({
             onNote('New key made. Remote panels need the new code or link.');
           }}
         >
-          NEW KEY
+          New key
         </button>
       </Row>
     </>
@@ -1061,7 +1073,7 @@ function RemotePanelRows({ onNote }: { onNote: (note: string) => void }) {
         label="This panel"
         desc={`Shows the Kehai running at ${location.host}. Layout, theme and token budget here belong to this browser alone.`}
       >
-        <span className="cc-mini" style={{ flex: 'none' }}>REMOTE</span>
+        <span className="cc-mini" style={{ flex: 'none' }}>Remote</span>
       </Row>
       <Row label="Forget the key" desc="This browser stops showing the host until it is paired again.">
         <button
@@ -1072,7 +1084,7 @@ function RemotePanelRows({ onNote }: { onNote: (note: string) => void }) {
             onNote('Key forgotten.');
           }}
         >
-          FORGET
+          Forget
         </button>
       </Row>
     </>
@@ -1096,7 +1108,7 @@ function TrayRows() {
     return (
       <Row label="Tray" desc="This desktop has no tray for Kehai's icon, so Kehai keeps its taskbar button and closing it quits.">
         <span className="cc-mini" style={{ flex: 'none' }}>
-          NO TRAY
+          No tray
         </span>
       </Row>
     );
@@ -1108,9 +1120,9 @@ function TrayRows() {
         desc="Off: Kehai is only in the tray, and not in Alt+Tab, like a wallpaper. On: it also has a taskbar button and shows in Alt+Tab."
       >
         <Seg
-          options={['OFF', 'ON']}
-          value={shell.taskbar ? 'ON' : 'OFF'}
-          onPick={(v) => send({ action: 'set_taskbar', on: v === 'ON' })}
+          options={['Off', 'On']}
+          value={shell.taskbar ? 'On' : 'Off'}
+          onPick={(v) => send({ action: 'set_taskbar', on: v === 'On' })}
         />
       </Row>
       <Row
@@ -1118,9 +1130,9 @@ function TrayRows() {
         desc="Only the tray suits a desk where a tablet is the panel: Kehai reads this PC and serves the tablet, with nothing on screen here."
       >
         <Seg
-          options={['SHOW THE PANEL', 'ONLY THE TRAY']}
-          value={shell.start === 'tray' ? 'ONLY THE TRAY' : 'SHOW THE PANEL'}
-          onPick={(v) => send({ action: 'set_start', start: v === 'ONLY THE TRAY' ? 'tray' : 'panel' })}
+          options={['Show the panel', 'Only the tray']}
+          value={shell.start === 'tray' ? 'Only the tray' : 'Show the panel'}
+          onPick={(v) => send({ action: 'set_start', start: v === 'Only the tray' ? 'tray' : 'panel' })}
         />
       </Row>
     </>
@@ -1130,19 +1142,19 @@ function TrayRows() {
 /** Which part of Kehai a problem came from, as a tag, in its colour. */
 function problemTag(p: LogProblem): [string, string] {
   const named: Record<string, string> = {
-    'poller.update': 'UPDATES',
-    'poller.notify': 'NOTIFICATIONS',
+    'poller.update': 'Updates',
+    'poller.notify': 'Notifications',
     'poller.display': 'DISPLAY',
-    'poller.flow': 'FOCUS TIMER',
-    'poller.media': 'MEDIA',
-    'poller.agents': 'AGENTS',
-    'poller.quota': 'AGENT TOKENS',
-    remote: 'REMOTE PANELS',
-    shell: 'TRAY',
-    panel: 'PANEL',
-    kehai: 'KEHAI',
+    'poller.flow': 'Focus timer',
+    'poller.media': 'Media',
+    'poller.agents': 'Agents',
+    'poller.quota': 'Agent tokens',
+    remote: 'Remote panels',
+    shell: 'Tray',
+    panel: 'Panel',
+    kehai: 'Kehai',
   };
-  const label = named[p.src] ?? p.src.replace(/^poller\./, '').toUpperCase();
+  const label = named[p.src] ?? p.src.replace(/^poller\./, '');
   const color = p.level === 'error' ? 'var(--cc-danger)' : p.src === 'poller.update' ? 'var(--cc-accent)' : 'var(--cc-accent-2)';
   return [label, color];
 }
@@ -1154,21 +1166,21 @@ function when(ms: number): string {
   const today = new Date();
   if (d.toDateString() === today.toDateString()) return time;
   const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-  if (d.toDateString() === yesterday.toDateString()) return `YESTERDAY ${time}`;
-  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }).toUpperCase()} ${time}`;
+  if (d.toDateString() === yesterday.toDateString()) return `Yesterday ${time}`;
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`;
 }
 
 function ProblemList({ problems }: { problems: LogProblem[] }) {
   return (
     <div style={{ background: 'var(--cc-inset)', boxShadow: 'inset 0 0 0 1px var(--cc-line)', margin: '4px 0 6px' }}>
       <div style={{ height: 30, display: 'flex', alignItems: 'center', padding: '0 14px', gap: 12 }}>
-        <span className="cc-label">LAST PROBLEMS · NEWEST FIRST</span>
+        <span className="cc-label">Last problems · newest first</span>
         <span style={{ flex: 1 }} />
-        <span className="cc-mini">THE LAST 5 WARNINGS AND ERRORS</span>
+        <span className="cc-mini">The last 5 warnings and errors</span>
       </div>
       {problems.length === 0 ? (
         <div className="cc-mini" style={{ padding: '10px 14px', borderTop: '1px solid var(--cc-line)' }}>
-          NOTHING HAS GONE WRONG THAT KEHAI KNOWS OF.
+          Nothing has gone wrong that Kehai knows of.
         </div>
       ) : (
         problems.map((p) => {
@@ -1183,7 +1195,7 @@ function ProblemList({ problems }: { problems: LogProblem[] }) {
                 {when(p.atMs)}
               </span>
               <span style={{ width: 118, flex: 'none' }}>
-                <span style={{ fontSize: 9, letterSpacing: '0.1em', padding: '2px 6px', border: '1px solid currentColor', color }}>{tag}</span>
+                <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: 'var(--cc-line)', color }}>{tag}</span>
               </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12 }}>
@@ -1243,7 +1255,7 @@ function ProblemRows() {
   if (!log) return null;
   return (
     <>
-      <Group label="PROBLEMS" note="WHAT WENT WRONG, AND WHERE TO LOOK" />
+      <Group label="Problems" note="What went wrong, and where to look" />
       <ProblemList problems={log.problems} />
       <Row
         label="Log"
@@ -1256,15 +1268,15 @@ function ProblemRows() {
             title={log.file ?? undefined}
             onClick={() => send({ action: 'open_folder' })}
           >
-            OPEN FOLDER
+            Open folder
           </button>
           <button
             className="cc-chip"
-            style={{ padding: '8px 16px', marginLeft: -1, minWidth: 96 }}
+            style={{ padding: '8px 16px', marginLeft: 2, minWidth: 96 }}
             title="The last 200 lines, to paste into an issue or a message"
             onClick={() => setCopy('asking')}
           >
-            {copy === 'copied' ? 'COPIED' : copy === 'failed' ? 'NOT COPIED' : 'COPY'}
+            {copy === 'copied' ? 'Copied' : copy === 'failed' ? 'Not copied' : 'Copy'}
           </button>
         </div>
       </Row>
@@ -1272,7 +1284,7 @@ function ProblemRows() {
         label="More detail"
         desc="Also what each source published and how often, until Kehai restarts. For a problem the usual log doesn't catch."
       >
-        <Seg options={['OFF', 'ON']} value={log.detail ? 'ON' : 'OFF'} onPick={(v) => send({ action: 'detail', on: v === 'ON' })} />
+        <Seg options={['Off', 'On']} value={log.detail ? 'On' : 'Off'} onPick={(v) => send({ action: 'detail', on: v === 'On' })} />
       </Row>
       <Row
         label="Report a bug"
@@ -1280,10 +1292,10 @@ function ProblemRows() {
       >
         <button
           className="cc-chip"
-          style={{ padding: '8px 16px', color: 'var(--cc-accent)', borderColor: 'var(--cc-accent)' }}
+          style={{ padding: '6px 16px' }}
           onClick={() => send({ action: 'report' })}
         >
-          REPORT A BUG
+          Report a bug
         </button>
       </Row>
     </>
@@ -1308,7 +1320,7 @@ function UpdateRow({ update }: { update: UpdatePayload | undefined }) {
   let control: React.ReactNode = null;
   const check = (
     <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => sendUpdate({ action: 'check' })}>
-      CHECK
+      Check
     </button>
   );
 
@@ -1322,7 +1334,7 @@ function UpdateRow({ update }: { update: UpdatePayload | undefined }) {
         break;
       case 'checking':
         desc = 'Asking GitHub for the latest release.';
-        control = <span className="cc-mini" style={{ flex: 'none' }}>CHECKING</span>;
+        control = <span className="cc-mini" style={{ flex: 'none' }}>Checking</span>;
         break;
       case 'current':
         desc = `Up to date. Checked ${update.checkedAtMs ? ago(update.checkedAtMs) : 'just now'}.`;
@@ -1333,18 +1345,18 @@ function UpdateRow({ update }: { update: UpdatePayload | undefined }) {
           desc = `Version ${update.latest} is ready. Installing closes Kehai, updates it and opens it again.`;
           control = (
             <button
-              className="cc-chip cc-chip-on"
-              style={{ padding: '8px 16px' }}
+              className="cc-chip cc-primary"
+              style={{ padding: '6px 16px' }}
               onClick={() => sendUpdate({ action: 'install' })}
             >
-              INSTALL
+              Install
             </button>
           );
         } else {
           desc = `Version ${update.latest} is out. ${update.reason ?? ''}`.trim();
           control = (
             <button className="cc-chip" style={{ padding: '8px 16px' }} onClick={() => sendUpdate({ action: 'open_release' })}>
-              RELEASE PAGE
+              Release page
             </button>
           );
         }
@@ -1353,13 +1365,13 @@ function UpdateRow({ update }: { update: UpdatePayload | undefined }) {
         desc = `Downloading ${update.latest}.`;
         control = (
           <span className="cc-mini" style={{ flex: 'none' }}>
-            {update.progress === null ? 'DOWNLOADING' : `${Math.round(update.progress * 100)}%`}
+            {update.progress === null ? 'Downloading' : `${Math.round(update.progress * 100)}%`}
           </span>
         );
         break;
       case 'installing':
         desc = 'Handing over to the installer. Kehai closes now and opens again when it is done.';
-        control = <span className="cc-mini" style={{ flex: 'none' }}>INSTALLING</span>;
+        control = <span className="cc-mini" style={{ flex: 'none' }}>Installing</span>;
         break;
       case 'failed':
         desc = 'The last check did not finish.';
@@ -1428,14 +1440,14 @@ function ReleaseNotes({ text }: { text: string }) {
     <div style={{ padding: '12px 14px', background: 'var(--cc-inset)', borderBottom: '1px solid var(--cc-line)' }}>
       {blocks.map((block, i) =>
         block.kind === 'heading' ? (
-          <div key={i} className="cc-mini" style={{ letterSpacing: '0.14em', marginTop: i === 0 ? 0 : 12 }}>
-            {plain(block.text).toUpperCase()}
+          <div key={i} className="cc-mini" style={{ marginTop: i === 0 ? 0 : 12 }}>
+            {plain(block.text)}
           </div>
         ) : (
           <div
             key={i}
             style={{
-              fontSize: 11,
+              fontSize: 13,
               lineHeight: 1.6,
               marginTop: 4,
               paddingLeft: block.kind === 'item' ? 12 : 0,
@@ -1557,7 +1569,7 @@ export function SettingsScreen({
         return;
       }
       setSelectedId(result.id);
-      setNote('Imported under Yours. USE puts it on screen.');
+      setNote('Imported under Yours. Use puts it on screen.');
     } catch {
       setNote('Could not read a layout from the clipboard.');
     }
@@ -1570,17 +1582,17 @@ export function SettingsScreen({
     } else {
       const tiles = placeTile(here, name, minSize);
       if (!tiles) {
-        setOnScreenNote(`No room for ${label(name)}. Make space with ARRANGE first.`);
+        setOnScreenNote(`No room for ${label(name)}. Make space with Arrange first.`);
         return;
       }
       editHere((a) => withTiles(a, tiles));
     }
     if (copying) setOnScreenNote(`${layout.name} is a preset, so this changed a copy of it, now under Yours and on screen.`);
-    else setOnScreenNote(on ? `${label(name)} removed from this layout.` : `${label(name)} added. ARRANGE moves it.`);
+    else setOnScreenNote(on ? `${label(name)} removed from this layout.` : `${label(name)} added. Arrange moves it.`);
   };
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
       <div
         data-tauri-drag-region
         style={{
@@ -1594,15 +1606,15 @@ export function SettingsScreen({
           borderBottom: '1px solid var(--cc-line)',
         }}
       >
-        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="var(--cc-accent)" strokeWidth="1.3">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="var(--cc-muted)" strokeWidth="1.3">
           <circle cx="8" cy="8" r="2.4" />
           <path d="M8 1.4v2M8 12.6v2M1.4 8h2M12.6 8h2M3.3 3.3l1.4 1.4M11.3 11.3l1.4 1.4M12.7 3.3l-1.4 1.4M4.7 11.3l-1.4 1.4" />
         </svg>
-        <span style={{ fontSize: 12, fontWeight: 600, letterSpacing: '0.2em' }}>SETTINGS</span>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>Settings</span>
         <div style={{ flex: 1 }} />
-        <span className="cc-mini">CHANGES APPLY IMMEDIATELY</span>
+        <span className="cc-mini">Changes apply immediately</span>
         <button className="cc-chip" style={{ padding: '6px 14px' }} onClick={onClose}>
-          CLOSE
+          Close
         </button>
       </div>
 
@@ -1623,51 +1635,52 @@ export function SettingsScreen({
               key={n}
               onClick={() => setSection(n)}
               style={{
-                height: 46,
+                height: 40,
                 flex: 'none',
                 display: 'flex',
                 alignItems: 'center',
                 gap: 12,
-                padding: '0 18px',
-                background: section === n ? 'var(--cc-pane-2)' : 'transparent',
+                margin: '0 8px',
+                padding: '0 12px',
+                background: section === n ? 'var(--cc-line)' : 'transparent',
                 border: 0,
-                borderLeft: `2px solid ${section === n ? 'var(--cc-accent)' : 'transparent'}`,
-                color: section === n ? 'var(--cc-accent)' : 'var(--cc-muted)',
+                borderRadius: 12,
+                color: section === n ? 'var(--cc-text)' : 'var(--cc-muted)',
                 textAlign: 'left',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
                 <path d={NAV_ICON[n]} />
               </svg>
-              <span style={{ fontSize: 11, letterSpacing: '0.16em', flex: 1 }}>{n}</span>
+              <span style={{ fontSize: 14, flex: 1 }}>{NAV_NAME[n]}</span>
             </button>
           ))}
           <div style={{ flex: 1 }} />
           <div style={{ padding: '16px 18px', borderTop: '1px solid var(--cc-line)' }}>
-            <span className="cc-mini" style={{ fontSize: 9, lineHeight: 1.7, display: 'block' }}>
-              EVERY CHANGE IS SAVED AS YOU MAKE IT. THERE IS NO FILE TO EDIT AND NOTHING TO RESTART.
+            <span className="cc-mini" style={{ fontSize: 12, lineHeight: 1.7, display: 'block' }}>
+              Every change is saved as you make it. There is no file to edit and nothing to restart.
             </span>
           </div>
         </div>
 
         <div style={{ flex: 1, padding: '26px 30px', minWidth: 0, overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-            <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: '0.16em' }}>{section}</span>
+            <span className="cc-display" style={{ fontSize: 34 }}>{NAV_NAME[section]}</span>
             {note && <span className="cc-mini" style={{ color: 'var(--cc-accent)' }}>{note}</span>}
           </div>
 
           {section === 'LAYOUT' && (
             <>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16 }}>
-                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
-                  PRESETS · UPDATED WITH EACH RELEASE
+                <span className="cc-label">
+                  Presets · updated with each release
                 </span>
                 <div style={{ flex: 1 }} />
-                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
-                  THIS DISPLAY
+                <span className="cc-label">
+                  This display
                 </span>
-                <span style={{ fontSize: 11 }}>
-                  {display.width} × {display.height} · {shape.toUpperCase()}
+                <span style={{ fontSize: 13 }}>
+                  {display.width} × {display.height} · {shape}
                 </span>
               </div>
               <div style={CARD_GRID}>
@@ -1684,8 +1697,8 @@ export function SettingsScreen({
               </div>
 
               <div style={{ marginTop: 22 }}>
-                <span className="cc-mini" style={{ letterSpacing: '0.16em' }}>
-                  YOURS
+                <span className="cc-label">
+                  Yours
                 </span>
               </div>
               <div style={CARD_GRID}>
@@ -1703,7 +1716,7 @@ export function SettingsScreen({
                   onClick={() => {
                     const id = copyLayout(settings.layoutId);
                     select(id);
-                    setNote(`Copied ${layout.name}. ARRANGE changes the copy; USE puts it on screen.`);
+                    setNote(`Copied ${layout.name}. Arrange changes the copy; Use puts it on screen.`);
                   }}
                   style={{
                     minHeight: 132,
@@ -1718,8 +1731,8 @@ export function SettingsScreen({
                   }}
                 >
                   <span style={{ fontSize: 22, fontWeight: 200 }}>+</span>
-                  <span className="cc-mini" style={{ letterSpacing: '0.14em', color: 'var(--cc-muted)' }}>
-                    COPY THE ONE IN USE
+                  <span className="cc-mini" style={{ color: 'var(--cc-muted)' }}>
+                    Copy the one in use
                   </span>
                 </button>
               </div>
@@ -1758,28 +1771,28 @@ export function SettingsScreen({
                         fontSize: 12,
                       }}
                     />
-                    <button className="cc-chip cc-chip-on" style={{ height: 34, padding: '0 14px' }} onClick={commitRename}>
-                      SAVE NAME
+                    <button className="cc-chip cc-primary" style={{ height: 34, padding: '0 14px' }} onClick={commitRename}>
+                      Save name
                     </button>
                     <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => setRenaming(null)}>
-                      CANCEL
+                      Cancel
                     </button>
                   </>
                 ) : (
                   <>
                     <button
-                      className="cc-chip cc-chip-on"
-                      style={{ height: 34, padding: '0 14px', opacity: selected.id === settings.layoutId ? 0.5 : 1 }}
+                      className={selected.id === settings.layoutId ? 'cc-chip' : 'cc-chip cc-primary'}
+                      style={{ height: 34, padding: '0 14px' }}
                       disabled={selected.id === settings.layoutId}
                       onClick={() => {
                         useLayout(selected.id);
                         setNote(null);
                       }}
                     >
-                      {selected.id === settings.layoutId ? 'IN USE' : `USE ${selected.name.toUpperCase()}`}
+                      {selected.id === settings.layoutId ? 'In use' : `Use ${selected.name}`}
                     </button>
                     <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => onArrange(selected.id)}>
-                      ARRANGE
+                      Arrange
                     </button>
                     {!isPreset(selected.id) && (
                       <button
@@ -1787,14 +1800,14 @@ export function SettingsScreen({
                         style={{ height: 34, padding: '0 14px' }}
                         onClick={() => setRenaming(selected.name)}
                       >
-                        RENAME
+                        Rename
                       </button>
                     )}
                     <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => void exportSelected()}>
-                      EXPORT
+                      Export
                     </button>
                     <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => void importFromClipboard()}>
-                      IMPORT
+                      Import
                     </button>
                     <div style={{ flex: 1 }} />
                     {!isPreset(selected.id) && (
@@ -1804,8 +1817,7 @@ export function SettingsScreen({
                           height: 34,
                           padding: '0 14px',
                           color: confirmDelete ? 'var(--cc-bg)' : 'var(--cc-danger)',
-                          background: confirmDelete ? 'var(--cc-danger)' : 'transparent',
-                          borderColor: 'var(--cc-danger)',
+                          background: confirmDelete ? 'var(--cc-danger)' : undefined,
                         }}
                         onClick={() => {
                           if (!confirmDelete) {
@@ -1818,7 +1830,7 @@ export function SettingsScreen({
                           setNote(`${selected.name} deleted.`);
                         }}
                       >
-                        {confirmDelete ? 'PRESS AGAIN TO DELETE' : 'DELETE'}
+                        {confirmDelete ? 'Press again to delete' : 'Delete'}
                       </button>
                     )}
                   </>
@@ -1832,12 +1844,12 @@ export function SettingsScreen({
 
               <div id="on-this-layout" style={{ marginTop: 28, paddingTop: 18, borderTop: '1px solid var(--cc-line)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <span className="cc-label">ON THIS LAYOUT</span>
+                  <span className="cc-label">On this layout</span>
                   <span className="cc-mini" style={{ flex: 1, minWidth: 0 }}>
-                    {layout.name.toUpperCase()} · {shape.toUpperCase()}, THE ONE ON SCREEN
+                    {layout.name} · {shape}, the one on screen
                   </span>
                   <button className="cc-chip" style={{ height: 34, padding: '0 14px' }} onClick={() => onArrange(settings.layoutId)}>
-                    ARRANGE
+                    Arrange
                   </button>
                 </div>
                 <div className="cc-mini" style={{ marginTop: 8, marginBottom: 6, lineHeight: 1.6 }}>
@@ -1855,10 +1867,10 @@ export function SettingsScreen({
                   return (
                     <Row key={name} label={label(name)} desc={registry[name].about}>
                       <Seg
-                        options={['OFF', 'ON']}
-                        value={on ? 'ON' : 'OFF'}
+                        options={['Off', 'On']}
+                        value={on ? 'On' : 'Off'}
                         onPick={(v) => {
-                          if ((v === 'ON') !== on) toggleWidget(name, on);
+                          if ((v === 'On') !== on) toggleWidget(name, on);
                         }}
                       />
                     </Row>
@@ -1866,7 +1878,7 @@ export function SettingsScreen({
                 })}
   
                 <div className="cc-mini" style={{ marginTop: 12, lineHeight: 1.6 }}>
-                  A widget’s options are in its own sheet: hold its tile, right-click it, or OPTIONS under Widgets.
+                  A widget’s options are in its own sheet: hold its tile, right-click it, or Options under Widgets.
                 </div>
               </div>
             </>
@@ -1875,7 +1887,7 @@ export function SettingsScreen({
           {section === 'WIDGETS' && (
             <>
               <Group
-                label={`BUNDLED WITH KEHAI · ${widgetNames.filter((n) => !registry[n].local).length}`}
+                label={`Bundled with Kehai · ${widgetNames.filter((n) => !registry[n].local).length}`}
                 note="Part of Kehai, and updated with it. Each reads only the computer Kehai runs on."
               />
               {widgetNames
@@ -1912,7 +1924,7 @@ export function SettingsScreen({
                     setJumpToOnScreen(true);
                   }}
                 >
-                  ON THIS LAYOUT
+                  On this layout
                 </button>
               </div>
             </>
@@ -1920,7 +1932,7 @@ export function SettingsScreen({
 
           {section === 'APPEARANCE' && (
             <>
-              <Group label="COLOURS" note="Any layout takes any colours." />
+              <Group label="Colours" note="Any layout takes any colours." />
               <div style={{ display: 'flex', gap: 12 }}>
                 {THEMES.map((t) => (
                   <button
@@ -1929,23 +1941,23 @@ export function SettingsScreen({
                     style={{
                       flex: 1,
                       background: 'var(--cc-pane)',
-                      border: `1px solid ${settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-line)'}`,
-                      padding: 10,
+                      border: `1px solid ${settings.theme === t.id ? 'var(--cc-muted)' : 'var(--cc-line)'}`,
+                      borderRadius: 18,
+                      padding: 8,
                       display: 'flex',
                       flexDirection: 'column',
-                      gap: 9,
+                      gap: 8,
                     }}
                   >
-                    <div style={{ height: 74, background: t.swatch[0], display: 'flex', alignItems: 'flex-end', gap: 6, padding: 8 }}>
-                      <div style={{ flex: 1, height: 10, background: t.swatch[1] }} />
-                      <div style={{ flex: 1, height: 10, background: t.swatch[2] }} />
-                      <div style={{ flex: 2, height: 10, background: t.swatch[3] }} />
+                    <div style={{ height: 74, borderRadius: 12, background: t.swatch[0], display: 'flex', alignItems: 'flex-end', gap: 6, padding: 8 }}>
+                      <div style={{ flex: 1, height: 8, borderRadius: 2, background: t.swatch[1] }} />
+                      <div style={{ flex: 1, height: 8, borderRadius: 2, background: t.swatch[2] }} />
+                      <div style={{ flex: 2, height: 8, borderRadius: 2, background: t.swatch[3] }} />
                     </div>
                     <span
                       style={{
-                        fontSize: 10,
-                        letterSpacing: '0.14em',
-                        color: settings.theme === t.id ? 'var(--cc-accent)' : 'var(--cc-muted)',
+                        fontSize: 14,
+                        color: settings.theme === t.id ? 'var(--cc-text)' : 'var(--cc-muted)',
                       }}
                     >
                       {t.name}
@@ -1968,12 +1980,12 @@ export function SettingsScreen({
                   desc="Registers the app to launch at sign-in. Written to the OS, not to these settings."
                 >
                   {autostart === null ? (
-                    <span className="cc-mini" style={{ flex: 'none' }}>UNAVAILABLE HERE</span>
+                    <span className="cc-mini" style={{ flex: 'none' }}>Unavailable here</span>
                   ) : (
                     <Seg
-                      options={['OFF', 'ON']}
-                      value={autostart ? 'ON' : 'OFF'}
-                      onPick={(v) => setAutostart(v === 'ON')}
+                      options={['Off', 'On']}
+                      value={autostart ? 'On' : 'Off'}
+                      onPick={(v) => setAutostart(v === 'On')}
                     />
                   )}
                 </Row>
@@ -1983,9 +1995,9 @@ export function SettingsScreen({
                 desc="The header slides away and returns when the pointer reaches the top edge."
               >
                 <Seg
-                  options={['OFF', 'ON']}
-                  value={settings.autoHideBar ? 'ON' : 'OFF'}
-                  onPick={(v) => setAutoHideBar(v === 'ON')}
+                  options={['Off', 'On']}
+                  value={settings.autoHideBar ? 'On' : 'Off'}
+                  onPick={(v) => setAutoHideBar(v === 'On')}
                 />
               </Row>
               {REMOTE_PANEL && (
@@ -2016,7 +2028,7 @@ export function SettingsScreen({
                 <Seg
                   options={[0, 1, 5, 10, 20]}
                   value={settings.budgetTokens ? settings.budgetTokens / 1_000_000 : 0}
-                  format={(v) => (v === 0 ? 'NONE' : `${v}M`)}
+                  format={(v) => (v === 0 ? 'None' : `${v} min`)}
                   onPick={(v) => setBudget(v === 0 ? null : v * 1_000_000)}
                 />
               </SubRow>
@@ -2063,9 +2075,9 @@ export function SettingsScreen({
                     desc="Once a day, starting a minute after launch. Asks github.com for the latest release and sends nothing else."
                   >
                     <Seg
-                      options={['OFF', 'ON']}
-                      value={settings.autoCheckUpdates ? 'ON' : 'OFF'}
-                      onPick={(v) => setAutoCheckUpdates(v === 'ON')}
+                      options={['Off', 'On']}
+                      value={settings.autoCheckUpdates ? 'On' : 'Off'}
+                      onPick={(v) => setAutoCheckUpdates(v === 'On')}
                     />
                   </Row>
                   <ProblemRows />
@@ -2079,7 +2091,7 @@ export function SettingsScreen({
                       style={{ padding: '8px 16px' }}
                       onClick={() => sendUpdate({ action: 'open_support' })}
                     >
-                      BUY A COFFEE
+                      Buy a coffee
                     </button>
                   </Row>
                 </>
@@ -2093,7 +2105,7 @@ export function SettingsScreen({
                     onClose();
                   }}
                 >
-                  SETUP
+                  Setup
                 </button>
               </Row>
               <Row
@@ -2105,8 +2117,7 @@ export function SettingsScreen({
                   style={{
                     padding: '8px 16px',
                     color: confirmReset ? 'var(--cc-bg)' : 'var(--cc-danger)',
-                    background: confirmReset ? 'var(--cc-danger)' : 'transparent',
-                    borderColor: 'var(--cc-danger)',
+                    background: confirmReset ? 'var(--cc-danger)' : undefined,
                   }}
                   onClick={() => {
                     if (!confirmReset) {
@@ -2118,7 +2129,7 @@ export function SettingsScreen({
                     setNote('Reset to defaults.');
                   }}
                 >
-                  {confirmReset ? 'PRESS AGAIN TO RESET' : 'RESET'}
+                  {confirmReset ? 'Press again to reset' : 'Reset'}
                 </button>
               </Row>
             </div>

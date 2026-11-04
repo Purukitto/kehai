@@ -12,7 +12,7 @@ export function Clock({ props }: WidgetProps) {
   const { time, date } = clockParts(tick ? new Date(tick.iso) : new Date(), seconds);
 
   // Height sets the size; width caps it, so a narrow tile gets a smaller clock
-  // rather than one cut off at the edge. Mono digits advance 0.6em each.
+  // rather than one cut off at the edge. Tabular digits advance 0.6em each.
   const pad = hero ? 40 : 20;
   const [floor, byHeight, ceiling] = hero ? [48, size.h * 0.42, 208] : [24, size.h * 0.34, 72];
   const byWidth = size.w > 0 ? (size.w - pad * 2) / (time.length * 0.6) : Infinity;
@@ -41,11 +41,10 @@ export function Clock({ props }: WidgetProps) {
       }}
     >
       <span
+        className="cc-display"
         style={{
           fontSize,
-          fontWeight: hero ? 100 : 200,
           lineHeight: 0.92,
-          letterSpacing: '-0.04em',
           whiteSpace: 'nowrap',
           display: 'block',
         }}
@@ -64,10 +63,9 @@ export function Clock({ props }: WidgetProps) {
       <span
         style={{
           display: size.h > 110 ? 'block' : 'none',
-          fontSize: hero ? 18 : 12,
-          letterSpacing: '0.2em',
+          fontSize: hero ? 18 : 13,
           color: 'var(--cc-muted)',
-          marginTop: hero ? 24 : 10,
+          marginTop: hero ? 24 : 8,
           whiteSpace: 'nowrap',
           overflow: 'hidden',
           textOverflow: 'ellipsis',

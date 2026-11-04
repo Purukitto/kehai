@@ -8,12 +8,12 @@ import type { QuotaPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { Awaiting, Meter, Pane } from './chrome';
 
-/** Escalation against a budget the user set. Amber stays the identity colour. */
+/** Escalation against a budget the user set. Under it, the number is just a number. */
 export function budgetStatus(pct: number | null): { label: string; color: string } {
-  if (pct === null) return { label: 'NO BUDGET SET', color: 'var(--cc-accent)' };
-  if (pct >= 92) return { label: 'OVER BUDGET', color: 'var(--cc-danger)' };
-  if (pct >= 80) return { label: 'NEAR BUDGET', color: 'var(--cc-danger)' };
-  return { label: 'NOMINAL', color: 'var(--cc-accent)' };
+  if (pct === null) return { label: 'No budget set', color: 'var(--cc-text)' };
+  if (pct >= 92) return { label: 'Over budget', color: 'var(--cc-danger)' };
+  if (pct >= 80) return { label: 'Near budget', color: 'var(--cc-danger)' };
+  return { label: 'Within budget', color: 'var(--cc-text)' };
 }
 
 /**
@@ -49,7 +49,7 @@ const LINE: CSSProperties = {
   padding: '0 40px',
   display: 'flex',
   alignItems: 'center',
-  gap: 18,
+  gap: 16,
   minWidth: 0,
   overflow: 'hidden',
   flex: 1,
@@ -64,8 +64,8 @@ export function Quota({ props }: WidgetProps) {
 
   if (!quota) {
     return (
-      <Pane label="TOKEN USAGE">
-        <Awaiting label="SESSION USAGE" />
+      <Pane label="Token usage">
+        <Awaiting label="This block" />
       </Pane>
     );
   }
@@ -76,24 +76,22 @@ export function Quota({ props }: WidgetProps) {
     if (line) {
       return (
         <div style={LINE}>
-          <span className="cc-mini" style={{ letterSpacing: '0.22em', flex: 'none' }}>
-            AGENT TOKENS
+          <span className="cc-label" style={{ flex: 'none' }}>
+            Agent tokens
           </span>
-          <span className="cc-mini" style={{ color: 'var(--cc-dim)' }}>
-            NO SOURCE
-          </span>
+          <span className="cc-mini">No transcripts to read</span>
         </div>
       );
     }
     return (
-      <Pane label="TOKEN USAGE">
+      <Pane label="Token usage">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NO AGENT TRANSCRIPTS</div>
+          <div style={{ fontSize: 14, color: 'var(--cc-muted)' }}>No agent transcripts</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
             {quota.reason}
           </div>
-          <div className="cc-mini" style={{ marginTop: 6 }}>
-            THIS SOURCE IS OPTIONAL
+          <div className="cc-mini" style={{ marginTop: 4 }}>
+            This source is optional.
           </div>
         </div>
       </Pane>
@@ -108,10 +106,10 @@ export function Quota({ props }: WidgetProps) {
   if (line) {
     return (
       <div style={LINE}>
-        <span className="cc-mini" style={{ letterSpacing: '0.22em', flex: 'none' }}>
-          {quota.windowHours}H USAGE
+        <span className="cc-label" style={{ flex: 'none' }}>
+          {quota.windowHours}-hour block
         </span>
-        <span style={{ fontSize: 30, fontWeight: 300, color: status.color, flex: 'none' }}>{hero}</span>
+        <span className="cc-display" style={{ fontSize: 32, color: status.color, flex: 'none' }}>{hero}</span>
         <span style={{ fontSize: 14, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
           {compact(quota.burnPerMin)}/min
         </span>
@@ -127,40 +125,22 @@ export function Quota({ props }: WidgetProps) {
   const path = sparkPath(quota.history, 400, 52);
 
   return (
-    <Pane label="TOKEN USAGE">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-        <span className="cc-label">{quota.windowHours}H BLOCK</span>
-        {pct === null ? (
+    <Pane label="Token usage" right={pct !== null ? <span style={{ color: status.color }}>{status.label}</span> : undefined}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span className="cc-label">{quota.windowHours}-hour block</span>
+        {pct === null && (
           // No budget is a choice not yet made, not an alarm: a way to make it.
-          <button
-            className="cc-chip"
-            style={{ fontSize: 9, padding: '3px 8px', color: 'var(--cc-muted)' }}
-            onClick={() => openSettings('SOURCES')}
-          >
-            SET A BUDGET
+          <button className="cc-chip cc-bare" style={{ color: 'var(--cc-muted)' }} onClick={() => openSettings('SOURCES')}>
+            Set a budget
           </button>
-        ) : (
-          <span
-            style={{
-              fontSize: 9,
-              letterSpacing: '0.1em',
-              padding: '1px 5px',
-              border: '1px solid currentColor',
-              color: status.color,
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {status.label}
-          </span>
         )}
       </div>
       <div style={{ flex: 1 }} />
       <span
+        className="cc-display"
         style={{
           fontSize: `clamp(28px, ${Math.max(22, Math.round(size.h * 0.28))}px, 84px)`,
-          fontWeight: 200,
           lineHeight: 0.95,
-          letterSpacing: '-0.035em',
           color: status.color,
         }}
       >
@@ -168,22 +148,22 @@ export function Quota({ props }: WidgetProps) {
       </span>
       <span style={{ fontSize: 14, color: 'var(--cc-muted)', marginTop: 12 }}>
         {quota.blockStartMs === null
-          ? 'NO ACTIVE BLOCK'
+          ? 'No block running'
           : pct === null
-            ? 'TOKENS THIS BLOCK'
-            : compact(used) + ' TOKENS'}
+            ? 'Tokens this block'
+            : compact(used) + ' tokens'}
       </span>
       {size.h > 240 && (
-        <span className="cc-mini" style={{ marginTop: 6 }}>
-          {compact(quota.burnPerMin)}/MIN · {quota.requests} REQUESTS ·{' '}
-          {quota.blockStartMs === null ? 'NEXT REQUEST STARTS A BLOCK' : 'RESETS IN ~' + humanDuration(quota.resetsInMs)}
+        <span className="cc-mini" style={{ marginTop: 4 }}>
+          {compact(quota.burnPerMin)} a minute · {quota.requests} requests ·{' '}
+          {quota.blockStartMs === null ? 'the next request starts one' : 'resets in about ' + humanDuration(quota.resetsInMs)}
         </span>
       )}
       <div style={{ flex: 1 }} />
       {size.h > 200 && path && (
         <svg width="100%" height="52" viewBox="0 0 400 52" preserveAspectRatio="none" style={{ display: 'block' }}>
-          <path d={path + ' L400 52 L0 52 Z'} fill={status.color} opacity="0.12" />
-          <path d={path} fill="none" stroke={status.color} strokeWidth="1.4" />
+          <path d={path + ' L400 52 L0 52 Z'} fill="var(--cc-muted)" opacity="0.1" />
+          <path d={path} fill="none" stroke="var(--cc-muted)" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
         </svg>
       )}
     </Pane>
