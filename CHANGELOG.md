@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-04
+
 ### Changed
 
 - **The panel goes still while you play.** In a CS2 round it turns dark and quiet,
@@ -370,7 +372,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Purukitto/kehai/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Purukitto/kehai/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Purukitto/kehai/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Purukitto/kehai/compare/v0.9.1...v0.9.2
