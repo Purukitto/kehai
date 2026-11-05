@@ -158,6 +158,8 @@ export function Agents({ props }: WidgetProps) {
 
   if (line) {
     const top = agents.sessions[0];
+    // One line in a tall tile reads larger: it grows with the tile, up to twice.
+    const k = Math.max(1, Math.min(2, size.h / 110));
     return (
       <div
         style={{
@@ -171,12 +173,12 @@ export function Agents({ props }: WidgetProps) {
           overflow: 'hidden',
         }}
       >
-        <span className="cc-label" style={{ flex: 'none' }}>
+        <span className="cc-label" style={{ flex: 'none', fontSize: Math.round(12 * Math.min(k, 1.4)) }}>
           Agents
         </span>
-        <span style={{ fontSize: 18, color: head.color, flex: 'none', whiteSpace: 'nowrap' }}>{head.text}</span>
+        <span className="cc-display" style={{ fontSize: Math.round(20 * k), color: head.color, flex: 'none', whiteSpace: 'nowrap' }}>{head.text}</span>
         {top && (
-          <span style={{ fontSize: 13, color: 'var(--cc-muted)', minWidth: 0, ...ELLIPSIS }}>
+          <span style={{ fontSize: Math.round(13 * Math.min(k, 1.5)), color: 'var(--cc-muted)', minWidth: 0, ...ELLIPSIS }}>
             {agentSentence(top, now)}
           </span>
         )}

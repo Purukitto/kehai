@@ -9,6 +9,20 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Fixed
+
+- On a display bigger than the one it is laid out for, such as a main monitor, the
+  panel now scales up to fit, instead of leaving small text in large empty tiles. It
+  follows the window's size on any display. A remote panel's browser keeps its own
+  zoom.
+- A large clock on a wide tile no longer stacks the hours over the minutes and cuts
+  off the date, and it grows with its tile.
+- One-line tiles grow their text with their tile, and the main readout shows only as
+  many agent rows as fit.
+- The vitals tile no longer runs off the bottom on a panel scaled to 125%: it sizes
+  its values to the room each row has, and goes to two columns when that gives them
+  more. The token tile drops its subtitle when it is too short to hold it.
+
 ## [0.12.0] - 2026-11-04
 
 ### Changed
@@ -34,9 +48,9 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ### Removed
 
-- The Now playing equaliser, which was a decoration, not the music.
-- The CS2 tile's lighting, the flash and smoke washes, and showing it full screen:
-  each pulled the eye to the panel in the middle of a round.
+- The Now playing equaliser.
+- The CS2 tile's lighting, the flash and smoke washes, and showing it full screen, so
+  the panel stays still in the middle of a round.
 - `lighting` in a game widget's file, which is now ignored. `match.still` says when
   the player is in play.
 

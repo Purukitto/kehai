@@ -85,6 +85,13 @@ export function Stage({ props }: WidgetProps) {
     if (waiting > 0) setHeldOff(true);
   };
 
+  // Sized from the tile, not the window: the same hero is wide and short on a
+  // bar display and narrow and tall in portrait.
+  const valueSize = Math.round(Math.max(48, Math.min(168, size.w ? size.w * 0.14 : 168, size.h ? size.h * 0.32 : 168)));
+  // What is left under the tabs, the value, its sentence and its meter, in
+  // agent rows: as many as fit, up to three.
+  const rowsFit = Math.max(0, Math.min(3, Math.floor((size.h - 229 - valueSize * 0.9) / 48)));
+
   let hero: Hero | null = null;
 
   if (tab === 'quota' && quota?.available) {
@@ -154,7 +161,7 @@ export function Stage({ props }: WidgetProps) {
       axisB: '',
       controls: (
         <div style={{ borderBottom: '1px solid var(--cc-line)', margin: '0 -16px' }}>
-          {agents.sessions.slice(0, 3).map((session) => (
+          {agents.sessions.slice(0, rowsFit).map((session) => (
             <AgentRow key={session.id} session={session} now={now} />
           ))}
         </div>
@@ -204,11 +211,8 @@ export function Stage({ props }: WidgetProps) {
     };
   }
 
-  // Sized from the tile, not the window: the same hero is wide and short on a
-  // bar display and narrow and tall in portrait. The chart takes what is left
-  // under the value, sentence and meter, and stays out when that is too little
-  // to read.
-  const valueSize = Math.round(Math.max(48, Math.min(168, size.w ? size.w * 0.14 : 168, size.h ? size.h * 0.32 : 168)));
+  // The chart takes what is left under the value, sentence and meter, and stays
+  // out when that is too little to read.
   const chartH = Math.min(132, Math.round(size.h - (36 + 56 + 24 + valueSize * 0.9 + 37 + 60 + 66)));
   // A bar or a line in the text colour would outshout the value above it.
   const quiet = hero && hero.color !== 'var(--cc-text)' ? hero.color : 'var(--cc-accent)';

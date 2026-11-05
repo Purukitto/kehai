@@ -104,13 +104,15 @@ export function Quota({ props }: WidgetProps) {
   const hero = pct === null ? compact(used) : pct + '%';
 
   if (line) {
+    // One line in a tall tile reads larger: it grows with the tile, up to twice.
+    const k = Math.max(1, Math.min(2, size.h / 110));
     return (
       <div style={LINE}>
-        <span className="cc-label" style={{ flex: 'none' }}>
+        <span className="cc-label" style={{ flex: 'none', fontSize: Math.round(12 * Math.min(k, 1.4)) }}>
           {quota.windowHours}-hour block
         </span>
-        <span className="cc-display" style={{ fontSize: 32, color: status.color, flex: 'none' }}>{hero}</span>
-        <span style={{ fontSize: 14, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
+        <span className="cc-display" style={{ fontSize: Math.round(32 * k), color: status.color, flex: 'none' }}>{hero}</span>
+        <span style={{ fontSize: Math.round(14 * Math.min(k, 1.5)), color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
           {compact(quota.burnPerMin)}/min
         </span>
         {pct !== null && (
@@ -146,13 +148,16 @@ export function Quota({ props }: WidgetProps) {
       >
         {hero}
       </span>
-      <span style={{ fontSize: 14, color: 'var(--cc-muted)', marginTop: 12 }}>
-        {quota.blockStartMs === null
-          ? 'No block running'
-          : pct === null
-            ? 'Tokens this block'
-            : compact(used) + ' tokens'}
-      </span>
+      {/* Sections go from the bottom as the tile shortens: this line below 170, the details below 240. */}
+      {size.h > 170 && (
+        <span style={{ fontSize: 14, color: 'var(--cc-muted)', marginTop: 12 }}>
+          {quota.blockStartMs === null
+            ? 'No block running'
+            : pct === null
+              ? 'Tokens this block'
+              : compact(used) + ' tokens'}
+        </span>
+      )}
       {size.h > 240 && (
         <span className="cc-mini" style={{ marginTop: 4 }}>
           {compact(quota.burnPerMin)} a minute · {quota.requests} requests ·{' '}

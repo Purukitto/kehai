@@ -19,10 +19,7 @@ underlying value is genuinely moving.
 
 ## How it looks
 
-Something you would keep on a desk, not a terminal. Until 0.12 Kehai dressed as one:
-labels in tracked capitals, outlined badges in four colours, a decorative equaliser
-and a glowing edge on the game tile. Each of those is a stock move, and together they
-read as a dashboard nobody designed. Now it is obsidian glass:
+Something you would keep on a desk, not a terminal: obsidian glass.
 
 - **Charcoal and champagne.** A near-black page with one faint glow from above, in the
   theme's accent, and nothing else in the way of gradient. The accent is a warm,
@@ -43,8 +40,8 @@ read as a dashboard nobody designed. Now it is obsidian glass:
   screen asks you to do is filled in champagne.
 - **One glow, earned.** An agent waiting on you lights the main readout from inside.
   Nothing else glows, and nothing pulses.
-- **Nothing pretends.** The equaliser was not the music, so it went. Motion is a value
-  changing, or a sheet arriving.
+- **Motion means something.** It is a value changing, or a sheet arriving, never
+  decoration.
 
 ## Presets
 
@@ -206,12 +203,10 @@ theme's back.
 
 ## While you play
 
-The question about a second screen during a game is why you would look at it at all.
-In the middle of a round you should not, and anything that moves at the edge of your
-eye is working against you. 0.11 got this wrong: the CS2 tile copied the HUD, health,
-armour, money and ammo, which the game already shows where you are looking, and lit
-its edge and flashed white with the game, which pulled the eye to the one place it
-should not go.
+In the middle of a round you should not be looking at a second screen, and anything
+that moves at the edge of your eye works against you. The game already shows your
+health, armour, money and ammo where you are looking, so the panel does not repeat
+them.
 
 So while you are in play the panel goes still: dark, nothing moving or changing
 colour, the score dimly, and how many things it is holding. Notifications and agents
@@ -225,6 +220,19 @@ What the tile shows is for those gaps, and only what the game does not keep: the
 match so far, round by round, your figures while you watch a teammate, and between
 matches, tonight's matches with how each went. A game widget lists none of the HUD.
 
+
+## Bigger displays
+
+Each arrangement is drawn for a display of its shape: a 1280 × 800 panel, a
+1920 × 480 bar, an 800 × 1280 tablet. A desktop window much bigger than that, a
+main monitor, zooms the whole page to fit, as Ctrl and + would, so it shows the
+panel larger rather than a panel's worth of text lost in tiles four times its size.
+The zoom follows the window's size, on any display, in steps of 5%, and never drops
+below 100%: a smaller window already lays itself out to fit. Inside it, every tile
+still fits itself to its own cell, below.
+
+It is the webview's own zoom, so everything the page measures agrees with what it
+draws. A remote panel's browser keeps its own zoom, which its owner can set.
 
 ## Responsiveness is per-tile
 
