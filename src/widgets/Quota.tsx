@@ -125,14 +125,23 @@ export function Quota({ props }: WidgetProps) {
   }
 
   const path = sparkPath(quota.history, 400, 52);
+  // As large as the tile's height allows, and never wider than the tile: a
+  // figure advances 0.6 em, inside the pane's 16 px each side.
+  const heroSize = Math.max(22, Math.min(84, Math.round(size.h * 0.28), Math.floor((size.w - 32) / (hero.length * 0.6))));
 
   return (
     <Pane label="Token usage" right={pct !== null ? <span style={{ color: status.color }}>{status.label}</span> : undefined}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-        <span className="cc-label">{quota.windowHours}-hour block</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, minWidth: 0 }}>
+        <span className="cc-label" style={{ whiteSpace: 'nowrap' }}>
+          {quota.windowHours}-hour block
+        </span>
         {pct === null && (
           // No budget is a choice not yet made, not an alarm: a way to make it.
-          <button className="cc-chip cc-bare" style={{ color: 'var(--cc-muted)' }} onClick={() => openSettings('SOURCES')}>
+          <button
+            className="cc-chip cc-bare"
+            style={{ color: 'var(--cc-muted)', whiteSpace: 'nowrap', marginRight: -14 }}
+            onClick={() => openSettings('SOURCES')}
+          >
             Set a budget
           </button>
         )}
@@ -141,9 +150,10 @@ export function Quota({ props }: WidgetProps) {
       <span
         className="cc-display"
         style={{
-          fontSize: `clamp(28px, ${Math.max(22, Math.round(size.h * 0.28))}px, 84px)`,
+          fontSize: heroSize,
           lineHeight: 0.95,
           color: status.color,
+          whiteSpace: 'nowrap',
         }}
       >
         {hero}

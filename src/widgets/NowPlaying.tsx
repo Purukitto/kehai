@@ -20,6 +20,10 @@ const COMPACT_BELOW = 210;
 const VOLUME_BESIDE_FROM = 720;
 /** One row narrower than this drops the cover, so the title keeps some room. */
 const ROW_COVER_FROM = 460;
+/** The least a title is given beside the buttons. Less, and they stop sharing a row. */
+const TITLE_MIN = 140;
+/** Tall enough for the title above the buttons, clear of the seek strip along the bottom. */
+const STACK_FROM = 132;
 /** As the volume keys move it. A block sets a tenth. */
 const VOLUME_STEP = 2;
 /**
@@ -51,14 +55,17 @@ function Transport({
   size,
   volume,
   onVolume,
+  lean = false,
 }: {
   playing: boolean;
   size: number;
   volume?: Volume | null;
   onVolume?: () => void;
+  /** Play and next only, for a row with no room for the title otherwise. */
+  lean?: boolean;
 }) {
   const buttons = [
-    { d: PREV, action: 'previous', main: false },
+    ...(lean ? [] : [{ d: PREV, action: 'previous', main: false }] as const),
     { d: playing ? PAUSE : PLAY, action: 'playpause', main: true },
     { d: NEXT, action: 'next', main: false },
   ] as const;
@@ -530,15 +537,30 @@ export function NowPlaying({ props }: WidgetProps) {
   } else if (compact) {
     // One row. Art, header and the timestamped bar are the first to go; the
     // bottom edge keeps position, and takes a seek, without costing a row.
+    const cover = wantArt && size.h > 90 && size.w >= ROW_COVER_FROM;
+    const coverSize = Math.min(52, size.h - 34);
+    // Four 50 px buttons and the divider, or three without a volume.
+    const transportW = volume ? 4 * 50 + 3 * 8 + 13 : 3 * 50 + 2 * 8;
+    const titleRoom = size.w - 32 - 16 - transportW - (cover ? coverSize + 16 : 0);
+    const stacked = titleRoom < TITLE_MIN && size.h >= STACK_FROM;
+    const lean = titleRoom < TITLE_MIN && !stacked;
     inner = (
       <div style={{ position: 'relative', flex: 1, display: 'flex', minWidth: 0 }}>
         {showVolume ? (
           <VolumeRow volume={volume} opened={opened} />
+        ) : stacked ? (
+          // Too narrow to share a row: the title over the buttons, both clear of the seek strip.
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, padding: '10px 16px 30px', minWidth: 0 }}>
+            <Title media={media} size="sm" />
+            <div style={{ display: 'flex', marginLeft: -5 }}>
+              <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} />
+            </div>
+          </div>
         ) : (
           <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: '0 16px', minWidth: 0 }}>
-            {wantArt && size.h > 90 && size.w >= ROW_COVER_FROM && <Cover src={art?.dataUrl ?? null} size={Math.min(52, size.h - 34)} />}
+            {cover && <Cover src={art?.dataUrl ?? null} size={coverSize} />}
             <Title media={media} size="sm" />
-            <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} />
+            <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} lean={lean} />
           </div>
         )}
         <SeekEdge elapsed={elapsed} duration={duration} canSeek={canSeek} onSeek={seek} />

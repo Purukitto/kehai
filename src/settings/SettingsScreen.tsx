@@ -40,6 +40,9 @@ import { Group, Row, Seg } from './controls';
 const NAV = ['LAYOUT', 'WIDGETS', 'APPEARANCE', 'WINDOW', 'SOURCES', 'REMOTE', 'ABOUT'] as const;
 export type Section = (typeof NAV)[number];
 
+/** Narrower than this, the section names go and their icons stay. */
+const RAIL_BELOW = 800;
+
 const NAV_NAME: Record<Section, string> = {
   LAYOUT: 'Layout',
   WIDGETS: 'Widgets',
@@ -583,26 +586,20 @@ export function TranscriptRootRow({ value, onCommit }: { value: string | null; o
   // Laid out as a SourceRow with no dot, so it reads as part of the agent rows
   // above, which both read this folder, rather than as a separate source.
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        padding: '12px 0',
-        borderBottom: '1px solid var(--cc-line)',
-      }}
-    >
-      <span style={{ width: 6, flex: 'none' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12 }}>Transcript folder</div>
-        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
-          One subfolder per project, each holding .jsonl transcripts. Blank uses ~/.claude/projects.
+    <div style={WRAP_ROW}>
+      <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', gap: 14 }}>
+        <span style={{ width: 6, flex: 'none' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12 }}>Transcript folder</div>
+          <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+            One subfolder per project, each holding .jsonl transcripts. Blank uses ~/.claude/projects.
+          </div>
         </div>
       </div>
-      <div style={{ display: 'flex', flex: 'none' }}>
+      <div style={{ display: 'flex', flex: 'none', marginLeft: 'auto', maxWidth: '100%' }}>
         <input
           className="cc-field"
-          style={{ width: 280 }}
+          style={{ width: 280, minWidth: 0, flex: '0 1 280px' }}
           value={draft}
           placeholder="~/.claude/projects"
           spellCheck={false}
@@ -627,29 +624,36 @@ export function TranscriptRootRow({ value, onCommit }: { value: string | null; o
   );
 }
 
-/** A setting that belongs to the source row above it, so it carries no dot. */
+/**
+ * A setting that belongs to the source row above it, so it carries no dot. As
+ * with every row, a control that would squeeze the words goes under them.
+ */
 function SubRow({ label, desc, children }: { label: string; desc: string; children: React.ReactNode }) {
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        padding: '12px 0',
-        borderBottom: '1px solid var(--cc-line)',
-      }}
-    >
-      <span style={{ width: 6, flex: 'none' }} />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12 }}>{label}</div>
-        <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
-          {desc}
+    <div style={WRAP_ROW}>
+      <div style={{ flex: '1 1 260px', minWidth: 0, display: 'flex', gap: 14 }}>
+        <span style={{ width: 6, flex: 'none' }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 12 }}>{label}</div>
+          <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.5 }}>
+            {desc}
+          </div>
         </div>
       </div>
-      {children}
+      <div style={{ flex: 'none', marginLeft: 'auto', maxWidth: '100%', display: 'flex', justifyContent: 'flex-end' }}>{children}</div>
     </div>
   );
 }
+
+const WRAP_ROW: React.CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+  columnGap: 14,
+  rowGap: 10,
+  padding: '12px 0',
+  borderBottom: '1px solid var(--cc-line)',
+};
 
 /**
  * Offered as a few lengths rather than a free field: a panel read from across
@@ -1203,7 +1207,7 @@ function ProblemList({ problems }: { problems: LogProblem[] }) {
                   {p.count > 1 && <span className="cc-mini">{`  ×${p.count}`}</span>}
                 </div>
                 {p.then && (
-                  <div className="cc-mini" style={{ marginTop: 3, textTransform: 'uppercase' }}>
+                  <div className="cc-mini" style={{ marginTop: 3 }}>
                     {p.then}
                   </div>
                 )}
@@ -1507,6 +1511,9 @@ export function SettingsScreen({
   } = useSettings();
   const display = useWindowShape();
   const shape = display.shape;
+  // On a narrow window the pages keep the width and the sections become a rail
+  // of icons, each named when pointed at.
+  const rail = display.width < RAIL_BELOW;
   const [autostart, setAutostart] = useAutostart();
   const [section, setSection] = useState<Section>(initialSection ?? 'LAYOUT');
   const update = useTopic<UpdatePayload>('app:update');
@@ -1621,27 +1628,31 @@ export function SettingsScreen({
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <div
           style={{
-            width: 224,
+            width: rail ? 60 : 224,
             flex: 'none',
             background: 'var(--cc-pane)',
             borderRight: '1px solid var(--cc-line)',
             display: 'flex',
             flexDirection: 'column',
             paddingTop: 10,
+            overflowY: 'auto',
           }}
         >
           {NAV.map((n) => (
             <button
               key={n}
               onClick={() => setSection(n)}
+              aria-label={NAV_NAME[n]}
+              title={rail ? NAV_NAME[n] : undefined}
               style={{
-                height: 40,
+                height: rail ? 44 : 40,
                 flex: 'none',
                 display: 'flex',
                 alignItems: 'center',
+                justifyContent: rail ? 'center' : undefined,
                 gap: 12,
                 margin: '0 8px',
-                padding: '0 12px',
+                padding: rail ? 0 : '0 12px',
                 background: section === n ? 'var(--cc-line)' : 'transparent',
                 border: 0,
                 borderRadius: 12,
@@ -1649,21 +1660,23 @@ export function SettingsScreen({
                 textAlign: 'left',
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
+              <svg width={rail ? 16 : 14} height={rail ? 16 : 14} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round">
                 <path d={NAV_ICON[n]} />
               </svg>
-              <span style={{ fontSize: 14, flex: 1 }}>{NAV_NAME[n]}</span>
+              {!rail && <span style={{ fontSize: 14, flex: 1 }}>{NAV_NAME[n]}</span>}
             </button>
           ))}
           <div style={{ flex: 1 }} />
-          <div style={{ padding: '16px 18px', borderTop: '1px solid var(--cc-line)' }}>
-            <span className="cc-mini" style={{ fontSize: 12, lineHeight: 1.7, display: 'block' }}>
-              Every change is saved as you make it. There is no file to edit and nothing to restart.
-            </span>
-          </div>
+          {!rail && display.height >= 560 && (
+            <div style={{ padding: '16px 18px', borderTop: '1px solid var(--cc-line)' }}>
+              <span className="cc-mini" style={{ fontSize: 12, lineHeight: 1.7, display: 'block' }}>
+                Every change is saved as you make it. There is no file to edit and nothing to restart.
+              </span>
+            </div>
+          )}
         </div>
 
-        <div style={{ flex: 1, padding: '26px 30px', minWidth: 0, overflowY: 'auto' }}>
+        <div style={{ flex: 1, padding: rail ? '22px 20px' : '26px 30px', minWidth: 0, overflowY: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
             <span className="cc-display" style={{ fontSize: 34 }}>{NAV_NAME[section]}</span>
             {note && <span className="cc-mini" style={{ color: 'var(--cc-accent)' }}>{note}</span>}
@@ -1671,16 +1684,15 @@ export function SettingsScreen({
 
           {section === 'LAYOUT' && (
             <>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 16 }}>
-                <span className="cc-label">
+              <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 10, rowGap: 4, marginTop: 16 }}>
+                <span className="cc-label" style={{ whiteSpace: 'nowrap' }}>
                   Presets · updated with each release
                 </span>
-                <div style={{ flex: 1 }} />
-                <span className="cc-label">
-                  This display
-                </span>
-                <span style={{ fontSize: 13 }}>
-                  {display.width} × {display.height} · {shape}
+                <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
+                  <span className="cc-label">This display</span>
+                  <span style={{ fontSize: 13 }}>
+                    {display.width} × {display.height} · {shape}
+                  </span>
                 </span>
               </div>
               <div style={CARD_GRID}>
@@ -2028,7 +2040,7 @@ export function SettingsScreen({
                 <Seg
                   options={[0, 1, 5, 10, 20]}
                   value={settings.budgetTokens ? settings.budgetTokens / 1_000_000 : 0}
-                  format={(v) => (v === 0 ? 'None' : `${v} min`)}
+                  format={(v) => (v === 0 ? 'None' : `${v}M`)}
                   onPick={(v) => setBudget(v === 0 ? null : v * 1_000_000)}
                 />
               </SubRow>

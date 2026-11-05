@@ -59,11 +59,16 @@ export function Vitals({ props }: WidgetProps) {
   const innerH = size.h - PAD * 2;
   const chars = Math.max(3, ...show.map((k) => (values[k] ?? '--').length));
   const listRow = (innerH - GAP * (n - 1)) / n;
-  const listSize = Math.min(48, listRow / LINE, (innerW - LABEL_W) / (chars * ADVANCE));
+  // A label set on a large value's baseline sits a little below its line, so
+  // each row is given a little more than the value's own line.
+  const listSize = Math.min(48, listRow / (LINE + 0.08), (innerW - LABEL_W) / (chars * ADVANCE));
   const gridRows = Math.ceil(n / 2);
   const gridRow = (innerH - GAP * (gridRows - 1)) / gridRows;
   const gridSize = n > 1 ? Math.min(44, (gridRow - LABEL_H) / LINE, (innerW - GAP * 2) / 2 / (chars * ADVANCE)) : 0;
-  const grid = gridSize > listSize * 1.15;
+  // In a wide tile one column leaves each label at one edge and its value at
+  // the other, so two columns win there unless they cost the values real size.
+  const wide = size.w > size.h * 1.5;
+  const grid = gridSize > listSize * (wide ? 0.8 : 1.15);
   const valueSize = Math.floor(inline ? Math.max(17, Math.min(30, size.h * 0.28)) : Math.max(13, grid ? gridSize : listSize));
 
   const value = (key: string) => (
