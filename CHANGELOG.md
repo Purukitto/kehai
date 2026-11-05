@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.12.2] - 2026-11-05
+
 ### Fixed
 
 - A widget's options sheet is as tall as what it holds. On a narrow sheet a setting's
@@ -411,7 +413,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.12.1...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.12.2...HEAD
+[0.12.2]: https://github.com/Purukitto/kehai/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Purukitto/kehai/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Purukitto/kehai/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Purukitto/kehai/compare/v0.10.0...v0.11.0
