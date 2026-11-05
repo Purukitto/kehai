@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Event delivery and the window controls the panel draws itself",
+  "description": "Event delivery, the window controls the panel draws itself, and its zoom to fit a big display",
   "windows": [
     "main"
   ],
@@ -12,6 +12,7 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-set-fullscreen",
     "core:window:allow-is-fullscreen",
+    "core:webview:allow-set-webview-zoom",
     "core:event:allow-listen",
     "core:event:allow-emit",
     "core:event:allow-unlisten",
