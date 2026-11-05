@@ -81,12 +81,13 @@ export function Lines({ lines, size }: { lines: Line[]; size: number }) {
           }}
         >
           <span style={{ width: l.small ? 6 : 8, height: l.small ? 6 : 8, borderRadius: '50%', flex: 'none', background: l.color }} />
-          <span style={{ ...clip, fontSize: Math.round(size * (l.small ? 0.5 : 1)), fontWeight: 300, color: l.small ? 'var(--cc-dim)' : l.color }}>
+          {/* The small words keep to the panel's smallest readable size, 12 px, however small the lines are drawn. */}
+          <span style={{ ...clip, fontSize: l.small ? Math.max(12, Math.round(size * 0.5)) : Math.round(size), fontWeight: 300, color: l.small ? 'var(--cc-dim)' : l.color }}>
             {l.text}
           </span>
           <span style={{ flex: 1 }} />
           {l.sub && (
-            <span style={{ ...clip, fontSize: Math.round(size * 0.52), color: 'var(--cc-muted)', flex: 'none', maxWidth: '45%' }}>
+            <span style={{ ...clip, fontSize: Math.max(12, Math.round(size * 0.52)), color: 'var(--cc-muted)', flex: 'none', maxWidth: '45%' }}>
               {l.sub}
             </span>
           )}

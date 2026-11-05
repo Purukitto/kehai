@@ -99,22 +99,34 @@ export function Sprint(_: WidgetProps) {
   // around them goes before they shrink.
   const showToday = size.h > 210;
   const showTrack = size.h > 160;
+  // A short tile says which sprint it is in its title instead of on a line of its own.
+  const showLabel = size.h > 170;
   const running = sprint.state === 'running';
   // Focus blocks the break follows are done; the one being focused on is not.
   const done = sprint.mode === 'break' ? sprint.index : sprint.index - 1;
+  // The numeral takes what the title, padding and the other rows leave, so the
+  // buttons are never pushed out of the tile, nor the figures out of its sides.
+  const rows = (showLabel ? 18 : 0) + 16 + 28 + (showTrack ? 4 : 0) + (showToday ? 33 : 0);
+  const numeral = Math.max(26, Math.min(92, Math.round(size.h * 0.3), Math.floor((size.h - 28 - 32 - rows) / 0.95), Math.floor((size.w - 32) / 3)));
+  const status = sprintStatus(sprint);
 
   return (
     <Pane
       label="Focus timer"
-      right={<span style={{ color: running && sprint.mode === 'break' ? sprintColor(sprint) : undefined }}>{sprintStatus(sprint)}</span>}
+      right={
+        <span style={{ color: running && sprint.mode === 'break' ? sprintColor(sprint) : undefined }}>
+          {showLabel ? status : `${sprintLabel(sprint)} · ${status}`}
+        </span>
+      }
     >
-      <span className="cc-label">{sprintLabel(sprint)}</span>
+      {showLabel && <span className="cc-label">{sprintLabel(sprint)}</span>}
       <div style={{ flex: 1 }} />
       <span
         className="cc-display"
         style={{
-          fontSize: `clamp(30px, ${Math.max(24, Math.round(size.h * 0.3))}px, 92px)`,
+          fontSize: numeral,
           lineHeight: 0.95,
+          whiteSpace: 'nowrap',
           // A countdown that is not counting should not look like one that is.
           color: running ? sprintColor(sprint) : 'var(--cc-muted)',
         }}
@@ -130,7 +142,7 @@ export function Sprint(_: WidgetProps) {
         <SprintControls sprint={sprint} compact={size.w < 230} />
       </div>
       <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', gap: 3, flex: 'none', visibility: showTrack ? 'visible' : 'hidden' }}>
+      <div style={{ display: showTrack ? 'flex' : 'none', gap: 3, flex: 'none' }}>
         {Array.from({ length: sprint.total }, (_v, i) => (
           <div
             key={i}

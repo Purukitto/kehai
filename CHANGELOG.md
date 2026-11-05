@@ -9,6 +9,29 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Fixed
+
+- A widget's options sheet is as tall as what it holds. On a narrow sheet a setting's
+  switch goes under its description, a group's name stays on one line, and Arrange
+  this layout moves under the note beside it. A tile too wide to leave room beside the
+  sheet is no longer outlined around the sheet's edges.
+- Settings on a narrow window, such as a tablet on its end, shows its sections as a
+  column of icons, so each page keeps the width. Rows there wrap the same way as in the
+  sheets, and the token budget's choices read 1M, 5M, 10M and 20M.
+- Token usage's figure stays inside a narrow tile, and its 5-hour block label stays on
+  one line.
+- A short focus timer tile keeps its buttons inside the tile and names the sprint in
+  its title.
+- A narrow one-row Now playing tile puts the title above the buttons where it is tall
+  enough, and drops the previous-track button where it is not, so the title is never
+  cut to a letter.
+- The status tile lays two readings out side by side in a wide tile, each label over
+  its value.
+- In the display map, a small display's note and name stay inside it.
+- The small notes on the panel while you play or are away are readable.
+- The night dimming choices and the problems list under About are in sentence case,
+  as the rest of Kehai is.
+
 ## [0.12.1] - 2026-11-05
 
 ### Fixed

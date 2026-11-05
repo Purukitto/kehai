@@ -44,6 +44,9 @@ export function OptionsSheet({
   // As wide as the room beside the tile allows, so the tile stays in view.
   const room = rect === null ? SHEET_W : onLeft ? rect.left : window.innerWidth - rect.right;
   const width = Math.min(window.innerWidth, Math.max(SHEET_MIN, Math.min(SHEET_W, room)));
+  // A tile too wide to leave room is partly under the sheet. Its ring would only
+  // show as stray edges round the sheet, so it keeps the dimming and goes unlit.
+  const covered = rect !== null && width > room;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -70,7 +73,7 @@ export function OptionsSheet({
             zIndex: 51,
             pointerEvents: 'none',
             borderRadius: 20,
-            boxShadow: '0 0 0 2px var(--cc-accent), 0 0 0 100vmax rgba(0, 0, 0, 0.62)',
+            boxShadow: covered ? '0 0 0 100vmax rgba(0, 0, 0, 0.62)' : '0 0 0 2px var(--cc-accent), 0 0 0 100vmax rgba(0, 0, 0, 0.62)',
           }}
         />
       )}
@@ -81,7 +84,9 @@ export function OptionsSheet({
         style={{
           position: 'fixed',
           top: 12,
-          bottom: 12,
+          // As tall as what it holds, up to the window, rather than a full-height
+          // slab with a few rows at the top of it.
+          maxHeight: 'calc(100% - 24px)',
           [onLeft ? 'left' : 'right']: 12,
           width: width - 12,
           zIndex: 52,
@@ -100,11 +105,16 @@ export function OptionsSheet({
             gap: 12,
             padding: '0 16px 0 24px',
             borderBottom: '1px solid var(--cc-line)',
+            minWidth: 0,
           }}
         >
           <GameIcon path={spec?.game?.source.icon ?? null} color="var(--cc-muted)" />
-          <span className="cc-display" style={{ fontSize: 22 }}>{name}</span>
-          <span className="cc-mini">Options</span>
+          <span className="cc-display" style={{ fontSize: 22, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {name}
+          </span>
+          <span className="cc-mini" style={{ flex: 'none' }}>
+            Options
+          </span>
           <div style={{ flex: 1 }} />
           <button className="cc-chip" style={{ padding: '6px 20px' }} onClick={onClose}>
             Done
@@ -113,7 +123,7 @@ export function OptionsSheet({
 
         <div
           style={{
-            flex: 1,
+            flex: '1 1 auto',
             minHeight: 0,
             overflowY: 'auto',
             padding: '0 24px 16px',
@@ -130,20 +140,26 @@ export function OptionsSheet({
           )}
         </div>
 
+        {/* The note and the button share a line where they fit, and the button drops under it where they don't. */}
         <div
           style={{
-            height: 52,
+            minHeight: 52,
             flex: 'none',
             display: 'flex',
             alignItems: 'center',
-            gap: 12,
-            padding: '0 16px 0 24px',
+            flexWrap: 'wrap',
+            columnGap: 12,
+            rowGap: 8,
+            padding: '10px 16px 10px 24px',
             borderTop: '1px solid var(--cc-line)',
           }}
         >
-          {!inSettings && <span className="cc-mini">Also under Settings → Widgets</span>}
-          <div style={{ flex: 1 }} />
-          <button className="cc-chip" onClick={onArrange}>
+          {!inSettings && (
+            <span className="cc-mini" style={{ whiteSpace: 'nowrap' }}>
+              Also under Settings → Widgets
+            </span>
+          )}
+          <button className="cc-chip" style={{ marginLeft: 'auto' }} onClick={onArrange}>
             Arrange this layout
           </button>
         </div>
