@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod backlight;
 pub mod cpu;
 pub mod disk;
 pub mod display;
@@ -35,6 +36,7 @@ pub fn spawn_all(app: AppHandle) {
     media::spawn(app.clone());
     update::spawn(app.clone());
     presence::spawn(app.clone());
+    backlight::spawn(app.clone());
     game::spawn(app.clone());
     widgets::spawn(app.clone());
     notify::spawn(app);

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { DisplayMap, displayLabel } from '../components/DisplayMap';
 import { WindowControls } from '../components/WindowControls';
+import { useBacklight } from '../core/backlight';
 import { bus } from '../core/bus';
 import { hhmm } from '../core/night';
 import type {
@@ -614,10 +615,11 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
 
   // In numbers, so nobody is surprised when the panel turns down at ten.
   const { fromMin, toMin } = settings.night;
+  const backlight = useBacklight();
   const awayMin = settings.away.afterMin ?? 10;
   const quietDesc = REMOTE_PANEL
     ? `Dims from ${hhmm(fromMin)} to ${hhmm(toMin)}, by this device’s clock. Settings → Appearance sets it.`
-    : `Dims from ${hhmm(fromMin)} to ${hhmm(toMin)}, and after ${awayMin} minutes with nobody here ${
+    : `${backlight ? 'Turns the display down' : 'Dims'} from ${hhmm(fromMin)} to ${hhmm(toMin)}, and after ${awayMin} minutes with nobody here ${
         settings.away.show === 'clock' ? 'shows only the time and what waits on you' : 'goes quiet'
       }. Settings → Appearance sets either.`;
 

@@ -10,11 +10,13 @@ import { Playing } from './components/Playing';
 import { Quiet } from './components/Quiet';
 import { Stale, hhmmAt } from './components/Stale';
 import { WindowControls } from './components/WindowControls';
+import { NIGHT_BACKLIGHT, useBacklight, useHoldBacklight, wantedLevel } from './core/backlight';
 import { bus } from './core/bus';
 import { startMockSource } from './core/mockSource';
 import { NavProvider } from './core/nav';
 import { DIM, useDimPreview, useNight } from './core/night';
 import type {
+  AgentsPayload,
   DisplaysPayload,
   FlowCommand,
   GpuCommand,
@@ -429,14 +431,6 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
     };
   }, []);
 
-  // Night turns down everything Kehai draws, setup and settings included, so
-  // opening them late does not light up the room.
-  const dim = dimPreview ? DIM[dimPreview] : night ? DIM[settings.night.level] : 1;
-  useEffect(() => {
-    const root = document.getElementById('root');
-    if (root) root.style.filter = dim < 1 ? `brightness(${dim})` : '';
-  }, [dim]);
-
   // A tap on a quiet panel wakes it at once, ahead of the engine noticing the
   // same tap. The next time nobody is here needs a tap of its own. A locked
   // session is not drawn: its lock screen covers every display anyway.
@@ -453,6 +447,34 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         : null;
   const quietRef = useRef(quiet);
   quietRef.current = quiet;
+
+  // Night turns down everything Kehai draws, setup and settings included, so
+  // opening them late does not light up the room. On a display Kehai can turn
+  // down, its backlight does that and the drawing keeps its contrast, until
+  // the backlight is as low as it goes.
+  const backlight = useBacklight();
+  const nightOrPreview = dimPreview ?? (night ? settings.night.level : null);
+  const dim = backlight
+    ? nightOrPreview
+      ? NIGHT_BACKLIGHT[nightOrPreview].filter
+      : 1
+    : nightOrPreview
+      ? DIM[nightOrPreview]
+      : 1;
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (root) root.style.filter = dim < 1 ? `brightness(${dim})` : '';
+  }, [dim]);
+  // Nothing is dark until an agent waits on you, and then shows it: the
+  // display comes up to the night level so it can be read across the room.
+  const agents = useTopic<AgentsPayload>('dev:agents');
+  const agentWaiting = !!agents?.available && agents.sessions.some((s) => s.state === 'waiting' || s.state === 'error');
+  const quietAsks = quiet === 'nothing' && agentWaiting ? 'clock' : quiet;
+  const hold = backlight?.yours != null ? wantedLevel(backlight.yours, settings.night.level, night, quietAsks, dimPreview) : null;
+  useHoldBacklight(hold, backlight !== null);
+  // The panel left showing while you are away is dimmed by the backlight where
+  // there is one, so it isn't dimmed twice.
+  const quietPanelFilter = backlight ? undefined : `brightness(${QUIET_PANEL})`;
   const still = mode === 'dashboard' && !quiet && inPlay && openedFor !== inPlay.since ? inPlay : null;
   const stillRef = useRef(still);
   stillRef.current = still;
@@ -504,7 +526,7 @@ ${e.error instanceof Error ? (e.error.stack ?? '') : ''}`);
         style={{
           height: '100%',
           visibility: quiet && quiet !== 'panel' ? 'hidden' : undefined,
-          filter: quiet === 'panel' ? `brightness(${QUIET_PANEL})` : undefined,
+          filter: quiet === 'panel' ? quietPanelFilter : undefined,
         }}
       >
         <HideText.Provider value={quiet === 'panel'}>{screen}</HideText.Provider>

@@ -9,6 +9,25 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- **Night turns the display itself down.** On a display that lets programs set its
+  brightness (most do, over DDC/CI), night and the quiet panel lower its backlight
+  instead of only darkening what Kehai draws, so text keeps its contrast and black is
+  really dark. **Settings → Appearance → This display** sets the brightness they come
+  back to, and the display's own buttons set it too. Kehai changes the display only
+  when something changes, never in steps, and gives it your level back when it quits
+  or is hidden in the tray. Windows only for now.
+
+### Changed
+
+- How dim the panel goes at night is a share of your brightness: A little and Half
+  turn the backlight down, and A lot takes it as low as it goes and darkens what Kehai
+  draws as well. On a display that doesn't answer, night darkens what Kehai draws, as
+  before.
+- The quiet Dimmed panel is turned down by the display's backlight where it can be,
+  rather than drawn at half brightness on top of it.
+
 ## [0.14.0] - 2026-11-06
 
 ### Added

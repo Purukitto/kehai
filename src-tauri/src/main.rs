@@ -84,6 +84,8 @@ fn main() {
 
     app.run(|_, event| {
         if let RunEvent::Exit = event {
+            // A panel turned down for the night isn't left that way.
+            pollers::backlight::give_back();
             log::stopped();
         }
     });

@@ -1,6 +1,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, RecvTimeoutError};
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
@@ -73,6 +74,48 @@ struct DisplaysPayload {
 enum Command {
     /// Make this the display Kehai is for and put it there now.
     Show { id: String, fill: bool },
+}
+
+/// Where the window is, against the display Kehai is for. Read by the
+/// backlight poller, which must touch no other display.
+#[derive(Clone, PartialEq, Debug)]
+pub enum Where {
+    /// On the display it is for: its id, and the system's name for it
+    /// (`\\.\DISPLAY2` on Windows).
+    On { id: String, device: String },
+    /// That display is gone, and the window is on the main one instead.
+    Missing,
+    /// Anywhere else, such as part-way through being dragged.
+    Elsewhere,
+}
+
+static WHERE: Mutex<Option<Where>> = Mutex::new(None);
+
+/// Where the window is, as of the display poller's last look. None before its
+/// first.
+pub fn whereabouts() -> Option<Where> {
+    WHERE.lock().ok().and_then(|w| w.clone())
+}
+
+fn note_where(keeper: &Keeper, seen: &Seen, found: &[(Display, Monitor)]) {
+    let here = if keeper.missing {
+        Where::Missing
+    } else {
+        match (&keeper.stored.id, &seen.current) {
+            (Some(chosen), Some(current)) if chosen == current => found
+                .iter()
+                .find(|(d, _)| &d.id == current)
+                .and_then(|(_, m)| m.name().cloned())
+                .map_or(Where::Elsewhere, |device| Where::On {
+                    id: current.clone(),
+                    device,
+                }),
+            _ => Where::Elsewhere,
+        }
+    };
+    if let Ok(mut w) = WHERE.lock() {
+        *w = Some(here);
+    }
 }
 
 /// Which display Kehai is for, as written to disk. The engine keeps it rather
@@ -477,7 +520,9 @@ pub fn spawn(app: AppHandle) {
                 save(path, &keeper.stored);
             }
         }
-        keeper.payload(displays, &look(&window, &found))
+        let seen = look(&window, &found);
+        note_where(keeper, &seen, &found);
+        keeper.payload(displays, &seen)
     };
 
     let mut last = tick(&mut keeper, None);

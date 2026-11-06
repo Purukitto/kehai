@@ -238,6 +238,7 @@ only what the game already shows you.
 | Agent sessions | optional — the same transcripts | same | same |
 | Focus timer | kept by the engine | same | same |
 | Whether you are at the computer | time since the last input, and the lock | not wired | not wired |
+| The display's brightness | over the display's own control line (DDC/CI), where it answers | not wired | not wired |
 | A game's state | sent by the game to `127.0.0.1` once set up; Steam found through the registry | the same; Steam found in your home folder | not wired |
 
 ## When a source is unavailable

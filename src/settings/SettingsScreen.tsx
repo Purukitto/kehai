@@ -5,6 +5,7 @@ import { OptionsSheet } from '../components/OptionsSheet';
 import { QrCode } from '../components/QrCode';
 import { bus } from '../core/bus';
 import type {
+  BacklightPayload,
   DisplayCommand,
   DisplaysPayload,
   GamePayload,
@@ -27,7 +28,8 @@ import { REMOTE_PANEL, forgetRemote } from '../core/remoteSource';
 import { LAYOUT_FORMAT, SHAPE_ASPECT, placeTile, withTiles } from '../core/layout';
 import { PRESETS, PRESET_ORDER, findLayout, isPreset, useSettings } from '../core/settings';
 import type { DimLevel, FocusSettings, QuietShow, RemoteSettings } from '../core/settings';
-import { DIM_NAME, hhmm, previewDim } from '../core/night';
+import { DIM_NAME, hhmm, previewDim, useNight } from '../core/night';
+import { nightLevel, sendBacklight, useBacklight } from '../core/backlight';
 import { SOURCES, SOURCE_IDS } from '../core/sources';
 import type { SourceId } from '../core/sources';
 import { useTopic } from '../core/useTopic';
@@ -700,6 +702,116 @@ const SHOW_DESC: Record<QuietShow, string> = {
   panel: 'The whole panel, dimmed to half, with what notifications say hidden.',
   nothing: 'Dark, until an agent waits on you.',
 };
+/** The same, on a display whose brightness Kehai sets. */
+const SHOW_DESC_BACKLIGHT: Record<QuietShow, string> = {
+  clock: 'The time, and only what is running or waiting on you, with the display turned down as at night. Notifications as a count.',
+  panel: 'The whole panel, with the display turned down as at night and what notifications say hidden.',
+  nothing: 'Dark, with the display as low as it goes, until an agent waits on you. Then the display comes up as at night.',
+};
+
+/** A tap on − or + moves it this far. A block sets a tenth. */
+const BRIGHTNESS_STEP = 5;
+
+/**
+ * −, ten blocks, + and the level, as Now playing's volume. What was pressed
+ * stands in for the display's reading until the engine reports it back, so
+ * pressing + several times never steps from a stale level.
+ */
+function LevelBlocks({ level, onSet, label }: { level: number; onSet: (level: number) => void; label: string }) {
+  const [pending, setPending] = useState<number | null>(null);
+  useEffect(() => {
+    if (pending === null) return;
+    if (level === pending) {
+      setPending(null);
+      return;
+    }
+    const id = window.setTimeout(() => setPending(null), 1500);
+    return () => window.clearTimeout(id);
+  }, [level, pending]);
+  const shown = pending ?? level;
+  const set = (next: number) => {
+    const clamped = Math.max(0, Math.min(100, Math.round(next)));
+    setPending(clamped);
+    onSet(clamped);
+  };
+  const on = Math.round(shown / 10);
+  const square = { width: 32, height: 32, padding: 0, flex: 'none' } as const;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 'none' }}>
+      <button className="cc-chip" style={square} onClick={() => set(shown - BRIGHTNESS_STEP)} aria-label={`${label} down`}>
+        <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="1.4">
+          <path d="M2 7h10" />
+        </svg>
+      </button>
+      <div style={{ display: 'flex', gap: 3, height: 32, width: 10 * 14 + 9 * 3 }} role="group" aria-label={label}>
+        {Array.from({ length: 10 }, (_, i) => (
+          <button
+            key={i}
+            onClick={() => set((i + 1) * 10)}
+            aria-label={`${(i + 1) * 10}`}
+            style={{ flex: 1, minWidth: 0, padding: 0, border: 0, background: 'none', display: 'flex', alignItems: 'center' }}
+          >
+            <span
+              style={{
+                display: 'block',
+                width: '100%',
+                height: 6,
+                borderRadius: 3,
+                background: i < on ? 'var(--cc-muted)' : 'var(--cc-line)',
+              }}
+            />
+          </button>
+        ))}
+      </div>
+      <button className="cc-chip" style={square} onClick={() => set(shown + BRIGHTNESS_STEP)} aria-label={`${label} up`}>
+        <svg width="14" height="14" viewBox="0 0 14 14" stroke="currentColor" strokeWidth="1.4">
+          <path d="M2 7h10M7 2v10" />
+        </svg>
+      </button>
+      <span style={{ fontSize: 15, width: 48, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>{shown}%</span>
+    </div>
+  );
+}
+
+/**
+ * The brightness of the display Kehai is for, set over the display's own
+ * control line. Only on the PC: a tablet's screen is its own.
+ */
+function BrightnessRows({ night }: { night: boolean }) {
+  const { settings } = useSettings();
+  const heard = useTopic<BacklightPayload>('app:backlight');
+  const displays = useTopic<DisplaysPayload>('app:displays');
+  if (!heard) return null;
+  const chosen = displays?.displays.find((d) => d.id === displays.chosen);
+  const name = chosen ? displayLabel(chosen) : displays?.chosenName;
+  const note = name ? `${name}, the one Kehai is for.` : 'The one Kehai is for.';
+  if (!heard.available || heard.yours === null) {
+    return (
+      <>
+        <Group label="This display" note={note} />
+        <Row label="Not available here" desc={heard.reason ?? 'This display doesn’t let programs set its brightness.'} />
+      </>
+    );
+  }
+  const now = heard.now ?? heard.yours;
+  const held =
+    now < heard.yours && night
+      ? ` At ${now}% for the night, until ${hhmm(settings.night.toMin)}.`
+      : now < heard.yours
+        ? ` At ${now}% for a few seconds, to show the night level.`
+        : '';
+  return (
+    <>
+      <Group label="This display" note={note} />
+      <Row
+        label="Brightness"
+        desc={`The display’s own backlight, as its buttons set it. Night and away turn it down from here and bring it back.${held}`}
+      >
+        <LevelBlocks label="Brightness" level={heard.yours} onSet={(level) => sendBacklight({ action: 'set', level })} />
+      </Row>
+    </>
+  );
+}
 
 /**
  * What the panel does while it is not being read: at night, and while nobody
@@ -709,14 +821,25 @@ const SHOW_DESC: Record<QuietShow, string> = {
 function QuietRows() {
   const { settings, setNight, setAway } = useSettings();
   const presence = useTopic<PresencePayload>('os:presence');
+  const backlight = useBacklight();
   const { night, away } = settings;
+  const isNight = useNight(night);
   // Never is stored as null; Seg wants a value it can compare.
   const after = [...new Set([0, 5, 10, 30, away.afterMin ?? 0])].sort((a, b) => a - b);
+  const yours = backlight?.yours ?? null;
+  const howDim =
+    yours !== null
+      ? `From your ${yours}%: a little is ${nightLevel(yours, 'little')}%, half is ${nightLevel(yours, 'half')}%, and a lot is as low as the display goes, with what Kehai draws darker too. Shown for a few seconds as you pick.`
+      : 'Shown for a few seconds as you pick. A backlit panel only goes so far: black stays as bright as its backlight.';
 
   return (
     <>
+      {!REMOTE_PANEL && <BrightnessRows night={isNight} />}
       <Group label="At night" note={REMOTE_PANEL ? 'By this device’s clock.' : 'By this panel’s clock.'} />
-      <Row label="Dim at night" desc="Everything Kehai draws turns down between these times.">
+      <Row
+        label="Dim at night"
+        desc={yours !== null ? 'The display turns its brightness down between these times.' : 'Everything Kehai draws turns down between these times.'}
+      >
         <Seg options={['Off', 'On']} value={night.on ? 'On' : 'Off'} onPick={(v) => setNight({ on: v === 'On' })} />
       </Row>
       <Row label="Between" desc="Fixed hours. Sunset would need your location, and Kehai asks for none.">
@@ -726,7 +849,7 @@ function QuietRows() {
           <TimeStep label="End" value={night.toMin} onChange={(toMin) => setNight({ toMin })} />
         </div>
       </Row>
-      <Row label="How dim" desc="Shown for a few seconds as you pick. A backlit panel only goes so far: black stays as bright as its backlight.">
+      <Row label="How dim" desc={howDim}>
         <Seg
           options={['little', 'half', 'lot'] as DimLevel[]}
           value={night.level}
@@ -753,7 +876,7 @@ function QuietRows() {
                   onPick={(v) => setAway({ afterMin: v === 0 ? null : v })}
                 />
               </Row>
-              <Row label="While it’s quiet, show" desc={SHOW_DESC[away.show]}>
+              <Row label="While it’s quiet, show" desc={(yours !== null ? SHOW_DESC_BACKLIGHT : SHOW_DESC)[away.show]}>
                 <Seg
                   options={['clock', 'panel', 'nothing'] as QuietShow[]}
                   value={away.show}
