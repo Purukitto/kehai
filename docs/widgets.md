@@ -78,13 +78,31 @@ call that has not returned shows as **TOOL**. That is also all a permission prom
 looks like, because nothing is written until it is answered, so Kehai lights one that
 has been open for half a minute but never claims it is waiting on you.
 
+**Tap a session to go to it.** Its window comes to the front on the display it is on,
+and the row says so for a moment: **Opened the desktop app**, **Opened VS Code** or
+**Opened the terminal**. The one waiting on you says **Go to** under its status. The
+agent's desktop app has no way to open one session from outside, so it comes forward
+and you pick the session in its own list; Kehai doesn't pick a tab in a terminal or
+an editor either. If Windows keeps another window in front, the row says **Couldn't
+bring it forward**, and the log says why. Ambient's line goes to the session it names,
+and the tray's menu lists up to three sessions waiting on you, to go to with a click.
+
+Kehai knows which sessions are open from the small file the agent keeps for each one
+beside its transcripts. A session you have closed leaves the list, and stops counting
+as waiting. An agent that keeps no such files shows its sessions as before, with
+nothing to tap. Tablets can't go to a session, since only the PC can bring its own
+windows forward: a tap there says **Open it on the PC**. Going to a window works on
+Windows only for now.
+
 What these read, and what they never read, is in [Privacy](privacy.md).
 
 ## Game widgets
 
-A game widget shows what a game sends to Kehai on this PC, through a route its
+A game widget reads what a game sends to Kehai on this PC, through a route its
 publisher offers. Kehai never reads a game's memory, injects into it or watches its
-screen, and a game widget shows only what the game already shows you.
+screen. It does two things: it keeps the panel still while you play, and it fills the
+gaps, after you die, at half time, between matches, with what the game does not keep.
+It never copies the game's own HUD, which is already where you are looking.
 
 ### Counter-Strike 2
 
@@ -99,32 +117,30 @@ and peripherals on the player's PC.
 3. **Write the file** puts `gamestate_integration_kehai_cs2.cfg` in
    `game\csgo\cfg`. Start CS2, or restart it: it reads the file when it starts.
 
-The tile then shows the score and round, LIVE or BOMB PLANTED, who won each round,
-your health and armour (red under 30), money, the weapon in your hands with its ammo,
-and your kills, assists, deaths and MVPs. Dead and watching a teammate, it shows theirs
-and says so, while **This match** stays yours. Between matches it keeps the last
-match's result. Deathmatch has no rounds or money, so those go. A small tile keeps the
-first readings in that list and drops the rest; the tile's options turn any of them
-off.
+**While you're in a round, the panel goes still.** Dark, nothing moving or lighting
+up, the score dimly and how many notifications and agents are waiting. They are kept,
+not shown. It opens by itself when you die and watch a teammate, at half time and
+after the match, and a touch opens it sooner. **While you play**, in the tile's
+options, can leave the panel as it is instead, or put another layout on screen for
+the match.
 
-It never shows other players, where anyone is, or the bomb's timer: CS2 does not send
-when the bomb was planted, and a countdown made from it is an aid some leagues ban.
+In the gaps the tile shows the score and the round, who won each round so far, and
+your kills, assists, deaths and MVPs, which stay yours while you watch someone else.
+Between matches, and after CS2 closes, it shows **Tonight**: each match since the last
+three-hour break, how it ended, the score from your side and your figures, with the
+time played. CS2 forgets these between matches; Kehai keeps the last 60, on this
+panel only, and **Forget them** in the options clears them. Deathmatch has no rounds,
+so the score goes.
 
-It wears CS2's own colours, the way RGB lighting for the game does, so it reads from
-the corner of your eye: each side in its colour, health green above 60, amber above 29
-and red below, armour steel blue, money green, and the ammo amber when the magazine is
-nearly empty. The tile's edge lights up too: your side's colour at buy time, the
-winner's when a round ends, orange while you burn, and red, breathing, while your
-health is low or the bomb is down. A flash washes the tile white as it fades on your
-screen, and smoke grey. **Colours** in its options switch to the theme's, and
-**Lighting** turns the edge and the washes off. Nothing breathes with reduced motion
-turned on in Windows.
+It never shows your health, money or weapons, which the HUD already does, and never
+other players, where anyone is, or the bomb's timer: CS2 does not send when the bomb
+was planted, and a countdown made from it is an aid some leagues ban.
 
-A tap on the tile shows it full screen, and another tap, or the header's button, goes
-back. **When a match goes live**, in its options, can do either for you: put a layout
-of your choice on screen, or the tile full screen, and go back when the match ends or
-after two minutes in the menu. Nothing unless you choose. Picking a layout yourself
-during the match keeps that one.
+Each side is in CS2's own colour, so it reads from the corner of your eye.
+**Colours** in its options switch to the theme's.
+
+A copy set up with 0.11 has CS2 still sending health, money and weapons. Kehai shows
+none of it, and **Remove** then **Set up** writes the smaller file.
 
 **Remove**, in the options, deletes Kehai's file. Other programs' files in that folder,
 such as Overwolf's, are left as they are.
@@ -143,10 +159,9 @@ Beside the usual `kehai`, `id`, `name`, `about` and `min`, it has:
 
 | Field | What it says |
 | --- | --- |
-| `source` | Where the state comes from. `kind` is `valve-gsi`, the only kind so far, with `steamApp` (the game's Steam app id), `cfgDir` (its settings folder, inside the game's), `data` (the blocks to ask for, as the game names them), `game` and `short` (its names), `icon` (an SVG path on a 16 × 16 grid, one colour, never a game's own logo unless its publisher allows), and `asks` and `never`, which SET UP shows |
-| `match` | `in`: a value present only during a match. `title`: what the header says, with `{path}` for values. `phase` and `over`: when the match has ended |
-| `subject` | Optional. `self` and `who`: the player's id and the id the state is about. When they differ the tile says `tag` and whose state it is, by `name` |
-| `lighting` | Optional. `edge`: rules in order, each `when` (a condition), `color` (`#rrggbb`, `you` for the player's side, or `winner`), `pulse` and `tone` (the theme colour to use instead). `overlays`: washes, each `path`, `max`, `color` and `tone` |
+| `source` | Where the state comes from. `kind` is `valve-gsi`, the only kind so far, with `steamApp` (the game's Steam app id), `cfgDir` (its settings folder, inside the game's), `data` (the blocks to ask for, as the game names them), `game` and `short` (its names), `icon` (an SVG path on a 16 × 16 grid, one colour, never a game's own logo unless its publisher allows), and `asks` and `never`, which Set up shows |
+| `match` | `in`: a value present only during a match. `title`: what the header says, with `{path}` for values. `phase` and `over`: when the match has ended. `still`: optional, a condition for when the player is in play, and the panel goes still; without it, the whole match is |
+| `subject` | Optional. `self` and `who`: the player's id and the id the state is about. When they differ the player is out, watching someone, and the panel opens |
 | `readings` | 1 to 12, in order of importance, each drawn by one of Kehai's displays |
 
 Each reading has an `id`, a `name` and an `about` for its options, and can say `on:
@@ -156,12 +171,17 @@ the player's while they watch someone. Colours are the game's own, as `#rrggbb`:
 side's `hex`, a meter's `color` or `ramp` (steps of `above` and `color`), a number's
 `color`, and an item's `low` (`below`, a share of `max`, and `color`). A player can
 always switch them to the theme's.
+
+List what the game does not show the player, never a copy of its HUD: the tile is
+read in the gaps, not during play. A racing game's fuel for so many laps, or a
+strategy game's timings, earn a place; health and ammo do not.
+
 The displays:
 
 | `display` | Draws | Fields |
 | --- | --- | --- |
 | `teams` | Two sides' scores, the round, its phase and who won each round | `you`, `sides` (two, each `label`, `is`, `score`, `color`, `wins`), `round`, `history`, `phase`, `alert` |
-| `meters` | Values out of a maximum, as ten blocks | `items`: `label`, `value`, `max`, `low`, `tag` |
+| `meters` | Values out of a maximum, with a bar | `items`: `label`, `value`, `max`, `low`, `tag` |
 | `numbers` | Plain values | `items`: `label`, `value`, `prefix` |
 | `item` | One thing in hand, with a count | `label`, `item`, `names`, `strip`, `count`, `max`, `rest` |
 | `stats` | A row of small values | `label`, `items`: `label`, `short`, `value` |

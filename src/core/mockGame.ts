@@ -1,4 +1,5 @@
 import { bus } from './bus';
+import { reloadMatches } from './gameSession';
 import type { GameCommand, GamePayload, GameSetupPayload, LocalWidgetsPayload } from './payloads';
 
 /**
@@ -7,7 +8,9 @@ import type { GameCommand, GamePayload, GameSetupPayload, LocalWidgetsPayload } 
  * round every half minute: buy time, live, a bomb planted, a death and a
  * teammate watched, until the match ends and it starts again.
  *
- * `?game=live` starts with CS2 set up and a match on.
+ * `?game=live` starts with CS2 set up and a match on, and `?game=menu` with it
+ * open in the menu. Either puts three earlier matches in tonight's list, if
+ * the panel has none kept.
  */
 
 const FOLDER = 'E:\\SteamLibrary\\steamapps\\common\\Counter-Strike Global Offensive';
@@ -126,13 +129,44 @@ function cs2(t: number, n: number) {
   };
 }
 
+/** Three matches earlier tonight, as the panel would have kept them. */
+function seedTonight() {
+  try {
+    const kept = JSON.parse(localStorage.getItem('kehai.games.v1') ?? '{}') as Record<string, unknown[]>;
+    if (kept.cs2?.length) return;
+    const now = Date.now();
+    const min = 60_000;
+    const match = (endsAgo: number, long: number, title: string, result: string, score: [number, number], k: number, a: number, d: number, mvp: number) => ({
+      at: now - (endsAgo + long) * min,
+      end: now - endsAgo * min,
+      title,
+      result,
+      score,
+      you: 0,
+      stats: { Kills: k, Assists: a, Deaths: d, MVP: mvp },
+    });
+    kept.cs2 = [
+      match(118, 41, 'de_ancient · competitive', 'won', [13, 9], 21, 4, 14, 3),
+      match(68, 44, 'de_inferno · competitive', 'lost', [10, 13], 17, 6, 18, 1),
+      match(16, 47, 'de_nuke · competitive', 'won', [13, 11], 24, 3, 16, 4),
+    ];
+    localStorage.setItem('kehai.games.v1', JSON.stringify(kept));
+    reloadMatches();
+  } catch {
+    // Nothing to show then.
+  }
+}
+
 export function startMockGame(pub: <T>(topic: string, src: string, data: T) => void): () => void {
   const setup: GameSetupPayload = { supported: true, port: null, listening: false, error: null, games: [], found: null };
   let state: 'none' | 'waiting' | 'set' = 'none';
   let started = 0;
   let last: Record<string, unknown> | null = null;
-  const live = new URLSearchParams(location.search).get('game') === 'live';
+  const asked = new URLSearchParams(location.search).get('game');
+  const live = asked === 'live' || asked === 'menu';
+  const menu = asked === 'menu';
   if (live) {
+    seedTonight();
     state = 'set';
     setup.port = 41730;
     setup.listening = true;
@@ -147,6 +181,10 @@ export function startMockGame(pub: <T>(topic: string, src: string, data: T) => v
     }
     if (state === 'waiting') {
       pub<GamePayload>('game:cs2', 'mock.game', { setup: 'waiting', heardMs: null, live: false, data: null });
+      return;
+    }
+    if (menu) {
+      pub<GamePayload>('game:cs2', 'mock.game', { setup: 'set', heardMs: Date.now(), live: true, data: { provider: { name: 'Counter-Strike 2', appid: 730, steamid: '76561198000000001' } } });
       return;
     }
     const t = Math.floor((Date.now() - started) / 1000);

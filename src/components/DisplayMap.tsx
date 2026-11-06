@@ -3,7 +3,7 @@ import type { DisplayInfo } from '../core/payloads';
 
 /** What a display is called on the panel: its own name, or its number. */
 export function displayLabel(d: { name: string | null; number: number | null }): string {
-  return d.name ? d.name.toUpperCase() : `DISPLAY ${d.number ?? '?'}`;
+  return d.name ?? `Display ${d.number ?? '?'}`;
 }
 
 /** Margin around the arrangement inside the map. */
@@ -82,6 +82,9 @@ export function DisplayMap({
           const tags = h >= 50 && w >= 90;
           const digits = Math.max(16, Math.min(56, h * (roomy ? 0.32 : tags ? 0.34 : 0.5)));
           const marker = here && !filled && w >= 220 && h >= 130;
+          // Name and size on one line where it fits, and on two where it would be cut.
+          const sizeText = `${d.width} × ${d.height}`;
+          const oneLine = !d.name || (displayLabel(d).length + 3 + sizeText.length) * 7.3 <= w - 16;
           const label = `${displayLabel(d)}, ${d.width} by ${d.height}${d.primary ? ', main display' : ''}${here ? ', Kehai is here' : ''}`;
           return (
             <button
@@ -99,6 +102,7 @@ export function DisplayMap({
                 height: h,
                 background: on ? 'var(--cc-pane-2)' : 'var(--cc-pane)',
                 border: on ? '2px solid var(--cc-accent)' : '1px solid var(--cc-line-2)',
+                borderRadius: 16,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -118,33 +122,40 @@ export function DisplayMap({
                     width: Math.min(64, w * 0.25),
                     height: Math.min(40, h * 0.2),
                     border: `1px solid ${on ? 'var(--cc-accent)' : 'var(--cc-text)'}`,
+                    borderRadius: 2,
                     background: 'var(--cc-bg)',
                   }}
                 />
               )}
-              <span style={{ fontSize: digits, fontWeight: 200, lineHeight: 0.9, color: on ? 'var(--cc-accent)' : 'var(--cc-muted)' }}>
+              <span style={{ fontSize: digits, fontWeight: 300, lineHeight: 0.9, color: on ? 'var(--cc-text)' : 'var(--cc-muted)' }}>
                 {d.number}
               </span>
               {roomy && (
                 <span
                   style={{
-                    fontSize: 10,
-                    letterSpacing: '0.1em',
+                    fontSize: 12,
+                    lineHeight: 1.35,
                     color: on ? 'var(--cc-text)' : 'var(--cc-muted)',
                     maxWidth: '100%',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
                   }}
                 >
-                  {d.name ? `${displayLabel(d)} · ` : ''}
-                  {d.width} × {d.height}
+                  {oneLine ? (
+                    <span style={ELLIPSIS}>{d.name ? `${displayLabel(d)} · ${sizeText}` : sizeText}</span>
+                  ) : (
+                    <>
+                      <span style={ELLIPSIS}>{displayLabel(d)}</span>
+                      <span style={ELLIPSIS}>{sizeText}</span>
+                    </>
+                  )}
                 </span>
               )}
               {tags && (d.primary || here || (on && hint)) && (
-                <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {d.primary && <Tag color="var(--cc-muted)">MAIN</Tag>}
-                  {here && <Tag color={on ? 'var(--cc-accent)' : 'var(--cc-text)'}>KEHAI IS HERE</Tag>}
+                <span style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'center', maxWidth: '100%' }}>
+                  {d.primary && <Tag color="var(--cc-muted)">Main</Tag>}
+                  {here && <Tag color="var(--cc-text)">Kehai is here</Tag>}
                   {on && hint && <Tag color="var(--cc-accent-2)">{hint}</Tag>}
                 </span>
               )}
@@ -155,9 +166,12 @@ export function DisplayMap({
   );
 }
 
+const ELLIPSIS = { maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
+
+/** Never wider than its display: a long one is cut with an ellipsis, and its button's title says it in full. */
 function Tag({ color, children }: { color: string; children: string }) {
   return (
-    <span style={{ fontSize: 9, letterSpacing: '0.1em', padding: '2px 6px', border: '1px solid currentColor', color, flex: 'none' }}>
+    <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 10, background: 'var(--cc-line)', color, flex: '0 1 auto', minWidth: 0, ...ELLIPSIS }}>
       {children}
     </span>
   );

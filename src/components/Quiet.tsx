@@ -8,7 +8,7 @@ import { useWindowShape } from '../core/useWindowShape';
 import { sinceText } from '../widgets/Agents';
 import { sprintColor } from '../widgets/Sprint';
 
-interface Line {
+export interface Line {
   color: string;
   text: string;
   sub?: string;
@@ -20,8 +20,11 @@ interface Line {
  * What is worth seeing from across the room: an agent waiting on you, then a
  * timer counting down, since a break is when you are away, then how many
  * notifications came. Never what they say.
+ *
+ * Held is the same, said in one colour: while a game is being played, none of
+ * it is asking to be looked at yet.
  */
-function useLines(agentsOnly: boolean): Line[] {
+export function useLines(agentsOnly: boolean, held = false): Line[] {
   const tick = useTopic<ClockPayload>('os:clock');
   const agents = useTopic<AgentsPayload>('dev:agents');
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
@@ -33,9 +36,10 @@ function useLines(agentsOnly: boolean): Line[] {
   if (waiting.length > 0) {
     const first = waiting[0];
     lines.push({
-      color: first.state === 'error' ? 'var(--cc-danger)' : 'var(--cc-accent)',
+      color: held ? 'var(--cc-muted)' : first.state === 'error' ? 'var(--cc-danger)' : 'var(--cc-accent)',
       text: `${waiting.length} agent${waiting.length === 1 ? '' : 's'} waiting on you`,
-      sub: `${first.project} · ${sinceText(now - first.sinceMs)}`,
+      // Held, no running time beside it either.
+      sub: held ? first.project : `${first.project} · ${sinceText(now - first.sinceMs)}`,
     });
   }
   if (agentsOnly) return lines;
@@ -44,8 +48,9 @@ function useLines(agentsOnly: boolean): Line[] {
     lines.push({
       // A focus block takes the accent everywhere else, but here the accent is
       // kept for an agent waiting: only that should be bright from across the room.
-      color: sprint.mode === 'focus' ? 'var(--cc-muted)' : sprintColor(sprint),
-      text: `${sprint.mode === 'focus' ? 'Focusing' : 'On break'} · ${mmss(sprint.remainingSec)} left`,
+      color: sprint.mode === 'focus' || held ? 'var(--cc-muted)' : sprintColor(sprint),
+      // Held, it says minutes: a count of seconds would be the one thing moving on a still panel.
+      text: `${sprint.mode === 'focus' ? 'Focusing' : 'On break'} · ${held ? `${Math.ceil(sprint.remainingSec / 60)} min` : mmss(sprint.remainingSec)} left`,
       sub: sprint.mode === 'focus' ? `${sprint.index} of ${sprint.total}` : `after ${sprint.index} of ${sprint.total}`,
     });
   }
@@ -59,7 +64,7 @@ function useLines(agentsOnly: boolean): Line[] {
 
 const clip: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 };
 
-function Lines({ lines, size }: { lines: Line[]; size: number }) {
+export function Lines({ lines, size }: { lines: Line[]; size: number }) {
   if (lines.length === 0) return null;
   return (
     <div style={{ borderTop: '1px solid var(--cc-line)' }}>
@@ -75,13 +80,14 @@ function Lines({ lines, size }: { lines: Line[]; size: number }) {
             minWidth: 0,
           }}
         >
-          <span style={{ width: l.small ? 7 : 10, height: l.small ? 7 : 10, flex: 'none', background: l.color }} />
-          <span style={{ ...clip, fontSize: Math.round(size * (l.small ? 0.5 : 1)), fontWeight: 300, color: l.small ? 'var(--cc-dim)' : l.color }}>
+          <span style={{ width: l.small ? 6 : 8, height: l.small ? 6 : 8, borderRadius: '50%', flex: 'none', background: l.color }} />
+          {/* The small words keep to the panel's smallest readable size, 12 px, however small the lines are drawn. */}
+          <span style={{ ...clip, fontSize: l.small ? Math.max(12, Math.round(size * 0.5)) : Math.round(size), fontWeight: 300, color: l.small ? 'var(--cc-dim)' : l.color }}>
             {l.text}
           </span>
           <span style={{ flex: 1 }} />
           {l.sub && (
-            <span style={{ ...clip, fontSize: Math.round(size * 0.52), color: 'var(--cc-muted)', flex: 'none', maxWidth: '45%' }}>
+            <span style={{ ...clip, fontSize: Math.max(12, Math.round(size * 0.52)), color: 'var(--cc-muted)', flex: 'none', maxWidth: '45%' }}>
               {l.sub}
             </span>
           )}
@@ -91,7 +97,13 @@ function Lines({ lines, size }: { lines: Line[]; size: number }) {
   );
 }
 
-const big: CSSProperties = { fontWeight: 200, lineHeight: 0.9, letterSpacing: '-0.04em', whiteSpace: 'nowrap', color: 'var(--cc-muted)' };
+const big: CSSProperties = {
+  fontWeight: 200,
+  lineHeight: 0.9,
+  letterSpacing: '-0.04em',
+  whiteSpace: 'nowrap',
+  color: 'var(--cc-muted)',
+};
 
 /**
  * The panel while nobody is at the desk, or while the system is locked. It
@@ -128,11 +140,11 @@ export function Quiet({ show, onWake }: { show: QuietShow | 'blank'; onWake: () 
     );
   } else if (show === 'clock') {
     const dateLine = (size: number, gap: number) => (
-      <div style={{ fontSize: size, letterSpacing: '0.28em', color: 'var(--cc-dim)', marginTop: gap }}>{date}</div>
+      <div style={{ fontSize: size, color: 'var(--cc-dim)', marginTop: gap }}>{date}</div>
     );
     const hint = (
-      <div className="cc-mini" style={{ position: 'absolute', left: 0, right: 0, bottom: 26, textAlign: 'center', letterSpacing: '0.16em', opacity: 0.7 }}>
-        TOUCH THE PANEL OR MOVE THE MOUSE TO WAKE IT
+      <div className="cc-mini" style={{ position: 'absolute', left: 0, right: 0, bottom: 24, textAlign: 'center', opacity: 0.7 }}>
+        Touch the panel or move the mouse to wake it
       </div>
     );
     if (shape === 'bar') {
@@ -166,7 +178,7 @@ export function Quiet({ show, onWake }: { show: QuietShow | 'blank'; onWake: () 
         </div>
       );
     } else {
-      // Monospace digits advance 0.6em, so five characters need three ems.
+      // Tabular digits advance about 0.6em, so five characters need three ems.
       const size = Math.round(Math.min(height * 0.31, (width * 0.86) / 3));
       body = (
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '0 7%' }}>

@@ -26,6 +26,8 @@ import { registry } from '../widgets/registry';
 
 type Step = 'DISPLAY' | 'SOURCES' | 'LAYOUT' | 'FINISH';
 
+const STEP_NAME: Record<Step, string> = { DISPLAY: 'Display', SOURCES: 'Sources', LAYOUT: 'Layout', FINISH: 'Finish' };
+
 /**
  * A remote panel has no window to place, and the sources belong to the
  * machine it watches: it pairs as it always has, then chooses how it looks.
@@ -56,18 +58,18 @@ function Steps({ at, inline }: { at: number; inline: boolean }) {
       {STEPS.map((s, i) => {
         const done = i < at;
         const on = i === at;
-        const color = on ? 'var(--cc-accent)' : done ? 'var(--cc-muted)' : 'var(--cc-dim)';
+        const color = on ? 'var(--cc-text)' : done ? 'var(--cc-muted)' : 'var(--cc-dim)';
         return (
           <div
             key={s}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: 9,
+              gap: 8,
               color,
               height: inline ? undefined : '100%',
               padding: inline ? undefined : '0 22px',
-              boxShadow: on && !inline ? 'inset 0 -2px 0 var(--cc-accent)' : undefined,
+              boxShadow: on && !inline ? 'inset 0 -2px 0 var(--cc-text)' : undefined,
               flex: 'none',
             }}
           >
@@ -78,14 +80,15 @@ function Steps({ at, inline }: { at: number; inline: boolean }) {
                 display: 'inline-flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 10,
-                border: `1px solid ${on ? 'var(--cc-accent)' : done ? 'var(--cc-ok)' : 'var(--cc-line-2)'}`,
+                fontSize: 12,
+                borderRadius: '50%',
+                border: `1px solid ${on ? 'var(--cc-text)' : done ? 'var(--cc-ok)' : 'var(--cc-line-2)'}`,
                 color: done ? 'var(--cc-ok)' : color,
               }}
             >
               {done ? CHECK : i + 1}
             </span>
-            <span style={{ fontSize: 10, letterSpacing: '0.16em' }}>{s}</span>
+            <span style={{ fontSize: 14 }}>{STEP_NAME[s]}</span>
           </div>
         );
       })}
@@ -96,8 +99,8 @@ function Steps({ at, inline }: { at: number; inline: boolean }) {
 function Title({ children, sub }: { children: string; sub: ReactNode }) {
   return (
     <div>
-      <div style={{ fontSize: 24, fontWeight: 300, letterSpacing: '-0.01em' }}>{children}</div>
-      <div style={{ fontSize: 13, lineHeight: 1.65, color: 'var(--cc-muted)', maxWidth: 860, marginTop: 10 }}>{sub}</div>
+      <div className="cc-display" style={{ fontSize: 36 }}>{children}</div>
+      <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--cc-muted)', maxWidth: '68ch', marginTop: 8 }}>{sub}</div>
     </div>
   );
 }
@@ -109,7 +112,7 @@ function Choice({ label, desc, dot, children }: { label: string; desc: ReactNode
       {dot && <span style={{ width: 7, height: 7, flex: 'none', background: dot, alignSelf: 'flex-start', marginTop: 5 }} />}
       <div style={{ flex: '1 1 280px', minWidth: 0 }}>
         <div style={{ fontSize: 13 }}>{label}</div>
-        <div className="cc-mini" style={{ fontSize: 11, lineHeight: 1.6, marginTop: 5 }}>
+        <div className="cc-mini" style={{ fontSize: 13, lineHeight: 1.6, marginTop: 5 }}>
           {desc}
         </div>
       </div>
@@ -123,7 +126,7 @@ function Button({ children, onClick, fill, disabled }: { children: ReactNode; on
   return (
     <button
       className={fill ? 'cc-chip cc-chip-on' : 'cc-chip'}
-      style={{ height: 36, minWidth: 96, padding: '0 14px', fontSize: 10 }}
+      style={{ height: 36, minWidth: 96, padding: '0 14px', fontSize: 12 }}
       onClick={onClick}
       disabled={disabled}
     >
@@ -135,12 +138,12 @@ function Button({ children, onClick, fill, disabled }: { children: ReactNode; on
 function OnOff({ on, onPick }: { on: boolean; onPick: (on: boolean) => void }) {
   return (
     <div style={{ display: 'flex', gap: 4, flex: 'none' }}>
-      {['OFF', 'ON'].map((o) => (
+      {['Off', 'On'].map((o) => (
         <button
           key={o}
-          className={(o === 'ON') === on ? 'cc-chip cc-chip-on' : 'cc-chip'}
-          style={{ height: 36, minWidth: 56, fontSize: 10 }}
-          onClick={() => onPick(o === 'ON')}
+          className={(o === 'On') === on ? 'cc-chip cc-chip-on' : 'cc-chip'}
+          style={{ height: 36, minWidth: 56, fontSize: 12 }}
+          onClick={() => onPick(o === 'On')}
         >
           {o}
         </button>
@@ -211,8 +214,8 @@ function displayParts(state: DisplaysPayload | undefined, choice: DisplayChoice,
           border: choice.single === id ? '2px solid var(--cc-accent)' : '1px solid var(--cc-line-2)',
         }}
       >
-        <div style={{ fontSize: 11, letterSpacing: '0.14em', color: choice.single === id ? 'var(--cc-accent)' : 'var(--cc-text)' }}>{head}</div>
-        <div className="cc-mini" style={{ fontSize: 11, lineHeight: 1.65, marginTop: 8, color: 'var(--cc-muted)' }}>
+        <div style={{ fontSize: 13, color: choice.single === id ? 'var(--cc-accent)' : 'var(--cc-text)' }}>{head}</div>
+        <div className="cc-mini" style={{ fontSize: 13, lineHeight: 1.65, marginTop: 8, color: 'var(--cc-muted)' }}>
           {text}
         </div>
       </button>
@@ -226,9 +229,9 @@ function displayParts(state: DisplaysPayload | undefined, choice: DisplayChoice,
       main: <DisplayMap displays={state.displays} chosen={only.id} current={state.current} filled={state.fill} height={Math.min(mapHeight, 270)} />,
       extra: (
         <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap' }}>
-          {option('window', 'IN A WINDOW HERE', 'Beside your work. Drag it by the top strip and it reopens where you leave it.')}
-          {option('fill', 'FILL THIS DISPLAY', 'Kehai takes the whole screen. F11 gives the screen back.')}
-          {option('remote', 'ANOTHER DEVICE', 'An old tablet or laptop can show the panel over your network. Settings → Remote opens once setup is done.')}
+          {option('window', 'In a window here', 'Beside your work. Drag it by the top strip and it reopens where you leave it.')}
+          {option('fill', 'Fill this display', 'Kehai takes the whole screen. F11 gives the screen back.')}
+          {option('remote', 'Another device', 'An old tablet or laptop can show the panel over your network. Settings → Remote opens once setup is done.')}
         </div>
       ),
     };
@@ -249,7 +252,7 @@ function displayParts(state: DisplaysPayload | undefined, choice: DisplayChoice,
         chosen={picked}
         current={state.current}
         filled={state.fill && state.current === state.chosen}
-        hint={choice.picked === null && start.guessed ? 'LOOKS LIKE THE SMALL ONE' : undefined}
+        hint={choice.picked === null && start.guessed ? 'Looks like the small one' : undefined}
         height={mapHeight}
         onPick={(id) => onChoice({ ...choice, picked: id })}
       />
@@ -283,55 +286,55 @@ function SourcesStep({ notifyLater, onNotifyLater, agentsAnswer, onAgents }: { n
           desc: 'Not read until you allow it, from the tile or Settings → Sources.',
           right: (
             <>
-              <Status>NOT NOW</Status>
-              <Button fill onClick={allowNotifications}>ALLOW</Button>
+              <Status>Not now</Status>
+              <Button fill onClick={allowNotifications}>Allow</Button>
             </>
           ),
         }
       : {
           dot: 'var(--cc-accent-2)',
           desc: WINDOWS
-            ? 'To show them, Kehai reads the title and text of each notification. Windows asks you once, when you press ALLOW.'
-            : 'To show them, Kehai reads the title and text of each notification. Nothing is read until you press ALLOW.',
+            ? 'To show them, Kehai reads the title and text of each notification. Windows asks you once, when you press Allow.'
+            : 'To show them, Kehai reads the title and text of each notification. Nothing is read until you press Allow.',
           right: (
             <>
-              <Button onClick={onNotifyLater}>NOT NOW</Button>
-              <Button fill onClick={allowNotifications}>ALLOW</Button>
+              <Button onClick={onNotifyLater}>Not now</Button>
+              <Button fill onClick={allowNotifications}>Allow</Button>
             </>
           ),
         };
   } else if (notify.available) {
-    notifyRow = { dot: 'var(--cc-ok)', desc: 'The title and text of each one, shown and never kept.', right: <Status ok>ALLOWED</Status> };
+    notifyRow = { dot: 'var(--cc-ok)', desc: 'The title and text of each one, shown and never kept.', right: <Status ok>Allowed</Status> };
   } else {
     notifyRow = {
       dot: 'var(--cc-line-2)',
       desc: WINDOWS
         ? `Windows said no: ${notify.reason ?? 'access refused'}. Turn it on in Windows Settings → Privacy & security → Notifications, then check again.`
         : (notify.reason ?? 'This system does not let Kehai read notifications.'),
-      right: <Button onClick={askAgain}>CHECK AGAIN</Button>,
+      right: <Button onClick={askAgain}>Check again</Button>,
     };
   }
 
   const found = agents?.available === true;
   let agentsRow: { dot: string; desc: ReactNode; right: ReactNode };
   if (!agents) {
-    agentsRow = { dot: 'var(--cc-line-2)', desc: 'Looking for local session transcripts.', right: <Status>LOOKING</Status> };
+    agentsRow = { dot: 'var(--cc-line-2)', desc: 'Looking for local session transcripts.', right: <Status>Looking</Status> };
   } else if (found) {
     agentsRow = {
       dot: 'var(--cc-ok)',
       desc: `Token usage, and which sessions wait on you, from the transcripts in ${settings.transcriptRoot ?? 'the default folder'}.`,
-      right: <Status ok>FOUND</Status>,
+      right: <Status ok>Found</Status>,
     };
   } else if (agentsAnswer === 'unused') {
-    agentsRow = { dot: 'var(--cc-line-2)', desc: 'Their tiles say so rather than showing zeroes.', right: <Status>NOT USED HERE</Status> };
+    agentsRow = { dot: 'var(--cc-line-2)', desc: 'Their tiles say so rather than showing zeroes.', right: <Status>Not used here</Status> };
   } else {
     agentsRow = {
       dot: 'var(--cc-line-2)',
       desc: `Token usage, and which sessions wait on you, from local session transcripts. ${sentence(agents.reason ?? 'none found')}.`,
       right: (
         <>
-          <Button onClick={() => onAgents('unused')}>NOT USED HERE</Button>
-          <Button onClick={() => onAgents('folder')}>CHOOSE FOLDER</Button>
+          <Button onClick={() => onAgents('unused')}>Not used here</Button>
+          <Button onClick={() => onAgents('folder')}>Choose folder</Button>
         </>
       ),
     };
@@ -343,7 +346,7 @@ function SourcesStep({ notifyLater, onNotifyLater, agentsAnswer, onAgents }: { n
     <>
       <div style={{ borderBottom: '1px solid var(--cc-line)' }}>
         <Choice label="Processor, memory, network and disks" desc="Usage now and over the last few minutes." dot={cpu ? 'var(--cc-ok)' : 'var(--cc-line-2)'}>
-          <Status ok={!!cpu}>{cpu ? 'READING' : 'LOOKING'}</Status>
+          <Status ok={!!cpu}>{cpu ? 'Reading' : 'Looking'}</Status>
         </Choice>
         <Choice
           label="Processor temperature"
@@ -356,7 +359,7 @@ function SourcesStep({ notifyLater, onNotifyLater, agentsAnswer, onAgents }: { n
           }
           dot={tempKnown ? 'var(--cc-ok)' : 'var(--cc-line-2)'}
         >
-          <Status ok={tempKnown}>{tempKnown ? 'READING' : 'NOT AVAILABLE'}</Status>
+          <Status ok={tempKnown}>{tempKnown ? 'Reading' : 'Not available'}</Status>
         </Choice>
         <Choice
           label="Now playing"
@@ -369,7 +372,7 @@ function SourcesStep({ notifyLater, onNotifyLater, agentsAnswer, onAgents }: { n
           }
           dot={media ? 'var(--cc-ok)' : 'var(--cc-line-2)'}
         >
-          <Status ok={!!media}>{media ? 'READING' : MAC ? 'NOT AVAILABLE' : 'NOTHING PLAYING'}</Status>
+          <Status ok={!!media}>{media ? 'Reading' : MAC ? 'Not available' : 'Nothing playing'}</Status>
         </Choice>
         <Choice label="Notifications" desc={notifyRow.desc} dot={notifyRow.dot}>
           {notifyRow.right}
@@ -456,8 +459,18 @@ function PresetCard({ layout, shape, chosen, suggested, isEmpty, onPick }: { lay
                   minHeight: 0,
                 }}
               >
-                <span style={{ fontSize: 8, letterSpacing: '0.12em', padding: '0 4px', textAlign: 'center', lineHeight: 1.3, color: hatched ? 'var(--cc-muted)' : chosen ? 'var(--cc-text)' : 'var(--cc-muted)' }}>
-                  {(registry[t.widget]?.name ?? t.widget).toUpperCase()}
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: '0 4px',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: hatched ? 'var(--cc-muted)' : chosen ? 'var(--cc-text)' : 'var(--cc-muted)',
+                  }}
+                >
+                  {registry[t.widget]?.name ?? t.widget}
                 </span>
               </div>
             );
@@ -465,13 +478,13 @@ function PresetCard({ layout, shape, chosen, suggested, isEmpty, onPick }: { lay
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, width: '100%' }}>
-        <span style={{ fontSize: 11, letterSpacing: '0.14em', color: chosen ? 'var(--cc-accent)' : 'var(--cc-text)' }}>{layout.name.toUpperCase()}</span>
+        <span style={{ fontSize: 13, color: chosen ? 'var(--cc-accent)' : 'var(--cc-text)' }}>{layout.name}</span>
         {suggested && (
-          <span style={{ fontSize: 9, letterSpacing: '0.1em', padding: '2px 6px', border: '1px solid currentColor', color: 'var(--cc-accent-2)' }}>SUGGESTED</span>
+          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 12, background: 'var(--cc-line)', color: 'var(--cc-text)' }}>Suggested</span>
         )}
         <span style={{ flex: 1 }} />
         <span className="cc-mini">
-          {tiles.length} TILES{emptyCount ? ` · ${emptyCount} EMPTY` : ''}
+          {tiles.length} tiles{emptyCount ? ` · ${emptyCount} empty` : ''}
         </span>
       </div>
     </button>
@@ -496,7 +509,7 @@ function Colours({ height }: { height: number }) {
               <span style={{ fontSize: 20, fontWeight: 200, color: accent }}>21:50</span>
               <span style={{ width: 6, height: 6, background: second }} />
             </div>
-            <div style={{ height: 26, display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 10, letterSpacing: '0.14em', color: on ? 'var(--cc-accent)' : text }}>{t.name}</div>
+            <div style={{ height: 26, display: 'flex', alignItems: 'center', padding: '0 12px', fontSize: 12, color: on ? 'var(--cc-accent)' : text }}>{t.name}</div>
           </button>
         );
       })}
@@ -523,10 +536,10 @@ function LayoutCards({ shape }: { shape: Shape }) {
 function Key({ k, what }: { k: string; what: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <span className="cc-chip" style={{ minWidth: 64, color: 'var(--cc-text)', fontSize: 10 }}>
+      <span className="cc-chip" style={{ minWidth: 64, color: 'var(--cc-text)', fontSize: 12 }}>
         {k}
       </span>
-      <span className="cc-mini" style={{ fontSize: 11, color: 'var(--cc-muted)' }}>
+      <span className="cc-mini" style={{ fontSize: 13, color: 'var(--cc-muted)' }}>
         {what}
       </span>
     </div>
@@ -587,17 +600,17 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
     setAt((i) => Math.min(STEPS.length - 1, i + 1));
   };
 
-  let nextLabel = 'NEXT';
+  let nextLabel = 'Next';
   let hint = '';
   if (step === 'DISPLAY' && displays && displays.displays.length > 1) {
     const id = choice.picked ?? startingPick(displays).id;
     const target = displays.displays.find((d) => d.id === id);
-    nextLabel = target ? `SHOW KEHAI ON ${target.number}` : 'NEXT';
+    nextLabel = target ? `Show Kehai on ${target.number}` : 'Next';
     hint = target ? `${target.number} · ${displayLabel(target)} · ${target.width} × ${target.height}` : '';
   }
   if (step === 'SOURCES') hint = 'All of this stays under Settings → Sources.';
   if (step === 'LAYOUT') hint = 'Later, the layout’s name in the header switches it.';
-  if (step === 'FINISH') nextLabel = 'OPEN THE PANEL';
+  if (step === 'FINISH') nextLabel = 'Open the panel';
 
   // In numbers, so nobody is surprised when the panel turns down at ten.
   const { fromMin, toMin } = settings.night;
@@ -625,7 +638,7 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
         ),
         main: <SourcesStep notifyLater={notifyLater} onNotifyLater={() => setNotifyLater(true)} agentsAnswer={agentsAnswer} onAgents={setAgentsAnswer} />,
         extra: (
-          <div className="cc-mini" style={{ fontSize: 11 }}>
+          <div className="cc-mini" style={{ fontSize: 13 }}>
             The clock and the focus timer need nothing.
           </div>
         ),
@@ -639,7 +652,7 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
         extra: (
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
-              <span className="cc-label">COLOURS</span>
+              <span className="cc-label">Colours</span>
               <span className="cc-mini">The whole screen changes as you pick.</span>
             </div>
             <Colours height={bar ? 76 : 84} />
@@ -673,12 +686,12 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
         ),
         extra: (
           <div>
-            <div className="cc-label">WORTH KNOWING</div>
+            <div className="cc-label">Worth knowing</div>
             <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(max(${bar ? 220 : 300}px, 45%), 1fr))`, gap: '12px 40px', marginTop: 14 }}>
               <Key k="S" what="Settings, and back to the panel" />
               <Key k="F11" what="Fullscreen, or a window again" />
-              <Key k="ESC" what="Back to the panel from anywhere" />
-              <Key k="SWIPE" what="Along the header, for the next layout" />
+              <Key k="Esc" what="Back to the panel from anywhere" />
+              <Key k="Swipe" what="Along the header, for the next layout" />
             </div>
           </div>
         ),
@@ -689,29 +702,29 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
   const buttons = (
     <>
       {at > 0 ? (
-        <button className="cc-chip" style={{ height: 40, minWidth: 110, fontSize: 10 }} onClick={() => setAt((i) => i - 1)}>
-          BACK
+        <button className="cc-chip" style={{ height: 40, minWidth: 110, fontSize: 12 }} onClick={() => setAt((i) => i - 1)}>
+          Back
         </button>
       ) : (
         <span style={{ width: 110 }} />
       )}
-      <span className="cc-mini" style={{ flex: 1, textAlign: 'center', fontSize: 11, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+      <span className="cc-mini" style={{ flex: 1, textAlign: 'center', fontSize: 13, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
         {hint}
       </span>
-      <button className="cc-chip cc-chip-on" style={{ height: 40, minWidth: 150, padding: '0 20px', fontSize: 10 }} onClick={next}>
+      <button className="cc-chip cc-primary" style={{ height: 40, minWidth: 150, padding: '0 20px' }} onClick={next}>
         {nextLabel}
       </button>
     </>
   );
 
   const skip = (
-    <button className="cc-chip" style={{ height: bar ? 26 : 28, marginRight: isTauri() ? 6 : 18, fontSize: 10, padding: '0 12px' }} onClick={() => finish()}>
-      SKIP SETUP
+    <button className="cc-chip" style={{ height: bar ? 26 : 28, marginRight: isTauri() ? 6 : 18, fontSize: 12, padding: '0 12px' }} onClick={() => finish()}>
+      Skip setup
     </button>
   );
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--cc-bg)' }}>
+    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent' }}>
       <div
         data-tauri-drag-region
         style={{
@@ -728,8 +741,8 @@ export function Setup({ onDone }: { onDone: (then?: Section) => void }) {
         <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="var(--cc-accent)" strokeWidth="1.8" strokeLinejoin="round">
           <path d="M8 1.4 14.6 8 8 14.6 1.4 8Z" />
         </svg>
-        <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: '0.24em' }}>KEHAI</span>
-        <span className="cc-label">· SETUP</span>
+        <span style={{ fontSize: 12, fontWeight: 600 }}>Kehai</span>
+        <span className="cc-label">· setup</span>
         {bar && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginLeft: 28 }}>
             <Steps at={at} inline />

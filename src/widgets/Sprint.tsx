@@ -10,21 +10,24 @@ function command(c: FlowCommand) {
   bus.publish<FlowCommand>('flow:command', 'widget.sprint', c);
 }
 
-/** Focus and break keep their own colours, so the mode reads without the label. */
+/**
+ * A break keeps its own colour, so the mode reads without the label. Focus is
+ * plain: the accent is kept for something waiting on you.
+ */
 export function sprintColor(sprint: SprintPayload): string {
-  return sprint.mode === 'focus' ? 'var(--cc-accent)' : 'var(--cc-accent-2)';
+  return sprint.mode === 'focus' ? 'var(--cc-text)' : 'var(--cc-accent-2)';
 }
 
 export function sprintStatus(sprint: SprintPayload): string {
-  if (sprint.state === 'paused') return 'PAUSED';
-  if (sprint.state === 'idle') return 'READY';
-  return sprint.mode === 'focus' ? 'FOCUSING' : 'ON BREAK';
+  if (sprint.state === 'paused') return 'Paused';
+  if (sprint.state === 'idle') return 'Ready';
+  return sprint.mode === 'focus' ? 'Focusing' : 'On break';
 }
 
 export function sprintLabel(sprint: SprintPayload): string {
   return sprint.mode === 'focus'
-    ? `SPRINT ${sprint.index} OF ${sprint.total}`
-    : `BREAK AFTER ${sprint.index} OF ${sprint.total}`;
+    ? `Sprint ${sprint.index} of ${sprint.total}`
+    : `Break after ${sprint.index} of ${sprint.total}`;
 }
 
 export function focusedToday(sprint: SprintPayload): string {
@@ -49,16 +52,12 @@ export function SprintControls({
   const running = sprint.state === 'running';
   // Nothing to go back to from the first block, untouched.
   const pristine = sprint.state === 'idle' && sprint.mode === 'focus' && sprint.index === 1;
-  const chip = { height, padding: '0 14px', fontSize: 10 };
+  const chip = { height, padding: '0 14px' };
 
   return (
-    <div style={{ display: 'flex', gap: 6, flex: 'none' }}>
-      <button
-        className="cc-chip"
-        style={{ ...chip, color: sprintColor(sprint), borderColor: sprintColor(sprint) }}
-        onClick={() => command({ action: running ? 'pause' : 'start' })}
-      >
-        {running ? 'PAUSE' : sprint.state === 'paused' ? 'RESUME' : 'START'}
+    <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+      <button className="cc-chip" style={chip} onClick={() => command({ action: running ? 'pause' : 'start' })}>
+        {running ? 'Pause' : sprint.state === 'paused' ? 'Resume' : 'Start'}
       </button>
       {!compact && (
         <button
@@ -67,7 +66,7 @@ export function SprintControls({
           onClick={() => command({ action: 'skip' })}
           title={sprint.mode === 'focus' ? 'End this block and take the break' : 'End the break'}
         >
-          SKIP
+          Skip
         </button>
       )}
       {!compact && !pristine && (
@@ -77,7 +76,7 @@ export function SprintControls({
           onClick={() => command({ action: 'reset' })}
           title="Back to the first sprint. Today's total stays."
         >
-          RESET
+          Reset
         </button>
       )}
     </div>
@@ -90,8 +89,8 @@ export function Sprint(_: WidgetProps) {
 
   if (!sprint) {
     return (
-      <Pane label="FOCUS TIMER">
-        <Awaiting label="FOCUS SPRINT" />
+      <Pane label="Focus timer">
+        <Awaiting label="Focus sprint" />
       </Pane>
     );
   }
@@ -100,27 +99,34 @@ export function Sprint(_: WidgetProps) {
   // around them goes before they shrink.
   const showToday = size.h > 210;
   const showTrack = size.h > 160;
+  // A short tile says which sprint it is in its title instead of on a line of its own.
+  const showLabel = size.h > 170;
   const running = sprint.state === 'running';
   // Focus blocks the break follows are done; the one being focused on is not.
   const done = sprint.mode === 'break' ? sprint.index : sprint.index - 1;
+  // The numeral takes what the title, padding and the other rows leave, so the
+  // buttons are never pushed out of the tile, nor the figures out of its sides.
+  const rows = (showLabel ? 18 : 0) + 16 + 28 + (showTrack ? 4 : 0) + (showToday ? 33 : 0);
+  const numeral = Math.max(26, Math.min(92, Math.round(size.h * 0.3), Math.floor((size.h - 28 - 32 - rows) / 0.95), Math.floor((size.w - 32) / 3)));
+  const status = sprintStatus(sprint);
 
   return (
     <Pane
-      label="FOCUS TIMER"
+      label="Focus timer"
       right={
-        <span className="cc-mini" style={{ fontSize: 9, color: running ? sprintColor(sprint) : undefined }}>
-          {sprintStatus(sprint)}
+        <span style={{ color: running && sprint.mode === 'break' ? sprintColor(sprint) : undefined }}>
+          {showLabel ? status : `${sprintLabel(sprint)} · ${status}`}
         </span>
       }
     >
-      <span className="cc-label">{sprintLabel(sprint)}</span>
+      {showLabel && <span className="cc-label">{sprintLabel(sprint)}</span>}
       <div style={{ flex: 1 }} />
       <span
+        className="cc-display"
         style={{
-          fontSize: `clamp(30px, ${Math.max(24, Math.round(size.h * 0.3))}px, 92px)`,
-          fontWeight: 200,
+          fontSize: numeral,
           lineHeight: 0.95,
-          letterSpacing: '-0.035em',
+          whiteSpace: 'nowrap',
           // A countdown that is not counting should not look like one that is.
           color: running ? sprintColor(sprint) : 'var(--cc-muted)',
         }}
@@ -129,22 +135,22 @@ export function Sprint(_: WidgetProps) {
       </span>
       {showToday && (
         <span style={{ fontSize: 14, color: 'var(--cc-muted)', marginTop: 12 }}>
-          {focusedToday(sprint)} FOCUSED TODAY
+          {focusedToday(sprint)} focused today
         </span>
       )}
-      <div style={{ marginTop: 14 }}>
+      <div style={{ marginTop: 16 }}>
         <SprintControls sprint={sprint} compact={size.w < 230} />
       </div>
       <div style={{ flex: 1 }} />
-      <div style={{ display: 'flex', gap: 3, flex: 'none', visibility: showTrack ? 'visible' : 'hidden' }}>
+      <div style={{ display: showTrack ? 'flex' : 'none', gap: 3, flex: 'none' }}>
         {Array.from({ length: sprint.total }, (_v, i) => (
           <div
             key={i}
             style={{
               flex: 1,
-              height: 6,
-              background:
-                i < done ? 'var(--cc-accent)' : i === done && sprint.mode === 'focus' ? 'var(--cc-accent-2)' : 'var(--cc-line)',
+              height: 4,
+              borderRadius: 2,
+              background: i < done ? 'var(--cc-muted)' : i === done && sprint.mode === 'focus' ? 'var(--cc-text)' : 'var(--cc-line)',
             }}
           />
         ))}

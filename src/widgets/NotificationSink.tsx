@@ -10,18 +10,13 @@ import type { NotifyCommand, NotifyItem, NotifyPayload, SprintPayload } from '..
 import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
-const PALETTE = ['var(--cc-accent)', 'var(--cc-accent-2)', 'var(--cc-ok)', 'var(--cc-muted)'];
-
-/** Stable colour per source, so an app keeps its tag colour between polls. */
-function sourceColor(source: string): string {
-  let hash = 0;
-  for (let i = 0; i < source.length; i += 1) hash = (hash * 31 + source.charCodeAt(i)) | 0;
-  return PALETTE[Math.abs(hash) % PALETTE.length];
-}
-
+/** An app's name, short enough to sit beside the time. No colour: which app is not news. */
 function shortSource(source: string): string {
-  return source.replace(/\s+/g, ' ').trim().slice(0, 10).toUpperCase();
+  return source.replace(/\s+/g, ' ').trim().slice(0, 18);
 }
+
+/** The filter that shows every app. */
+const ALL = '*';
 
 function timeOf(atMs: number): string {
   if (!atMs) return '--:--';
@@ -69,36 +64,21 @@ function lines(items: NotifyItem[]): Line[] {
 }
 
 function Row({ line, dense }: { line: Line; dense: boolean }) {
-  const color = sourceColor(line.source);
   const item = line.item;
   return (
     <div
       className="cc-notify-row"
       style={{
         flex: 'none',
-        padding: dense ? '5px 10px 6px 8px' : '7px 12px 8px 10px',
-        borderBottom: '1px solid var(--cc-line)',
-        borderLeft: '2px solid transparent',
+        padding: dense ? '6px 16px' : '8px 16px 10px',
+        borderTop: '1px solid var(--cc-line)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }}>
-        <span className="cc-mini" style={{ flex: 'none' }}>{timeOf(line.atMs)}</span>
-        <span
-          style={{
-            fontSize: 9,
-            letterSpacing: '0.1em',
-            padding: '1px 5px',
-            border: '1px solid currentColor',
-            color,
-            flex: 'none',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: 96,
-          }}
-        >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--cc-muted)', flex: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
           {shortSource(line.source)}
         </span>
+        <span className="cc-mini" style={{ flex: 'none' }}>{timeOf(line.atMs)}</span>
         <div style={{ flex: 1 }} />
         <button
           className="cc-dismiss"
@@ -114,9 +94,9 @@ function Row({ line, dense }: { line: Line; dense: boolean }) {
       {item ? (
         <div
           style={{
-            fontSize: dense ? 11 : 12,
+            fontSize: dense ? 13 : 14,
             color: 'var(--cc-text)',
-            marginTop: 3,
+            marginTop: 2,
             lineHeight: 1.35,
             overflow: 'hidden',
             textOverflow: 'ellipsis',
@@ -126,11 +106,11 @@ function Row({ line, dense }: { line: Line; dense: boolean }) {
           {item.title || item.body || '(no text)'}
         </div>
       ) : (
-        <div style={{ fontSize: 11, letterSpacing: '0.14em', color: 'var(--cc-muted)', marginTop: 4 }}>
-          {line.ids.length} NEW
+        <div style={{ fontSize: 13, color: 'var(--cc-muted)', marginTop: 2 }}>
+          {line.ids.length} new
           {!dense && (
-            <span className="cc-mini" style={{ letterSpacing: '0.06em', marginLeft: 10 }}>
-              WHAT THEY SAY ISN’T SHOWN
+            <span className="cc-mini" style={{ marginLeft: 8 }}>
+              what they say isn’t shown
             </span>
           )}
         </div>
@@ -138,7 +118,7 @@ function Row({ line, dense }: { line: Line; dense: boolean }) {
       {!dense && item && item.body && item.title && (
         <div
           style={{
-            fontSize: 11,
+            fontSize: 13,
             color: 'var(--cc-muted)',
             marginTop: 2,
             overflow: 'hidden',
@@ -159,11 +139,11 @@ function Count({ items, why }: { items: NotifyItem[]; why: string }) {
   const apps = new Set(items.map((i) => i.app)).size;
   return (
     <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-      <div style={{ fontSize: Math.max(28, Math.min(96, size.h * 0.28)), fontWeight: 200, lineHeight: 1, color: 'var(--cc-text)' }}>
+      <div className="cc-display" style={{ fontSize: Math.max(28, Math.min(96, size.h * 0.28)), lineHeight: 1, color: 'var(--cc-text)' }}>
         {items.length}
       </div>
-      <div className="cc-label" style={{ marginTop: 12, color: 'var(--cc-muted)' }}>
-        {items.length === 0 ? 'NOTHING WAITING' : `WAITING, FROM ${apps} ${apps === 1 ? 'APP' : 'APPS'}`}
+      <div className="cc-label" style={{ marginTop: 12 }}>
+        {items.length === 0 ? 'Nothing waiting' : `waiting, from ${apps} ${apps === 1 ? 'app' : 'apps'}`}
       </div>
       <div className="cc-mini" style={{ marginTop: 8 }}>
         {why}
@@ -179,7 +159,7 @@ export function NotificationSink(_: WidgetProps) {
   const size = useTileSize();
   const hideText = useHideText();
   // An app's id, or ALL.
-  const [filter, setFilter] = useState('ALL');
+  const [filter, setFilter] = useState(ALL);
 
   const chips = useMemo(() => {
     const names = new Map<string, string>();
@@ -189,8 +169,8 @@ export function NotificationSink(_: WidgetProps) {
 
   if (!feed) {
     return (
-      <Pane label="NOTIFICATIONS">
-        <span className="cc-mini">AWAITING FIRST EVENT</span>
+      <Pane label="Notifications">
+        <span className="cc-mini">Nothing heard yet</span>
       </Pane>
     );
   }
@@ -199,15 +179,15 @@ export function NotificationSink(_: WidgetProps) {
   // A remote panel cannot give the host's go-ahead, so it only says so.
   if (feed.pending) {
     return (
-      <Pane label="NOTIFICATIONS">
+      <Pane label="Notifications">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>NOT ALLOWED YET</div>
-          <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
+          <div style={{ fontSize: 14, color: 'var(--cc-muted)' }}>Not allowed yet</div>
+          <div className="cc-mini" style={{ marginTop: 4, lineHeight: 1.6 }}>
             {REMOTE_PANEL ? 'Allow it on the machine Kehai runs on.' : 'Kehai reads none of them until you allow it.'}
           </div>
           {!REMOTE_PANEL && (
-            <button className="cc-chip cc-chip-on" style={{ marginTop: 12, padding: '7px 16px' }} onClick={allowNotifications}>
-              ALLOW
+            <button className="cc-chip" style={{ marginTop: 16, padding: '6px 16px' }} onClick={allowNotifications}>
+              Allow
             </button>
           )}
         </div>
@@ -218,9 +198,9 @@ export function NotificationSink(_: WidgetProps) {
   // A refused listener must not look like a quiet day.
   if (!feed.available) {
     return (
-      <Pane label="NOTIFICATIONS">
+      <Pane label="Notifications">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-danger)' }}>LISTENER UNAVAILABLE</div>
+          <div style={{ fontSize: 14, color: 'var(--cc-danger)' }}>Can’t read notifications</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>{feed.reason}</div>
         </div>
       </Pane>
@@ -230,9 +210,9 @@ export function NotificationSink(_: WidgetProps) {
   // The host shows remote panels none of them, and this is one.
   if (feed.withheld) {
     return (
-      <Pane label="NOTIFICATIONS">
+      <Pane label="Notifications">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>KEPT ON THE PC</div>
+          <div style={{ fontSize: 14, color: 'var(--cc-muted)' }}>Kept on the PC</div>
           <div className="cc-mini" style={{ marginTop: 8, lineHeight: 1.6 }}>
             The PC shows remote panels none of its notifications.
           </div>
@@ -244,8 +224,8 @@ export function NotificationSink(_: WidgetProps) {
   const focusing = settings.notify.quietFocus && sprint?.state === 'running' && sprint.mode === 'focus';
   if (focusing && !hideText) {
     return (
-      <Pane label="NOTIFICATIONS" right={<span className="cc-mini" style={{ color: 'var(--cc-accent)' }}>FOCUSING</span>}>
-        <Count items={feed.items} why={`THE LIST COMES BACK AT THE BREAK, IN ${mmss(sprint.remainingSec)}`} />
+      <Pane label="Notifications" right="Focusing">
+        <Count items={feed.items} why={`The list comes back at the break, in ${mmss(sprint.remainingSec)}.`} />
       </Pane>
     );
   }
@@ -253,14 +233,14 @@ export function NotificationSink(_: WidgetProps) {
   // Nobody is at the desk: how many, not who from or what they say.
   if (hideText) {
     return (
-      <Pane label="NOTIFICATIONS">
+      <Pane label="Notifications">
         <div style={{ margin: 'auto', textAlign: 'center', padding: 16 }}>
-          <div style={{ fontSize: 12, color: 'var(--cc-muted)' }}>
-            {feed.items.length === 0 ? 'NOTHING WAITING' : `${feed.items.length} IN TRAY`}
+          <div style={{ fontSize: 14, color: 'var(--cc-muted)' }}>
+            {feed.items.length === 0 ? 'Nothing waiting' : `${feed.items.length} waiting`}
           </div>
           {feed.items.length > 0 && (
-            <div className="cc-mini" style={{ marginTop: 8 }}>
-              HIDDEN WHILE YOU ARE AWAY
+            <div className="cc-mini" style={{ marginTop: 4 }}>
+              Hidden while you’re away
             </div>
           )}
         </div>
@@ -269,29 +249,32 @@ export function NotificationSink(_: WidgetProps) {
   }
 
   // A chip whose app has gone from the list leaves nothing to filter by.
-  const on = chips.some(([id]) => id === filter) ? filter : 'ALL';
-  const visible = feed.items.filter((i) => on === 'ALL' || i.app === on);
+  const on = chips.some(([id]) => id === filter) ? filter : ALL;
+  const visible = feed.items.filter((i) => on === ALL || i.app === on);
   const rows = lines(visible);
   const dense = size.h < 320;
   const onName = chips.find(([id]) => id === on)?.[1];
   const textless = REMOTE_PANEL && feed.items.length > 0 && feed.items.every((i) => i.nameOnly);
 
   return (
-    <Pane label="NOTIFICATIONS" padded={false}>
+    <Pane label="Notifications" padded={false}>
       {size.h > 220 && chips.length > 0 && (
         <div
           style={{
             flex: 'none',
             display: 'flex',
             gap: 4,
-            padding: '8px 10px',
-            borderBottom: '1px solid var(--cc-line)',
-            background: 'var(--cc-inset)',
+            padding: '4px 16px 8px',
             overflow: 'hidden',
           }}
         >
-          {[['ALL', 'ALL'], ...chips].map(([id, name]) => (
-            <button key={id} onClick={() => setFilter(id)} className={on === id ? 'cc-chip cc-chip-on' : 'cc-chip'}>
+          {[[ALL, 'All'], ...chips].map(([id, name]) => (
+            <button
+              key={id}
+              onClick={() => setFilter(id)}
+              className={on === id ? 'cc-chip cc-chip-on' : 'cc-chip cc-bare'}
+              style={{ color: on === id ? undefined : 'var(--cc-muted)' }}
+            >
               {name}
             </button>
           ))}
@@ -301,7 +284,7 @@ export function NotificationSink(_: WidgetProps) {
       <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         {rows.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center' }}>
-            <span className="cc-mini" style={{ color: 'var(--cc-line-2)' }}>NOTHING WAITING</span>
+            <span className="cc-mini">Nothing waiting</span>
           </div>
         ) : (
           rows.map((line) => <Row key={line.key} line={line} dense={dense} />)
@@ -311,32 +294,30 @@ export function NotificationSink(_: WidgetProps) {
       <div
         style={{
           flex: 'none',
-          height: 26,
+          height: 36,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '0 10px',
-          background: 'var(--cc-inset)',
+          padding: '0 8px 0 16px',
           borderTop: '1px solid var(--cc-line)',
         }}
       >
         <span className="cc-mini">
           {textless
-            ? 'WHAT THEY SAY STAYS ON THE PC'
-            : on === 'ALL'
-              ? `${feed.items.length} SHOWN`
-              : `${visible.length} OF ${feed.items.length} SHOWN`}
+            ? 'What they say stays on the PC'
+            : on === ALL
+              ? `${feed.items.length} shown`
+              : `${visible.length} of ${feed.items.length} shown`}
         </span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          {on !== 'ALL' && <span className="cc-mini" style={{ color: 'var(--cc-accent)' }}>FILTERED</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {visible.length > 0 && (
             <button
-              className="cc-chip"
-              style={{ padding: '2px 7px' }}
+              className="cc-chip cc-bare"
+              style={{ color: 'var(--cc-muted)' }}
               onClick={() => clear(visible.map((i) => i.id))}
               title="Dismiss what the tile shows, here and in the system tray. A hidden app's stay."
             >
-              {onName ? `CLEAR ${onName}` : 'CLEAR ALL'}
+              {onName ? `Clear ${onName}` : 'Clear all'}
             </button>
           )}
         </div>

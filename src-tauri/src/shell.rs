@@ -9,8 +9,10 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::mpsc::RecvTimeoutError;
 use std::sync::{Mutex, MutexGuard, OnceLock};
 use std::thread;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -74,12 +76,55 @@ struct View {
     visible: bool,
     /// Agents waiting on you, or stopped by an error.
     waiting: usize,
+    /// Of those, the ones open in a window the menu can go to.
+    go_to: Vec<Waiting>,
     clients: usize,
     /// Each display's id, its name for the tooltip, and its row in Move to.
     displays: Vec<(String, String, String)>,
     current: Option<String>,
     fill: bool,
     update: Update,
+}
+
+/// A session waiting on you that the menu offers to go to.
+#[derive(Clone, PartialEq, Debug)]
+struct Waiting {
+    id: String,
+    name: String,
+    error: bool,
+    since_ms: i64,
+}
+
+/// How many sessions the menu offers at most. More would push the menu's own
+/// items off the bottom of a short display.
+const GO_TO_MAX: usize = 3;
+
+/// How often the menu's "waiting 4 min" is brought up to date while anything
+/// waits. Nothing else changes it.
+const GO_TO_TICK: Duration = Duration::from_secs(20);
+
+/// How long, the way the menu says it.
+fn ago(ms: i64) -> String {
+    let s = (ms / 1000).max(0);
+    if s < 60 {
+        format!("{s} s")
+    } else if s < 3600 {
+        format!("{} min", s / 60)
+    } else {
+        format!("{} h", s / 3600)
+    }
+}
+
+/// One "Go to" line. A menu reads `&` as a shortcut marker, so a project's own
+/// is doubled. The time sits in the menu's right-hand column on Windows.
+fn go_to_label(w: &Waiting, now: i64) -> String {
+    let gap = if cfg!(windows) { "\t" } else { " · " };
+    format!(
+        "Go to {}{gap}{} {}",
+        w.name.replace('&', "&&"),
+        if w.error { "error" } else { "waiting" },
+        ago(now - w.since_ms)
+    )
 }
 
 #[derive(Clone, Default, PartialEq)]
@@ -91,8 +136,19 @@ enum Update {
     Installing(String),
 }
 
+/// The "Go to" lines at the top of the menu, the line under them, and what
+/// they say, so lines that read the same are left alone.
+#[derive(Default)]
+struct GoToLines {
+    items: Vec<MenuItem<Wry>>,
+    line: Option<PredefinedMenuItem<Wry>>,
+    shown: Vec<String>,
+}
+
 struct Shell {
     tray: Option<TrayIcon<Wry>>,
+    menu: Menu<Wry>,
+    go_to: Mutex<GoToLines>,
     toggle: MenuItem<Wry>,
     move_to: Submenu<Wry>,
     updates: MenuItem<Wry>,
@@ -321,7 +377,12 @@ fn menu_event(app: &AppHandle, id: &str) {
         }
         "quit" => app.exit(0),
         _ => {
-            if let Some(display) = id.strip_prefix("move:") {
+            if let Some(session) = id.strip_prefix("jump:") {
+                // The click on the menu is what lets Windows bring another
+                // program's window forward, so it goes straight there.
+                let (app, session) = (app.clone(), session.to_string());
+                thread::spawn(move || crate::pollers::agents::jump(&app, &session));
+            } else if let Some(display) = id.strip_prefix("move:") {
                 let fill = SHELL.get().is_some_and(|s| lock(&s.view).fill);
                 show(app);
                 let _ = app.emit(
@@ -418,15 +479,38 @@ fn observe(view: &mut View, envelope: &Value) -> bool {
     let before = view.clone();
     match envelope["topic"].as_str() {
         Some("dev:agents") => {
-            view.waiting = data["sessions"]
+            let yours: Vec<&Value> = data["sessions"]
                 .as_array()
                 .filter(|_| data["available"].as_bool() == Some(true))
-                .map_or(0, |sessions| {
+                .map(|sessions| {
                     sessions
                         .iter()
                         .filter(|s| matches!(s["state"].as_str(), Some("waiting" | "error")))
-                        .count()
-                });
+                        .collect()
+                })
+                .unwrap_or_default();
+            view.waiting = yours.len();
+            // Longest waiting first, errors among them: whichever has waited
+            // longest is the one most likely forgotten.
+            let mut go_to: Vec<Waiting> = yours
+                .iter()
+                .filter(|s| s["via"].is_string())
+                .filter_map(|s| {
+                    let project = s["project"].as_str()?;
+                    Some(Waiting {
+                        id: s["id"].as_str()?.to_string(),
+                        name: match s["worktree"].as_str() {
+                            Some(w) => format!("{project} ({w})"),
+                            None => project.to_string(),
+                        },
+                        error: s["state"].as_str() == Some("error"),
+                        since_ms: s["sinceMs"].as_i64().unwrap_or(0),
+                    })
+                })
+                .collect();
+            go_to.sort_by_key(|w| w.since_ms);
+            go_to.truncate(GO_TO_MAX);
+            view.go_to = go_to;
         }
         Some("app:remote") => {
             view.clients = data["clients"].as_u64().unwrap_or(0) as usize;
@@ -475,6 +559,48 @@ fn observe(view: &mut View, envelope: &Value) -> bool {
     *view != before
 }
 
+/// Puts the "Go to" lines at the top of the menu as they should read now,
+/// touching the menu only when a line changes. A line under them parts them
+/// from the menu's own items, and goes when they do.
+fn refresh_go_to(app: &AppHandle, shell: &Shell) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as i64);
+    let wanted: Vec<(String, String)> = lock(&shell.view)
+        .go_to
+        .iter()
+        .map(|w| (w.id.clone(), go_to_label(w, now)))
+        .collect();
+    let labels: Vec<String> = wanted.iter().map(|(id, l)| format!("{id}\n{l}")).collect();
+
+    let mut go_to = lock(&shell.go_to);
+    let GoToLines { items, line, shown } = &mut *go_to;
+    if *shown == labels {
+        return;
+    }
+    for item in items.drain(..) {
+        let _ = shell.menu.remove(&item);
+    }
+    if let Some(sep) = line.take() {
+        let _ = shell.menu.remove(&sep);
+    }
+    for (at, (id, label)) in wanted.iter().enumerate() {
+        if let Ok(item) = MenuItem::with_id(app, format!("jump:{id}"), label, true, None::<&str>) {
+            if shell.menu.insert(&item, at).is_ok() {
+                items.push(item);
+            }
+        }
+    }
+    if !items.is_empty() {
+        if let Ok(sep) = PredefinedMenuItem::separator(app) {
+            if shell.menu.insert(&sep, items.len()).is_ok() {
+                *line = Some(sep);
+            }
+        }
+    }
+    *shown = labels;
+}
+
 /// Follows the bus for as long as Kehai runs: agents waiting, displays,
 /// remote panels and updates all show in the tray.
 fn watch(app: AppHandle) {
@@ -491,12 +617,21 @@ fn watch(app: AppHandle) {
         if changed {
             refresh(&app, shell);
         }
+        refresh_go_to(&app, shell);
         // Ends only if the bus cut this tap off for falling behind; then it
         // starts again from the retained values.
-        while let Ok(envelope) = rx.recv() {
-            let changed = observe(&mut lock(&shell.view), &envelope);
-            if changed {
-                refresh(&app, shell);
+        loop {
+            match rx.recv_timeout(GO_TO_TICK) {
+                Ok(envelope) => {
+                    let changed = observe(&mut lock(&shell.view), &envelope);
+                    if changed {
+                        refresh(&app, shell);
+                        refresh_go_to(&app, shell);
+                    }
+                }
+                // Only the times have moved on.
+                Err(RecvTimeoutError::Timeout) => refresh_go_to(&app, shell),
+                Err(RecvTimeoutError::Disconnected) => break,
             }
         }
     });
@@ -575,6 +710,8 @@ pub fn setup(app: &AppHandle) -> bool {
 
     let _ = SHELL.set(Shell {
         tray,
+        menu,
+        go_to: Mutex::new(GoToLines::default()),
         toggle,
         move_to,
         updates,
@@ -783,6 +920,46 @@ mod tests {
             !observe(&mut view, &agents),
             "the same news twice changes nothing"
         );
+    }
+
+    #[test]
+    fn offers_to_go_to_open_sessions_waiting_longest_first() {
+        let mut view = View::default();
+        let s = |id: &str, state: &str, since: i64, via: Value| json!({ "id": id, "project": "kehai", "worktree": null, "state": state, "sinceMs": since, "via": via });
+        let agents = json!({ "topic": "dev:agents", "data": { "available": true, "sessions": [
+            s("a", "error", 300, json!("vscode")),
+            s("b", "waiting", 100, json!("desktop")),
+            s("c", "waiting", 200, Value::Null),
+            s("d", "working", 50, json!("terminal")),
+            s("e", "waiting", 400, json!("terminal")),
+            s("f", "waiting", 500, json!("terminal")),
+        ] } });
+        observe(&mut view, &agents);
+        assert_eq!(
+            view.waiting, 5,
+            "the count still takes in every one waiting"
+        );
+        let ids: Vec<&str> = view.go_to.iter().map(|w| w.id.as_str()).collect();
+        // Not c, which can't be gone to; not d, which is at work; three at most.
+        assert_eq!(ids, ["b", "a", "e"]);
+        assert!(view.go_to[1].error);
+    }
+
+    #[test]
+    fn a_go_to_line_says_how_long() {
+        let w = Waiting {
+            id: "x".into(),
+            name: "R&D (main)".into(),
+            error: false,
+            since_ms: 0,
+        };
+        let gap = if cfg!(windows) { "\t" } else { " · " };
+        assert_eq!(
+            go_to_label(&w, 4 * 60_000 + 5_000),
+            format!("Go to R&&D (main){gap}waiting 4 min")
+        );
+        assert_eq!(ago(12_000), "12 s");
+        assert_eq!(ago(2 * 3_600_000), "2 h");
     }
 
     #[test]

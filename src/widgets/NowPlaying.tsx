@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { bus } from '../core/bus';
 import { mmss } from '../core/format';
@@ -20,6 +20,10 @@ const COMPACT_BELOW = 210;
 const VOLUME_BESIDE_FROM = 720;
 /** One row narrower than this drops the cover, so the title keeps some room. */
 const ROW_COVER_FROM = 460;
+/** The least a title is given beside the buttons. Less, and they stop sharing a row. */
+const TITLE_MIN = 140;
+/** Tall enough for the title above the buttons, clear of the seek strip along the bottom. */
+const STACK_FROM = 132;
 /** As the volume keys move it. A block sets a tenth. */
 const VOLUME_STEP = 2;
 /**
@@ -45,55 +49,25 @@ function Speaker({ muted }: { muted: boolean }) {
   );
 }
 
-function Equaliser({
-  bars,
-  playing,
-  height,
-  width,
-}: {
-  bars: number;
-  playing: boolean;
-  height: number;
-  width?: number;
-}) {
-  const cells = useMemo(
-    () =>
-      Array.from({ length: bars }, (_, i) => ({
-        delay: (Math.sin(i * 0.62) * 0.42 + 0.44).toFixed(2) + 's',
-        dur: (0.72 + (i % 4) * 0.14).toFixed(2) + 's',
-      })),
-    [bars]
-  );
-
-  return (
-    <div
-      className="cc-eq"
-      data-playing={playing}
-      style={width === undefined ? { height, flex: 1, minWidth: 0 } : { height, width, flex: 'none' }}
-    >
-      {cells.map((c, i) => (
-        <span key={i} style={{ animationDelay: c.delay, animationDuration: c.dur }} />
-      ))}
-    </div>
-  );
-}
-
 /** Previous, play/pause and next, then the speaker that opens volume when there is one. */
 function Transport({
   playing,
   size,
   volume,
   onVolume,
+  lean = false,
 }: {
   playing: boolean;
   size: number;
   volume?: Volume | null;
   onVolume?: () => void;
+  /** Play and next only, for a row with no room for the title otherwise. */
+  lean?: boolean;
 }) {
   const buttons = [
-    { d: PREV, action: 'previous', accent: false },
-    { d: playing ? PAUSE : PLAY, action: 'playpause', accent: true },
-    { d: NEXT, action: 'next', accent: false },
+    ...(lean ? [] : [{ d: PREV, action: 'previous', main: false }] as const),
+    { d: playing ? PAUSE : PLAY, action: 'playpause', main: true },
+    { d: NEXT, action: 'next', main: false },
   ] as const;
 
   return (
@@ -103,13 +77,11 @@ function Transport({
           key={b.action}
           onClick={() => command({ action: b.action })}
           aria-label={b.action}
+          className={b.main ? 'cc-chip' : 'cc-chip cc-bare'}
           style={{
             width: size + 10,
             height: size,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: b.accent ? 'var(--cc-accent)' : 'var(--cc-muted)',
+            color: b.main ? 'var(--cc-text)' : 'var(--cc-muted)',
           }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -133,13 +105,10 @@ function SpeakerButton({ size, muted, onClick }: { size: number; muted: boolean;
       onClick={onClick}
       aria-label="Volume"
       title="This computer's volume"
+      className="cc-chip cc-bare"
       style={{
         width: size + 10,
         height: size,
-        flex: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         color: muted ? 'var(--cc-dim)' : 'var(--cc-muted)',
       }}
     >
@@ -202,7 +171,7 @@ function VolumeControls({
     f();
   };
   const on = Math.round(volume.level / 10);
-  const square = { width: size, height: size, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' } as const;
+  const square = { width: size, height: size, flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 0, borderRadius: 4 } as const;
   // The row's own width, which its parent sets, so the blocks coming and going
   // cannot change it.
   const row = useRef<HTMLDivElement | null>(null);
@@ -248,8 +217,9 @@ function VolumeControls({
               style={{
                 display: 'block',
                 width: '100%',
-                height: Math.round(size * 0.42),
-                background: i < on ? (volume.muted ? 'var(--cc-line-2)' : 'var(--cc-accent)') : 'var(--cc-line)',
+                height: 6,
+                borderRadius: 3,
+                background: i < on ? (volume.muted ? 'var(--cc-line-2)' : 'var(--cc-muted)') : 'var(--cc-line)',
               }}
             />
           </button>
@@ -274,8 +244,8 @@ function VolumeControls({
 
 function Level({ volume, style }: { volume: Volume; style?: React.CSSProperties }) {
   return volume.muted ? (
-    <span className="cc-mini" style={{ flex: 'none', letterSpacing: '0.14em', ...style }}>
-      MUTED
+    <span className="cc-mini" style={{ flex: 'none', ...style }}>
+      Muted
     </span>
   ) : (
     <span style={{ flex: 'none', fontSize: 13, ...style }}>{volume.level}</span>
@@ -372,9 +342,9 @@ function SeekBar({
           touchAction: canSeek ? 'none' : undefined,
         }}
       >
-        <div style={{ position: 'relative', width: '100%', height: drag !== null ? 6 : 3, background: 'var(--cc-inset)' }}>
+        <div style={{ position: 'relative', width: '100%', height: drag !== null ? 6 : 3, background: 'var(--cc-line)', borderRadius: 2, overflow: 'hidden' }}>
           {drag !== null && <div style={{ position: 'absolute', inset: 0, width: was + '%', background: 'var(--cc-line-2)' }} />}
-          <div style={{ position: 'absolute', inset: 0, width: pct + '%', background: 'var(--cc-accent-2)' }} />
+          <div style={{ position: 'absolute', inset: 0, width: pct + '%', background: 'var(--cc-muted)' }} />
         </div>
         {drag !== null && (
           <span
@@ -419,9 +389,9 @@ function SeekEdge({
         touchAction: canSeek ? 'none' : undefined,
       }}
     >
-      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: drag !== null ? 6 : 3, background: 'var(--cc-inset)' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: drag !== null ? 6 : 3, background: 'var(--cc-line)', borderRadius: 2, overflow: 'hidden' }}>
         {drag !== null && <div style={{ position: 'absolute', inset: 0, width: was + '%', background: 'var(--cc-line-2)' }} />}
-        <div style={{ position: 'absolute', inset: 0, width: pct + '%', background: 'var(--cc-accent-2)' }} />
+        <div style={{ position: 'absolute', inset: 0, width: pct + '%', background: 'var(--cc-muted)' }} />
       </div>
       {drag !== null && (
         <div
@@ -436,7 +406,8 @@ function SeekEdge({
             justifyContent: 'center',
             gap: 6,
             background: 'var(--cc-pane-2)',
-            border: '1px solid var(--cc-accent-2)',
+            borderRadius: 4,
+            boxShadow: '0 8px 24px rgb(0 0 0 / 0.35)',
             pointerEvents: 'none',
           }}
         >
@@ -456,7 +427,7 @@ function Cover({ src, size }: { src: string | null; size: number }) {
         height: size,
         flex: 'none',
         background: 'var(--cc-inset)',
-        border: '1px solid var(--cc-line)',
+        borderRadius: 4,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -502,10 +473,10 @@ function Title({ media, size }: { media: MediaPayload; size: 'sm' | 'md' }) {
 /** The whole row as volume, labelled, as the one-row form and the empty tile show it. */
 function VolumeRow({ volume, opened }: { volume: Volume; opened: ReturnType<typeof useVolumeOpen> }) {
   return (
-    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px', minWidth: 0 }}>
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: '0 16px', minWidth: 0 }}>
       <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 84 }}>
         <span className="cc-label">PC volume</span>
-        <Level volume={volume} style={{ fontSize: volume.muted ? 10 : 22, fontWeight: 300 }} />
+        <Level volume={volume} style={{ fontSize: volume.muted ? 12 : 22, fontWeight: 300 }} />
       </div>
       <VolumeControls volume={volume} size={40} readout={false} onTouch={opened.touch} onClose={opened.close} />
     </div>
@@ -519,7 +490,6 @@ export function NowPlaying({ props }: WidgetProps) {
   const volume = useVolume();
   const opened = useVolumeOpen();
   const wantArt = props.art !== false;
-  const wantEq = props.equaliser !== 'off';
 
   const compact = useBreakpoint(size.h, COMPACT_BELOW);
 
@@ -553,13 +523,13 @@ export function NowPlaying({ props }: WidgetProps) {
     inner = showVolume ? (
       <VolumeRow volume={volume} opened={opened} />
     ) : (
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, color: 'var(--cc-line-2)', padding: '0 18px' }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, color: 'var(--cc-dim)', padding: '0 16px' }}>
         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round">
           <path d="M6 12.4V3.2l7-1.4v9.2" />
           <circle cx="4" cy="12.4" r="2" />
           <path d="M2 14 14 2" />
         </svg>
-        <span style={{ fontSize: 12, flex: 1 }}>nothing playing</span>
+        <span style={{ fontSize: 13, flex: 1 }}>Nothing playing</span>
         {/* It's the computer's volume, not the track's, so it stays. */}
         {volume && <SpeakerButton size={40} muted={volume.muted} onClick={opened.show} />}
       </div>
@@ -567,23 +537,30 @@ export function NowPlaying({ props }: WidgetProps) {
   } else if (compact) {
     // One row. Art, header and the timestamped bar are the first to go; the
     // bottom edge keeps position, and takes a seek, without costing a row.
+    const cover = wantArt && size.h > 90 && size.w >= ROW_COVER_FROM;
+    const coverSize = Math.min(52, size.h - 34);
+    // Four 50 px buttons and the divider, or three without a volume.
+    const transportW = volume ? 4 * 50 + 3 * 8 + 13 : 3 * 50 + 2 * 8;
+    const titleRoom = size.w - 32 - 16 - transportW - (cover ? coverSize + 16 : 0);
+    const stacked = titleRoom < TITLE_MIN && size.h >= STACK_FROM;
+    const lean = titleRoom < TITLE_MIN && !stacked;
     inner = (
       <div style={{ position: 'relative', flex: 1, display: 'flex', minWidth: 0 }}>
         {showVolume ? (
           <VolumeRow volume={volume} opened={opened} />
-        ) : (
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 14, padding: '0 18px', minWidth: 0 }}>
-            {wantArt && size.h > 90 && size.w >= ROW_COVER_FROM && <Cover src={art?.dataUrl ?? null} size={Math.min(52, size.h - 34)} />}
+        ) : stacked ? (
+          // Too narrow to share a row: the title over the buttons, both clear of the seek strip.
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10, padding: '10px 16px 30px', minWidth: 0 }}>
             <Title media={media} size="sm" />
-            {wantEq && size.w > (volume ? 600 : 470) && (
-              <Equaliser
-                bars={18}
-                width={Math.min(160, Math.round(size.w * 0.18))}
-                playing={media.playing}
-                height={Math.max(18, Math.min(34, Math.round(size.h * 0.2)))}
-              />
-            )}
-            <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} />
+            <div style={{ display: 'flex', marginLeft: -5 }}>
+              <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 16, padding: '0 16px', minWidth: 0 }}>
+            {cover && <Cover src={art?.dataUrl ?? null} size={coverSize} />}
+            <Title media={media} size="sm" />
+            <Transport playing={media.playing} size={40} volume={volume} onVolume={opened.show} lean={lean} />
           </div>
         )}
         <SeekEdge elapsed={elapsed} duration={duration} canSeek={canSeek} onSeek={seek} />
@@ -593,19 +570,13 @@ export function NowPlaying({ props }: WidgetProps) {
     const beside = volume && size.w >= VOLUME_BESIDE_FROM;
     inner = (
       <Pane
-        label="NOW PLAYING"
-        right={<span className="cc-mini" style={{ fontSize: 9 }}>{media.player.toUpperCase()}</span>}
+        label="Now playing"
+        right={media.player}
       >
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', minWidth: 0 }}>
           {wantArt && <Cover src={art?.dataUrl ?? null} size={size.h > 300 ? 72 : 56} />}
           <Title media={media} size="md" />
         </div>
-
-        {wantEq && size.h > 250 && (
-          <div style={{ marginTop: 14 }}>
-            <Equaliser bars={36} playing={media.playing} height={26} />
-          </div>
-        )}
 
         <SeekBar elapsed={elapsed} duration={duration} canSeek={canSeek} onSeek={seek} />
 

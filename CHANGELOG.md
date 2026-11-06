@@ -9,6 +9,98 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-06
+
+### Added
+
+- **Tap an agent session to go to it.** Its window comes to the front on the display
+  it is on: the agent's desktop app, VS Code or the terminal it runs in. The session
+  waiting on you says **Go to**, and the row says for a moment what the tap did. The
+  desktop app comes forward as a whole, and you pick the session in its own list.
+  Ambient's agents line goes to the session it names. Windows only for now; on a
+  tablet a tap says to open it on the PC.
+- While agents wait on you, the tray's menu starts with up to three **Go to** items,
+  longest waiting first, with how long each has waited.
+
+### Changed
+
+- A session you have closed leaves the agents list, and no longer counts as waiting on
+  you, in the tile, the tray's icon and the main readout. Kehai reads which sessions
+  are open from the small file the agent keeps for each one; [Privacy](docs/privacy.md)
+  lists the four things it reads there.
+
+## [0.12.2] - 2026-11-05
+
+### Fixed
+
+- A widget's options sheet is as tall as what it holds. On a narrow sheet a setting's
+  switch goes under its description, a group's name stays on one line, and Arrange
+  this layout moves under the note beside it. A tile too wide to leave room beside the
+  sheet is no longer outlined around the sheet's edges.
+- Settings on a narrow window, such as a tablet on its end, shows its sections as a
+  column of icons, so each page keeps the width. Rows there wrap the same way as in the
+  sheets, and the token budget's choices read 1M, 5M, 10M and 20M.
+- Token usage's figure stays inside a narrow tile, and its 5-hour block label stays on
+  one line.
+- A short focus timer tile keeps its buttons inside the tile and names the sprint in
+  its title.
+- A narrow one-row Now playing tile puts the title above the buttons where it is tall
+  enough, and drops the previous-track button where it is not, so the title is never
+  cut to a letter.
+- The status tile lays two readings out side by side in a wide tile, each label over
+  its value.
+- In the display map, a small display's note and name stay inside it.
+- The small notes on the panel while you play or are away are readable.
+- The night dimming choices and the problems list under About are in sentence case,
+  as the rest of Kehai is.
+
+## [0.12.1] - 2026-11-05
+
+### Fixed
+
+- On a display bigger than the one it is laid out for, such as a main monitor, the
+  panel now scales up to fit, instead of leaving small text in large empty tiles. It
+  follows the window's size on any display. A remote panel's browser keeps its own
+  zoom.
+- A large clock on a wide tile no longer stacks the hours over the minutes and cuts
+  off the date, and it grows with its tile.
+- One-line tiles grow their text with their tile, and the main readout shows only as
+  many agent rows as fit.
+- The vitals tile no longer runs off the bottom on a panel scaled to 125%: it sizes
+  its values to the room each row has, and goes to two columns when that gives them
+  more. The token tile drops its subtitle when it is too short to hold it.
+
+## [0.12.0] - 2026-11-04
+
+### Changed
+
+- **The panel goes still while you play.** In a CS2 round it turns dark and quiet,
+  shows the score dimly and how many notifications and agents are waiting, and keeps
+  them for when you are out of the round: when you die, at half time, after the
+  match. A touch opens it sooner. The CS2 tile's options can leave the panel as it is
+  instead, or switch layouts for the match as before.
+- **The CS2 tile no longer copies the HUD.** Health, armour, money and the weapon are
+  gone, since the game already shows them where you are looking. In the gaps it shows
+  the score, who won each round and your match; between matches, **Tonight**: each
+  match, how it ended and how you did, and the time played. Set up now asks CS2 for
+  less; a copy set up with 0.11 can **Remove** and **Set up** again to write the
+  smaller file.
+- **A new look: obsidian glass.** Each tile is a rounded glass card over a charcoal page
+  with a faint glow; JetBrains Mono at a light weight, with the time, the main readout
+  and the score large and thin; plain sentences instead of tracked capitals; pill
+  buttons; a champagne accent, which lights the main readout while an agent waits on
+  you. The default theme is now called Obsidian, and the
+  dimmest text stays readable on every tile. The date reads in words, and the
+  sparklines are curves.
+
+### Removed
+
+- The Now playing equaliser.
+- The CS2 tile's lighting, the flash and smoke washes, and showing it full screen, so
+  the panel stays still in the middle of a round.
+- `lighting` in a game widget's file, which is now ignored. `match.still` says when
+  the player is in play.
+
 ## [0.11.0] - 2026-11-01
 
 ### Added
@@ -341,7 +433,11 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Purukitto/kehai/compare/v0.12.2...v0.13.0
+[0.12.2]: https://github.com/Purukitto/kehai/compare/v0.12.1...v0.12.2
+[0.12.1]: https://github.com/Purukitto/kehai/compare/v0.12.0...v0.12.1
+[0.12.0]: https://github.com/Purukitto/kehai/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Purukitto/kehai/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/Purukitto/kehai/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Purukitto/kehai/compare/v0.9.1...v0.9.2
