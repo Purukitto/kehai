@@ -6,6 +6,7 @@ use sysinfo::System;
 use tauri::AppHandle;
 
 use crate::bus;
+use crate::log;
 
 const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
 const INTERVAL: Duration = Duration::from_millis(1000);
@@ -22,7 +23,18 @@ pub struct MemPayload {
 
 pub fn spawn(app: AppHandle) {
     thread::spawn(move || {
-        let mut sys = System::new();
+        let mut sys = match System::new() {
+            Ok(sys) => sys,
+            Err(err) => {
+                log::problem(
+                    "poller.mem",
+                    "Could not read memory use.",
+                    Some("The memory widget stays empty."),
+                    err,
+                );
+                return;
+            }
+        };
 
         loop {
             sys.refresh_memory();

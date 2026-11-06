@@ -6,6 +6,7 @@ use sysinfo::Disks;
 use tauri::AppHandle;
 
 use crate::bus;
+use crate::log;
 
 /// Capacity moves slowly. Polling it at telemetry rates would be waste, so this
 /// deliberately runs slower than the interval the design sketched.
@@ -29,7 +30,18 @@ pub struct Volume {
 
 pub fn spawn(app: AppHandle) {
     thread::spawn(move || {
-        let mut disks = Disks::new_with_refreshed_list();
+        let mut disks = match Disks::new_with_refreshed_list() {
+            Ok(disks) => disks,
+            Err(err) => {
+                log::problem(
+                    "poller.disk",
+                    "Could not read the drives.",
+                    Some("The disk widget stays empty."),
+                    err,
+                );
+                return;
+            }
+        };
 
         loop {
             disks.refresh(true);

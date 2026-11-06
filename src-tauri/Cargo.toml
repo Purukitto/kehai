@@ -28,7 +28,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["tray-icon"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sysinfo = "0.39"
+sysinfo = "0.40"
 base64 = "0.23.1"
 # Already in the tree through Tauri. The focus timer needs the local date to
 # know when today ends.
