@@ -6,6 +6,7 @@ use sysinfo::Networks;
 use tauri::AppHandle;
 
 use crate::bus;
+use crate::log;
 
 const INTERVAL: Duration = Duration::from_millis(2000);
 
@@ -29,7 +30,18 @@ pub struct Interface {
 
 pub fn spawn(app: AppHandle) {
     thread::spawn(move || {
-        let mut networks = Networks::new_with_refreshed_list();
+        let mut networks = match Networks::new_with_refreshed_list() {
+            Ok(networks) => networks,
+            Err(err) => {
+                log::problem(
+                    "poller.net",
+                    "Could not read the network adapters.",
+                    Some("The network widget stays empty."),
+                    err,
+                );
+                return;
+            }
+        };
         let mut last = Instant::now();
 
         // The counters are deltas since the previous refresh, so the first
@@ -47,7 +59,7 @@ pub fn spawn(app: AppHandle) {
             let mut active: Vec<Interface> = networks
                 .iter()
                 .map(|(name, data)| Interface {
-                    name: name.clone(),
+                    name: name.to_string_lossy().into_owned(),
                     rx_bytes_per_sec: per_sec(data.received()),
                     tx_bytes_per_sec: per_sec(data.transmitted()),
                 })

@@ -438,10 +438,10 @@ fn build() -> Option<&'static str> {
 }
 
 fn os() -> String {
-    let name = sysinfo::System::long_os_version().unwrap_or_else(|| "Unknown OS".into());
+    let name = sysinfo::System::long_os_version().unwrap_or_else(|_| "Unknown OS".into());
     match sysinfo::System::kernel_version() {
-        Some(build) => format!("{name} (build {build})"),
-        None => name,
+        Ok(build) => format!("{name} (build {build})"),
+        Err(_) => name,
     }
 }
 

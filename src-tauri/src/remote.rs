@@ -237,6 +237,7 @@ fn save(path: &Path, key: &str) {
 /// say which PC it is showing, and so does the announcement on the network.
 fn host_name() -> String {
     sysinfo::System::host_name()
+        .ok()
         .map(|n| n.trim().to_string())
         .filter(|n| !n.is_empty())
         .unwrap_or_else(|| "Kehai".to_string())
@@ -290,15 +291,20 @@ fn escape(text: &str) -> String {
 /// first. Loopback and link-local addresses lead nowhere useful, and IPv6
 /// ones make for links nobody would type.
 fn addresses(port: u16, key: &str, name: &str) -> Vec<Address> {
-    let networks = sysinfo::Networks::new_with_refreshed_list();
+    // sysinfo refuses the list only where it cannot read adapters at all, and
+    // there no address could be found anyway.
+    let Ok(networks) = sysinfo::Networks::new_with_refreshed_list() else {
+        return Vec::new();
+    };
     let mut found: Vec<(bool, u8, Ipv4Addr, String)> = networks
         .iter()
         .flat_map(|(adapter, data)| {
+            let adapter = adapter.to_string_lossy().into_owned();
             data.ip_networks()
                 .iter()
                 .filter_map(move |net| match net.addr {
                     IpAddr::V4(v4) if !v4.is_loopback() && !v4.is_link_local() => {
-                        Some((virtual_adapter(adapter), rank(v4), v4, adapter.clone()))
+                        Some((virtual_adapter(&adapter), rank(v4), v4, adapter.clone()))
                     }
                     _ => None,
                 })

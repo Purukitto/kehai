@@ -24,8 +24,20 @@ const INTERVAL: Duration = Duration::from_millis(1000);
 
 pub fn spawn(app: AppHandle) {
     thread::spawn(move || {
-        let mut sys = System::new();
-        let mut components = Components::new_with_refreshed_list();
+        let mut sys = match System::new() {
+            Ok(sys) => sys,
+            Err(err) => {
+                log::problem(
+                    "poller.cpu",
+                    "Could not read the processor.",
+                    Some("The CPU widget stays empty."),
+                    err,
+                );
+                return;
+            }
+        };
+        // Without sensors there is still usage and clock to show.
+        let mut components = Components::new_with_refreshed_list().ok();
 
         // The first sample after construction is always zero: usage is measured
         // between refreshes, so prime it and wait out the minimum interval
@@ -39,15 +51,17 @@ pub fn spawn(app: AppHandle) {
             sys.refresh_cpu_all();
 
             let cpus = sys.cpus();
-            let threads: Vec<u32> = cpus.iter().map(|c| c.cpu_usage().round() as u32).collect();
+            let threads: Vec<u32> = cpus.iter().map(|c| c.usage().round() as u32).collect();
 
             let clock_ghz = cpus
                 .first()
                 .map(|c| c.frequency() as f32 / 1000.0)
                 .unwrap_or(0.0);
 
-            components.refresh(true);
-            let temp_c = cpu_temperature(&components);
+            let temp_c = components.as_mut().and_then(|components| {
+                components.refresh(true);
+                cpu_temperature(components)
+            });
 
             if !announced {
                 announced = true;
