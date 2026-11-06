@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-11-06
+
 ### Added
 
 - **The graphics card, beside the processor.** The main readout's Machine tab shows
@@ -453,7 +455,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/Purukitto/kehai/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Purukitto/kehai/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/Purukitto/kehai/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Purukitto/kehai/compare/v0.12.0...v0.12.1
