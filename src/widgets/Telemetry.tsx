@@ -2,7 +2,8 @@ import { bytes, rate, sparkPath } from '../core/format';
 import { useTileSize } from '../core/TileSize';
 import { useHistory } from '../core/useHistory';
 import { useTopic } from '../core/useTopic';
-import type { CpuPayload, DiskPayload, MemPayload, NetPayload } from '../core/payloads';
+import { gpuExtras, gpuHot, gpuModel, gpuTemp } from '../core/gpu';
+import type { CpuPayload, DiskPayload, GpuPayload, MemPayload, NetPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
@@ -33,8 +34,14 @@ export function Telemetry(_: WidgetProps) {
   const mem = useTopic<MemPayload>('telemetry:mem');
   const net = useTopic<NetPayload>('telemetry:net');
   const disk = useTopic<DiskPayload>('telemetry:disk');
+  const gpu = useTopic<GpuPayload>('telemetry:gpu');
+  const card = gpu?.available ? gpu : null;
 
   const cpuHistory = useHistory(cpu?.pct);
+  // The engine keeps a minute; until it has one, the line grows in from the right.
+  const gpuW = card ? (436 * Math.max(1, card.history.length - 1)) / 59 : 436;
+  const gpuPath = card ? sparkPath(card.history, Math.min(436, gpuW), 56, 100) : '';
+  const gpuMemPct = card && card.memTotalGib > 0 ? (card.memUsedGib / card.memTotalGib) * 100 : 0;
   const rxHistory = useHistory(net?.rxBytesPerSec);
   const txHistory = useHistory(net?.txBytesPerSec);
 
@@ -46,10 +53,12 @@ export function Telemetry(_: WidgetProps) {
   const memPct = mem && mem.totalGib > 0 ? (mem.usedGib / mem.totalGib) * 100 : 0;
 
   // Sections drop from the bottom as the tile shrinks, in the order the spec
-  // sheet set: disk first, then network, then the CPU history graph.
-  const showDisk = size.h > 520;
-  const showNet = size.h > 380;
-  const showGraph = size.h > 270;
+  // sheet set: disk first, then network, then the history graphs. A graphics
+  // card takes its own section under the processor, so the rest drop sooner.
+  const extra = card ? 130 : 0;
+  const showDisk = size.h > 520 + extra;
+  const showNet = size.h > 380 + extra;
+  const showGraph = size.h > 270 + extra;
 
   return (
     <Pane label="Machine" padded={false}>
@@ -96,6 +105,46 @@ export function Telemetry(_: WidgetProps) {
           </svg>
         )}
       </div>
+
+      {card && (
+        <Section label={'Graphics · ' + gpuModel(card.name)}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--cc-muted)', whiteSpace: 'nowrap' }}>
+              <b style={{ color: 'var(--cc-text)', fontWeight: 500 }}>{card.pct}%</b>
+              {' · '}
+              <span style={{ color: gpuHot(card) ? 'var(--cc-danger)' : card.tempC === null ? 'var(--cc-dim)' : 'var(--cc-muted)' }}>
+                {gpuTemp(card)}
+              </span>
+            </span>
+            <span className="cc-mini" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {gpuExtras(card)}
+            </span>
+          </div>
+          {showGraph && gpuPath && (
+            <svg
+              width="100%"
+              height="56"
+              viewBox="0 0 436 56"
+              preserveAspectRatio="none"
+              style={{ marginTop: 8, display: 'block', borderBottom: '1px solid var(--cc-line)' }}
+            >
+              <g transform={`translate(${436 - Math.min(436, gpuW)} 0)`}>
+                <path d={gpuPath + ` L${Math.min(436, gpuW)} 56 L0 56 Z`} fill="var(--cc-muted)" opacity="0.1" />
+                <path d={gpuPath} fill="none" stroke="var(--cc-muted)" strokeWidth="1.25" vectorEffect="non-scaling-stroke" />
+              </g>
+            </svg>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+            <span className="cc-mini">Memory</span>
+            <span className="cc-mini">
+              {card.memUsedGib.toFixed(1)} of {card.memTotalGib.toFixed(1)} GiB
+            </span>
+          </div>
+          <div style={{ display: 'flex', height: 4, marginTop: 4, borderRadius: 2, overflow: 'hidden', background: 'var(--cc-line)' }}>
+            <div style={{ width: `${gpuMemPct}%`, background: 'var(--cc-muted)' }} />
+          </div>
+        </Section>
+      )}
 
       <Section
         label="Memory"

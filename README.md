@@ -47,8 +47,8 @@ local, and stays out of the way.
     </td>
     <td width="50%" valign="top">
       <strong>The machine</strong><br>
-      CPU history and per-thread load, memory, network and disks, as a full pane or a
-      single status line.
+      CPU history and per-thread load, the graphics card's load, memory and
+      temperature, memory, network and disks, as a full pane or a single status line.
     </td>
   </tr>
   <tr>

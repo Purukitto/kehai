@@ -2024,6 +2024,7 @@ export function SettingsScreen({
             <div style={{ marginTop: 18 }}>
               <SourceRow label="Processor" topic="telemetry:cpu" desc="Usage, per-thread load and clock." />
               <SourceRow label="Memory" topic="telemetry:mem" desc="Physical and swap." />
+              <SourceRow label="Graphics" topic="telemetry:gpu" desc="The graphics card’s load, memory, temperature, fan and power." />
               <SourceRow label="Network" topic="telemetry:net" desc="Throughput per interface." />
               <SourceRow label="Disk" topic="telemetry:disk" desc="Volumes and capacity." />
               <SourceRow

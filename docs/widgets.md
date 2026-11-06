@@ -12,9 +12,9 @@
 
 | Widget | Shows | Reads |
 | --- | --- | --- |
-| **Main readout** `stage` | One large reading with tabs for tokens, agents, machine and focus. Moves to Agents while one waits on you | agent tokens, agent sessions, processor, memory, focus timer |
-| **Machine** `telemetry` | CPU history, memory, network, volumes | processor, memory, network, disk |
-| **Status strip** `vitals` | CPU, memory, network, unread and agents in a line | processor, memory, network, notifications, agent sessions |
+| **Main readout** `stage` | One large reading with tabs for tokens, agents, machine and focus. Moves to Agents while one waits on you | agent tokens, agent sessions, processor, graphics, memory, focus timer |
+| **Machine** `telemetry` | CPU history, the graphics card, memory, network, volumes | processor, graphics, memory, network, disk |
+| **Status strip** `vitals` | The readings you choose in a line: CPU, GPU, GPU temperature, memory, network, unread, agents | processor, graphics, memory, network, notifications, agent sessions |
 | **Agents** `agents` | Which agent sessions are working and which are waiting on you | agent sessions |
 | **Token usage** `quota` | Agent tokens in the current 5-hour block, and when it resets | agent tokens |
 | **Now playing** `media` | Track, transport, seek, cover art and this computer's volume | media session |
@@ -31,9 +31,35 @@ Which widgets are on screen is under **Settings → Layout → On this layout**.
 
 A widget's options open from its tile: hold it, or right-click it. **Options** under
 Settings → Widgets opens the same ones. Each group of options says where it applies:
-album art is kept with one Now playing tile, the main readout following attention is
-for every layout, and the Notifications rules are for this computer and every remote
-panel.
+album art, the status strip's readings and the main readout's tabs are kept with one
+tile, the main readout following attention and the graphics card are for every
+layout, and the Notifications rules are for this computer and every remote panel.
+Changing a preset's tile saves a copy of it under Yours.
+
+### The machine and the graphics card
+
+The main readout's Machine tab shows the processor and, on a PC with a graphics card,
+the card beside it: each with its load, temperature, a sentence and a meter, then load
+per thread for the processor and the last minute of load for the card. The Machine
+tile gives the card a section of its own, and the status strip has **GPU** and
+**GPU temp** readings.
+
+A card's load is its busiest engine's — 3D, video, compute or copy — as Task Manager
+shows it, so it can read lower than a vendor's tool that measures how long the card was
+busy at all. Its memory is the card's own; integrated graphics, which has almost none,
+counts the system memory it shares. Temperature, fan speed and power come from the
+card's driver, and turn up only where the driver reports them. Temperature turns red at
+the warning point the driver gives, and on a card that gives none it is never coloured.
+Load is never coloured: a card at 100% in a game is doing its job.
+
+With more than one card, Kehai shows the one with the most memory of its own. Where two
+or more report, the strip's, the main readout's and the Machine tile's options each
+offer **Graphics card**, one setting for the whole panel.
+
+The status strip shows the readings its options switch on, in a fixed order. In a
+single line it shrinks its values until they all fit, and leaves out whole any that
+still do not. A reading this PC can't give leaves the strip: both GPU readings without
+a card, and GPU temp on a card whose driver reports no temperature.
 
 ### Notifications
 
@@ -203,6 +229,8 @@ only what the game already shows you.
 | --- | --- | --- | --- |
 | CPU, memory, network, disk | via `sysinfo` | via `sysinfo` | via `sysinfo` |
 | CPU package temperature | usually unavailable — [see below](#why-cpu-temperature-is-usually-missing-on-windows) | label varies | label varies |
+| Graphics card load and memory | the counters Task Manager reads, with the cards listed by DXGI | not wired | not wired |
+| Graphics card temperature, fan and power | from the card's driver, where it reports them (Windows 10 2004 or later) | not wired | not wired |
 | Media session, transport and seek | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
 | System volume | the default output, as the volume keys turn it | not wired | not wired |
 | Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |

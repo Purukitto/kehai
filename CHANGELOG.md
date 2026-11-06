@@ -9,6 +9,26 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- **The graphics card, beside the processor.** The main readout's Machine tab shows
+  the card's load, temperature and memory next to the processor's, with the last
+  minute of its load. The Machine tile has a Graphics section, and the status strip
+  can show **GPU** and **GPU temp**. Temperature, fan and power come from the card's
+  driver where it reports them, and the temperature turns red at the driver's own
+  warning point. Windows only for now.
+- The status strip's readings and the main readout's tabs are chosen in their options:
+  hold the tile, or right-click it. On a preset, a change saves a copy under Yours.
+- On a PC with more than one graphics card, the same options choose which card the
+  readings follow. Until then it is the one with the most memory of its own.
+
+### Changed
+
+- The presets' status strips show the graphics card. Where a strip has no room for
+  more readings, GPU takes the place of Memory, which the Machine tab shows.
+- A status strip in a single line shrinks its values until every reading fits, and
+  leaves out whole any that still don't, instead of cutting the last one off.
+
 ## [0.13.0] - 2026-11-06
 
 ### Added

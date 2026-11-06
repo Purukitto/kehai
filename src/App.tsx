@@ -17,6 +17,7 @@ import { DIM, useDimPreview, useNight } from './core/night';
 import type {
   DisplaysPayload,
   FlowCommand,
+  GpuCommand,
   LogCommand,
   LogContext,
   LogPayload,
@@ -347,6 +348,13 @@ export default function App() {
       awayAfterSec: awayAfterMin === null ? null : awayAfterMin * 60,
     });
   }, [awayAfterMin]);
+
+  // And which graphics card to show, where the PC has more than one.
+  const gpuCard = settings.gpuCard;
+  useEffect(() => {
+    if (REMOTE) return;
+    bus.publish<GpuCommand>('gpu:command', 'settings', { action: 'pick', card: gpuCard });
+  }, [gpuCard]);
 
   // Errors in the panel's own page go to the engine's log, so a release build
   // keeps them. A remote panel's stay on the device it runs on.

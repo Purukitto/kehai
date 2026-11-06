@@ -13,6 +13,48 @@ export interface MemPayload {
   swapTotalGib: number;
 }
 
+/**
+ * The graphics card Kehai picked: the one with the most memory of its own that
+ * is not a software renderer. Load and memory come from the counters Task
+ * Manager reads; the sensors from what the driver reports, so a card without
+ * them leaves those fields null rather than zero.
+ */
+export interface GpuPayload {
+  /** False where no card reports, or on a platform Kehai can't read yet. */
+  available: boolean;
+  name: string;
+  /** The busiest engine's load, as Task Manager shows it. */
+  pct: number;
+  /** What that engine does: 3d, compute, video, copy. */
+  engine: string;
+  memUsedGib: number;
+  memTotalGib: number;
+  tempC: number | null;
+  /** The driver's own warning point. Null when it gives none: never guessed. */
+  warnC: number | null;
+  fanRpm: number | null;
+  /** Of the card's power limit. */
+  powerPct: number | null;
+  /** Load once a second, the last minute, oldest first. */
+  history: number[];
+  /** The id of the card shown. */
+  card: string;
+  /** Every card that isn't a software renderer, for the choice. */
+  cards: GpuCard[];
+}
+
+export interface GpuCard {
+  /** Vendor, device and subsystem: the same after a restart. */
+  id: string;
+  name: string;
+}
+
+/**
+ * Renderer → engine on `gpu:command`. Mirrors `Command` in `gpu.rs`. Null for
+ * the card Kehai picks itself.
+ */
+export type GpuCommand = { action: 'pick'; card: string | null };
+
 export interface NetInterface {
   name: string;
   rxBytesPerSec: number;

@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { p2 } from '../core/format';
+import { gpuModel } from '../core/gpu';
 import { withTileProp } from '../core/layout';
-import type { NotifyPayload, NotifyRemote, NotifyRule } from '../core/payloads';
+import type { GpuPayload, NotifyPayload, NotifyRemote, NotifyRule } from '../core/payloads';
 import { isPreset, useSettings } from '../core/settings';
 import type { OptionsProps } from '../core/types';
 import { useTopic } from '../core/useTopic';
 import { useWindowShape } from '../core/useWindowShape';
 import { Group, Row, Seg } from '../settings/controls';
+import { STAGE_TABS, TAB_NAMES } from './Stage';
+import { VITALS_DEFAULT, VITALS_NAMES, VITALS_READINGS } from './Vitals';
 
 const RULE_NAME: Record<NotifyRule, string> = { show: 'Show', name: 'Name only', hide: 'Hide' };
 const REMOTE_NAME: Record<NotifyRemote, string> = { same: 'Same as here', name: 'Name only', nothing: 'Nothing' };
@@ -141,10 +144,159 @@ function MediaOptions({ tile }: OptionsProps) {
   );
 }
 
-function StageOptions(_: OptionsProps) {
+/**
+ * A list kept with one tile, switched item by item: the strip's readings,
+ * Stage's tabs. Items stay in the widget's own order whatever order they were
+ * switched on in, and the last one can't be switched off.
+ */
+function TileList({
+  tile,
+  widget,
+  propKey,
+  all,
+  fallback,
+  names,
+  descs,
+}: {
+  tile: number;
+  widget: string;
+  propKey: string;
+  all: readonly string[];
+  fallback: string[];
+  names: Record<string, string>;
+  descs: Record<string, string>;
+}) {
+  const { settings, layout, editArrangement } = useSettings();
+  const { shape } = useWindowShape();
+  const t = layout.shapes[shape].tiles[tile];
+  if (t?.widget !== widget) return null;
+  const on = new Set((t.props?.[propKey] as string[] | undefined) ?? fallback);
+  const flip = (key: string, want: boolean) => {
+    const next = all.filter((k) => (k === key ? want : on.has(k)));
+    if (next.length === 0) return;
+    editArrangement(settings.layoutId, shape, (a) => withTileProp(a, tile, propKey, next));
+  };
+  return (
+    <>
+      <Group label="This tile" note={`On ${layout.name} only`} />
+      {isPreset(settings.layoutId) && (
+        <div className="cc-mini" style={{ marginBottom: 6, lineHeight: 1.6 }}>
+          {layout.name} is a preset, so a change here saves a copy of it under Yours.
+        </div>
+      )}
+      {all.map((key) => (
+        <Row key={key} label={names[key] ?? key} desc={descs[key]}>
+          <Seg options={['Off', 'On']} value={on.has(key) ? 'On' : 'Off'} onPick={(v) => flip(key, v === 'On')} />
+        </Row>
+      ))}
+    </>
+  );
+}
+
+function NotOnLayout({ name }: { name: string }) {
+  return (
+    <div style={{ padding: '24px 0', fontSize: 13, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
+      {name} is not on this layout. Its options are kept with each tile, so hold the tile once it is.
+    </div>
+  );
+}
+
+/** Which readings this strip shows. */
+function VitalsOptions({ tile }: OptionsProps) {
+  const gpu = useTopic<GpuPayload>('telemetry:gpu');
+  const noCard = gpu?.available === false ? 'No graphics card reports on this PC, so it stays hidden.' : undefined;
+  const noSensor = gpu?.available === true && gpu.tempC === null ? 'This card’s driver reports no temperature, so it stays hidden.' : undefined;
+  if (tile === null) return <NotOnLayout name="The status strip" />;
+  return (
+    <>
+      <TileList
+        tile={tile}
+        widget="vitals"
+        propKey="show"
+        all={VITALS_READINGS}
+        fallback={VITALS_DEFAULT}
+        names={VITALS_NAMES}
+        descs={{
+          cpu: 'The processor’s load.',
+          gpu: noCard ?? 'The graphics card’s load, on its busiest engine.',
+          gputemp: noCard ?? noSensor ?? 'Turns red at the warning point the card’s driver gives.',
+          mem: 'Memory in use.',
+          net: 'Download speed.',
+          unread: 'Notifications waiting.',
+          agents: 'Agent sessions. Lit while one waits on you.',
+        }}
+      />
+      <GpuCardChoice group />
+    </>
+  );
+}
+
+/**
+ * Which graphics card the readings follow, on a PC where more than one
+ * reports. One setting for every layout: the card is the PC's, not the
+ * tile's. Nothing at all with a single card.
+ */
+function GpuCardChoice({ group }: { group: boolean }) {
+  const gpu = useTopic<GpuPayload>('telemetry:gpu');
+  const { settings, setGpuCard } = useSettings();
+  const cards = gpu?.available ? gpu.cards : [];
+  if (cards.length < 2) return null;
+  // Two of the same model are told apart by their place in the list.
+  const names = cards.map((c, i) => {
+    const model = gpuModel(c.name);
+    return cards.filter((d) => gpuModel(d.name) === model).length > 1 ? `${model} ${i + 1}` : model;
+  });
+  const chosen = cards.findIndex((c) => c.id === settings.gpuCard);
+  return (
+    <>
+      {group && <Group label="Every layout" note="One setting for the whole panel" />}
+      <Row
+        label="Graphics card"
+        desc="Which card the GPU readings follow. Automatic picks the one with the most memory of its own."
+      >
+        <Seg
+          options={[AUTOMATIC, ...names]}
+          value={chosen < 0 ? AUTOMATIC : names[chosen]}
+          onPick={(v) => setGpuCard(v === AUTOMATIC ? null : (cards[names.indexOf(v)]?.id ?? null))}
+        />
+      </Row>
+    </>
+  );
+}
+
+const AUTOMATIC = 'Automatic';
+
+/** The Machine tile: only the card, where there is a choice. */
+function TelemetryOptions(_: OptionsProps) {
+  const gpu = useTopic<GpuPayload>('telemetry:gpu');
+  if (gpu?.available && gpu.cards.length > 1) return <GpuCardChoice group />;
+  return (
+    <div style={{ padding: '24px 0', fontSize: 13, lineHeight: 1.6, color: 'var(--cc-muted)' }}>
+      Nothing to set here. On a PC with two graphics cards, this is where you choose the one it shows.
+    </div>
+  );
+}
+
+function StageOptions({ tile }: OptionsProps) {
   const { settings, setFollowAttention } = useSettings();
   return (
     <>
+      {tile !== null && (
+        <TileList
+          tile={tile}
+          widget="stage"
+          propKey="tabs"
+          all={STAGE_TABS}
+          fallback={[...STAGE_TABS]}
+          names={TAB_NAMES}
+          descs={{
+            quota: 'Agent tokens in the 5-hour block.',
+            agents: 'Agent sessions, and which wait on you.',
+            machine: 'The processor, and the graphics card beside it when the PC has one.',
+            sprint: 'The focus timer.',
+          }}
+        />
+      )}
       <Group label="Every layout" note="One setting for the whole panel" />
       <Row
         label="Follows attention"
@@ -156,6 +308,7 @@ function StageOptions(_: OptionsProps) {
           onPick={(v) => setFollowAttention(v === 'On')}
         />
       </Row>
+      <GpuCardChoice group={false} />
     </>
   );
 }
@@ -165,4 +318,6 @@ export const OPTIONS = {
   media: MediaOptions,
   notify: NotifyOptions,
   stage: StageOptions,
+  telemetry: TelemetryOptions,
+  vitals: VitalsOptions,
 };

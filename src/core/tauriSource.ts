@@ -22,6 +22,7 @@ export function isTauri(): boolean {
 export const ENGINE_TOPICS = [
   'telemetry:cpu',
   'telemetry:mem',
+  'telemetry:gpu',
   'telemetry:net',
   'telemetry:disk',
   'flow:pomodoro',
@@ -55,6 +56,7 @@ export const COMMAND_TOPICS = [
   'remote:command',
   'display:command',
   'presence:command',
+  'gpu:command',
   'window:command',
   'log:command',
   'log:context',
