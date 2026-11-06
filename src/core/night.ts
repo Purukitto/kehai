@@ -5,7 +5,7 @@ import type { DimLevel, NightSettings } from './settings';
 /** How bright each level leaves what Kehai draws. */
 export const DIM: Record<DimLevel, number> = { little: 0.7, half: 0.5, lot: 0.3 };
 
-export const DIM_NAME: Record<DimLevel, string> = { little: 'A LITTLE', half: 'HALF', lot: 'A LOT' };
+export const DIM_NAME: Record<DimLevel, string> = { little: 'A little', half: 'Half', lot: 'A lot' };
 
 /** 1320 → 22:00. */
 export const hhmm = (min: number): string => p2(Math.floor(min / 60)) + ':' + p2(min % 60);

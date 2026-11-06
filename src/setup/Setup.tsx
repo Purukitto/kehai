@@ -459,7 +459,17 @@ function PresetCard({ layout, shape, chosen, suggested, isEmpty, onPick }: { lay
                   minHeight: 0,
                 }}
               >
-                <span style={{ fontSize: 8, padding: '0 4px', textAlign: 'center', lineHeight: 1.3, color: hatched ? 'var(--cc-muted)' : chosen ? 'var(--cc-text)' : 'var(--cc-muted)' }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    padding: '0 4px',
+                    maxWidth: '100%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                    color: hatched ? 'var(--cc-muted)' : chosen ? 'var(--cc-text)' : 'var(--cc-muted)',
+                  }}
+                >
                   {registry[t.widget]?.name ?? t.widget}
                 </span>
               </div>

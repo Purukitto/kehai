@@ -103,6 +103,8 @@ const ROW_H = 48;
 const LINE_BELOW = 120;
 /** The header and the footer, which the list fits between. */
 const CHROME_H = 28 * 2;
+/** Room between the tile's title and its first session. */
+const LIST_TOP = 4;
 
 /**
  * Now, re-read on the clock's tick. The engine only sends a change of state,
@@ -171,11 +173,13 @@ const ELLIPSIS: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', 
 export function AgentRow({
   session,
   now,
+  divider = true,
   said,
   onJump,
 }: {
   session: AgentSession;
   now: number;
+  divider?: boolean;
   said?: Said;
   onJump?: (session: AgentSession) => void;
 }) {
@@ -204,7 +208,7 @@ export function AgentRow({
         alignItems: 'center',
         gap: 12,
         padding: '0 16px',
-        borderTop: '1px solid var(--cc-line)',
+        borderTop: divider ? '1px solid var(--cc-line)' : '1px solid transparent',
         minWidth: 0,
         cursor: tappable ? 'pointer' : undefined,
         background: pressed ? 'var(--cc-pane-2)' : undefined,
@@ -336,7 +340,7 @@ export function Agents({ props }: WidgetProps) {
     );
   }
 
-  const fit = Math.max(1, Math.floor((size.h - CHROME_H) / ROW_H));
+  const fit = Math.max(1, Math.floor((size.h - CHROME_H - LIST_TOP) / ROW_H));
   const shown = agents.sessions.slice(0, fit);
   const hidden = agents.sessions.length - shown.length;
 
@@ -346,14 +350,15 @@ export function Agents({ props }: WidgetProps) {
       padded={false}
       right={<span style={{ color: head.color }}>{head.text}</span>}
     >
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/* Lines only between sessions: the title is not one of them. */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', paddingTop: LIST_TOP }}>
         {shown.length === 0 ? (
           <div style={{ margin: 'auto', textAlign: 'center' }}>
             <span className="cc-mini">No sessions in the last hour</span>
           </div>
         ) : (
-          shown.map((session) => (
-            <AgentRow key={session.id} session={session} now={now} said={said[session.id]} onJump={jump} />
+          shown.map((session, i) => (
+            <AgentRow key={session.id} session={session} now={now} divider={i > 0} said={said[session.id]} onJump={jump} />
           ))
         )}
       </div>

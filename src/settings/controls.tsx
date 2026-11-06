@@ -9,17 +9,21 @@ export function Row({
   desc?: React.ReactNode;
   children?: React.ReactNode;
 }) {
+  // Where the control would squeeze the words into a column a few words wide,
+  // it goes under them instead, on the right, and the words keep the row.
   return (
     <div
       style={{
         display: 'flex',
         alignItems: 'center',
-        gap: 24,
+        flexWrap: 'wrap',
+        columnGap: 24,
+        rowGap: 10,
         padding: '12px 0',
         borderBottom: '1px solid var(--cc-line)',
       }}
     >
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: `1 1 ${TEXT_MIN}px`, minWidth: 0 }}>
         <div style={{ fontSize: 14 }}>{label}</div>
         {desc && (
           <div style={{ marginTop: 4, fontSize: 12, lineHeight: 1.5, color: 'var(--cc-muted)', maxWidth: '68ch' }}>
@@ -27,10 +31,17 @@ export function Row({
           </div>
         )}
       </div>
-      {children}
+      {children && (
+        <div style={{ flex: 'none', marginLeft: 'auto', maxWidth: '100%', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 12 }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }
+
+/** The narrowest a row's words get before its control moves under them. */
+const TEXT_MIN = 240;
 
 /** One of a few, side by side in a single control, the chosen one raised. */
 export function Seg<T extends string | number>({
@@ -64,9 +75,12 @@ export function Seg<T extends string | number>({
 
 export function Group({ label, note }: { label: string; note: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginTop: 32, marginBottom: 4 }}>
-      <span style={{ fontSize: 14, fontWeight: 600 }}>{label}</span>
-      <span className="cc-mini">{note}</span>
+    // The name stays on one line, and its note goes under it when the two don't fit side by side.
+    <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', columnGap: 12, rowGap: 2, marginTop: 32, marginBottom: 4 }}>
+      <span style={{ fontSize: 14, fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
+      <span className="cc-mini" style={{ flex: '0 1 auto', minWidth: 0 }}>
+        {note}
+      </span>
     </div>
   );
 }
