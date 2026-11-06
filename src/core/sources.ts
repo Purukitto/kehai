@@ -10,6 +10,7 @@ export const SOURCES = {
   clock: { name: 'Clock', topics: ['os:clock'] },
   cpu: { name: 'Processor', topics: ['telemetry:cpu'] },
   memory: { name: 'Memory', topics: ['telemetry:mem'] },
+  gpu: { name: 'Graphics', topics: ['telemetry:gpu'] },
   network: { name: 'Network', topics: ['telemetry:net'] },
   disk: { name: 'Disk', topics: ['telemetry:disk'] },
   focus: { name: 'Focus timer', topics: ['flow:pomodoro'] },

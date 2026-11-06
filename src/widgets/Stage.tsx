@@ -5,7 +5,8 @@ import { useNav } from '../core/nav';
 import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
-import type { AgentsPayload, CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
+import { gpuExtras, gpuHot, gpuModel } from '../core/gpu';
+import type { AgentsPayload, CpuPayload, GpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { AgentRow, agentSentence, useJump, useNow, waitingOnYou } from './Agents';
 import { Meter } from './chrome';
@@ -13,7 +14,10 @@ import { budgetPct, budgetStatus, totalTokens } from './Quota';
 import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } from './Sprint';
 
 /** What each tab is called on screen. The ids are what layouts store. */
-const TAB_NAMES: Record<string, string> = {
+/** Every tab Stage can have, in the order it shows them. */
+export const STAGE_TABS = ['quota', 'agents', 'machine', 'sprint'] as const;
+
+export const TAB_NAMES: Record<string, string> = {
   quota: 'Tokens',
   agents: 'Agents',
   machine: 'Machine',
@@ -34,6 +38,13 @@ interface Hero {
   meter: { pct: number; label: string; note?: string };
   color: string;
   series: number[];
+  /**
+   * The line's top. A percentage charts on its whole scale, so a card idling
+   * at 2% draws a flat line rather than a busy one; a count scales to its peak.
+   */
+  max?: number;
+  /** How many points a full chart holds, for a series that starts empty. */
+  span?: number;
   /** One bar per item, for things that are side by side rather than over time. */
   bars?: boolean;
   chartLabel?: string;
@@ -44,7 +55,7 @@ interface Hero {
 }
 
 export function Stage({ props }: WidgetProps) {
-  const tabs = ((props.tabs as string[] | undefined) ?? ['quota', 'agents', 'machine', 'sprint']).filter(Boolean);
+  const tabs = ((props.tabs as string[] | undefined) ?? [...STAGE_TABS]).filter(Boolean);
   const { settings, setStageTab } = useSettings();
   const { openSettings } = useNav();
 
@@ -52,6 +63,7 @@ export function Stage({ props }: WidgetProps) {
   const agents = useTopic<AgentsPayload>('dev:agents');
   const cpu = useTopic<CpuPayload>('telemetry:cpu');
   const mem = useTopic<MemPayload>('telemetry:mem');
+  const gpu = useTopic<GpuPayload>('telemetry:gpu');
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
   const now = useNow();
   const size = useTileSize();
@@ -94,6 +106,9 @@ export function Stage({ props }: WidgetProps) {
   const rowsFit = Math.max(0, Math.min(3, Math.floor((size.h - 229 - valueSize * 0.9) / 48)));
 
   let hero: Hero | null = null;
+  // The Machine tab with a graphics card: the processor and the card side by
+  // side, each with its own value, temperature, meter and chart.
+  let pair: [Hero, Hero] | null = null;
 
   if (tab === 'quota' && quota?.available) {
     const pct = budgetPct(quota, settings.budgetTokens);
@@ -191,6 +206,35 @@ export function Stage({ props }: WidgetProps) {
       axisA: 'Thread 0',
       axisB: 'Thread ' + (cpu.threads.length - 1),
     };
+    if (gpu?.available) {
+      const memPct = gpu.memTotalGib > 0 ? Math.round((gpu.memUsedGib / gpu.memTotalGib) * 100) : 0;
+      const extras = gpuExtras(gpu, ', ');
+      const cpuHero: Hero = {
+        ...hero,
+        sub: cpu.clockGhz.toFixed(2) + ' GHz.' + (mem ? ' Memory ' + mem.usedGib.toFixed(1) + ' of ' + mem.totalGib.toFixed(1) + ' GiB.' : ''),
+      };
+      pair = [
+        cpuHero,
+        {
+          label: 'Graphics · ' + gpuModel(gpu.name),
+          value: gpu.pct + '%',
+          status: (
+            <span style={{ fontSize: 20, color: gpuHot(gpu) ? 'var(--cc-danger)' : 'var(--cc-muted)' }}>
+              {gpu.tempC === null ? 'no temperature sensor' : Math.round(gpu.tempC) + '°C'}
+            </span>
+          ),
+          sub: 'Memory ' + gpu.memUsedGib.toFixed(1) + ' of ' + gpu.memTotalGib.toFixed(1) + ' GiB.' + (extras ? ' ' + extras[0].toUpperCase() + extras.slice(1) + '.' : ''),
+          meter: { pct: gpu.pct, label: 'Graphics load', note: 'memory ' + memPct + '%' },
+          color: 'var(--cc-text)',
+          series: gpu.history,
+          max: 100,
+          span: 60,
+          chartLabel: 'Load, the last minute',
+          axisA: '1 min ago',
+          axisB: 'Now',
+        },
+      ];
+    }
   } else if (tab === 'sprint' && sprint) {
     const elapsedSec = Math.max(0, sprint.lengthSec - sprint.remainingSec);
     hero = {
@@ -214,12 +258,13 @@ export function Stage({ props }: WidgetProps) {
 
   // The chart takes what is left under the value, sentence and meter, and stays
   // out when that is too little to read.
-  const chartH = Math.min(132, Math.round(size.h - (36 + 56 + 24 + valueSize * 0.9 + 37 + 60 + 66)));
-  // A bar or a line in the text colour would outshout the value above it.
-  const quiet = hero && hero.color !== 'var(--cc-text)' ? hero.color : 'var(--cc-accent)';
-  const charted = chartH >= 44;
-  const path = hero && charted && !hero.bars && hero.series.length > 1 ? sparkPath(hero.series, 1000, chartH) : '';
-  const peak = hero?.bars ? Math.max(100, ...hero.series) : 0;
+  const chartFor = (v: number) => Math.min(132, Math.round(size.h - (36 + 56 + 24 + v * 0.9 + 37 + 60 + 66)));
+  const chartH = chartFor(valueSize);
+  // A pair shares the width, so each value is sized to its column. Too narrow
+  // for two columns, the pair stacks and leaves its charts out.
+  const stacked = size.w < 560;
+  const colW = stacked ? size.w - 80 : (size.w - 80 - 48) / 2;
+  const pairValueSize = Math.round(Math.max(40, Math.min(132, colW * 0.24, size.h * (stacked ? 0.14 : 0.28))));
 
   return (
     <div
@@ -269,7 +314,15 @@ export function Stage({ props }: WidgetProps) {
       </div>
 
       <div style={{ flex: 1, minHeight: 0, padding: '32px 40px 24px', display: 'flex', flexDirection: 'column' }}>
-        {!hero ? (
+        {pair ? (
+          <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: stacked ? 'column' : 'row', gap: stacked ? 32 : 48 }}>
+            {pair.map((h, i) => (
+              <div key={i} style={{ flex: stacked ? 'none' : 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+                <HeroBody hero={h} valueSize={pairValueSize} chartH={stacked ? 0 : chartFor(pairValueSize)} fillId={'cc-stage-fill-' + i} />
+              </div>
+            ))}
+          </div>
+        ) : !hero ? (
           <div style={{ margin: 'auto', textAlign: 'center' }}>
             <div className="cc-label">{TAB_NAMES[tab] ?? tab}</div>
             <div style={{ fontSize: 30, fontWeight: 300, color: 'var(--cc-line-2)', marginTop: 8 }}>--</div>
@@ -278,82 +331,98 @@ export function Stage({ props }: WidgetProps) {
             </div>
           </div>
         ) : (
-          <>
-            <span className="cc-label" style={{ fontSize: 14 }}>{hero.label}</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, marginTop: 8, flexWrap: 'wrap' }}>
-              <span
-                className="cc-display"
-                style={{
-                  fontSize: valueSize,
-                  lineHeight: 0.9,
-                  color: hero.color === 'var(--cc-text)' ? 'var(--cc-text)' : hero.color,
-                }}
-              >
-                {hero.value}
-              </span>
-              {typeof hero.status === 'string' ? (
-                <span style={{ fontSize: 20, color: hero.color === 'var(--cc-text)' ? 'var(--cc-muted)' : hero.color }}>{hero.status}</span>
-              ) : (
-                hero.status
-              )}
-            </div>
-            <span style={{ fontSize: 16, color: 'var(--cc-muted)', marginTop: 16, maxWidth: '68ch' }}>{hero.sub}</span>
-            <div style={{ marginTop: 24 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
-                <span className="cc-label">{hero.meter.label}</span>
-                {hero.meter.note && (
-                  <span className="cc-mini" style={{ whiteSpace: 'nowrap' }}>
-                    {hero.meter.note}
-                  </span>
-                )}
-              </div>
-              <Meter pct={hero.meter.pct} color={quiet ?? 'var(--cc-muted)'} height={6} />
-            </div>
-            <div style={{ flex: 1 }} />
-            {(path || (hero.bars && charted)) && (
-              <>
-                {hero.chartLabel && (
-                  <span className="cc-label" style={{ marginTop: 24, marginBottom: 8 }}>
-                    {hero.chartLabel}
-                  </span>
-                )}
-                {hero.bars ? (
-                  <div style={{ height: chartH, display: 'flex', alignItems: 'flex-end', gap: 2 }}>
-                    {hero.series.map((v, i) => (
-                      <div
-                        key={i}
-                        style={{ flex: 1, height: `${Math.max(2, (v / peak) * 100)}%`, background: v > 82 ? 'var(--cc-danger)' : 'var(--cc-line-2)', borderRadius: 1 }}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <svg
-                    width="100%"
-                    height={chartH}
-                    viewBox={`0 0 1000 ${chartH}`}
-                    preserveAspectRatio="none"
-                    style={{ display: 'block' }}
-                  >
-                    <defs>
-                      <linearGradient id="cc-stage-fill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0" stopColor={quiet ?? 'var(--cc-accent)'} stopOpacity="0.16" />
-                        <stop offset="1" stopColor={quiet ?? 'var(--cc-accent)'} stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <path d={path + ` L1000 ${chartH} L0 ${chartH} Z`} fill="url(#cc-stage-fill)" />
-                    <path d={path} fill="none" stroke={quiet ?? 'var(--cc-accent)'} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
-                  </svg>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-                  <span className="cc-mini">{hero.axisA}</span>
-                  <span className="cc-mini">{hero.axisB}</span>
-                </div>
-              </>
-            )}
-            {hero.controls}
-          </>
+          <HeroBody hero={hero} valueSize={valueSize} chartH={chartH} fillId="cc-stage-fill" />
         )}
       </div>
     </div>
+  );
+}
+
+/** One reading's value, sentence, meter and chart, under the tabs. */
+function HeroBody({ hero, valueSize, chartH, fillId }: { hero: Hero; valueSize: number; chartH: number; fillId: string }) {
+  // A bar or a line in the text colour would outshout the value above it.
+  const quiet = hero.color !== 'var(--cc-text)' ? hero.color : 'var(--cc-accent)';
+  const charted = chartH >= 44;
+  // A series still filling its span grows in from the right, at the pace it
+  // will keep, rather than stretching a few seconds across the whole chart.
+  const n = hero.series.length;
+  const lineW = hero.span && n < hero.span ? (1000 * Math.max(1, n - 1)) / (hero.span - 1) : 1000;
+  const lineX = 1000 - lineW;
+  const path = charted && !hero.bars && n > 1 ? sparkPath(hero.series, lineW, chartH, hero.max) : '';
+  const peak = hero.bars ? Math.max(100, ...hero.series) : 0;
+
+  return (
+    <>
+      <span className="cc-label" style={{ fontSize: 14, flex: 'none', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {hero.label}
+      </span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, marginTop: 8, flexWrap: 'wrap' }}>
+        <span
+          className="cc-display"
+          style={{
+            fontSize: valueSize,
+            lineHeight: 0.9,
+            color: hero.color === 'var(--cc-text)' ? 'var(--cc-text)' : hero.color,
+          }}
+        >
+          {hero.value}
+        </span>
+        {typeof hero.status === 'string' ? (
+          <span style={{ fontSize: 20, color: hero.color === 'var(--cc-text)' ? 'var(--cc-muted)' : hero.color }}>{hero.status}</span>
+        ) : (
+          hero.status
+        )}
+      </div>
+      <span style={{ fontSize: 16, color: 'var(--cc-muted)', marginTop: 16, maxWidth: '68ch' }}>{hero.sub}</span>
+      <div style={{ marginTop: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+          <span className="cc-label">{hero.meter.label}</span>
+          {hero.meter.note && (
+            <span className="cc-mini" style={{ whiteSpace: 'nowrap' }}>
+              {hero.meter.note}
+            </span>
+          )}
+        </div>
+        <Meter pct={hero.meter.pct} color={quiet} height={6} />
+      </div>
+      <div style={{ flex: 1 }} />
+      {(path || (hero.bars && charted)) && (
+        <>
+          {hero.chartLabel && (
+            <span className="cc-label" style={{ marginTop: 24, marginBottom: 8 }}>
+              {hero.chartLabel}
+            </span>
+          )}
+          {hero.bars ? (
+            <div style={{ height: chartH, display: 'flex', alignItems: 'flex-end', gap: 2 }}>
+              {hero.series.map((v, i) => (
+                <div
+                  key={i}
+                  style={{ flex: 1, height: `${Math.max(2, (v / peak) * 100)}%`, background: v > 82 ? 'var(--cc-danger)' : 'var(--cc-line-2)', borderRadius: 1 }}
+                />
+              ))}
+            </div>
+          ) : (
+            <svg width="100%" height={chartH} viewBox={`0 0 1000 ${chartH}`} preserveAspectRatio="none" style={{ display: 'block' }}>
+              <defs>
+                <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor={quiet} stopOpacity="0.16" />
+                  <stop offset="1" stopColor={quiet} stopOpacity="0" />
+                </linearGradient>
+              </defs>
+              <g transform={`translate(${lineX} 0)`}>
+                <path d={path + ` L${lineW} ${chartH} L0 ${chartH} Z`} fill={`url(#${fillId})`} />
+                <path d={path} fill="none" stroke={quiet} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+              </g>
+            </svg>
+          )}
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
+            <span className="cc-mini">{hero.axisA}</span>
+            <span className="cc-mini">{hero.axisB}</span>
+          </div>
+        </>
+      )}
+      {hero.controls}
+    </>
   );
 }

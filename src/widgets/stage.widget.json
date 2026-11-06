@@ -4,5 +4,5 @@
   "name": "Main readout",
   "about": "One large reading, with tabs for tokens, agents, the machine and focus.",
   "min": [6, 4],
-  "sources": ["tokens", "agents", "cpu", "memory", "focus"]
+  "sources": ["tokens", "agents", "cpu", "gpu", "memory", "focus"]
 }

@@ -17,6 +17,9 @@ import type {
   LogPayload,
   MediaCommand,
   MediaPayload,
+  GpuCard,
+  GpuCommand,
+  GpuPayload,
   MemPayload,
   NetPayload,
   NotifyCommand,
@@ -68,6 +71,23 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   let t = 0;
   const timers: number[] = [];
+
+  // A card in a game: ?gpu=none for a PC without one, ?gpu=hot past its
+  // warning point, ?gpu=nosensor for one whose driver reports no sensors.
+  // The PC has the two cards the author's does, so the choice shows; picking
+  // the integrated one reads as a card without sensors.
+  const gpuMode = new URLSearchParams(location.search).get('gpu');
+  const gpuLoad = (at: number) => wave(at, 3, 34, 92);
+  const gpuHistory = Array.from({ length: 60 }, (_, i) => gpuLoad(i - 60));
+  const GPU_CARDS: GpuCard[] = [
+    { id: '10de:2783:413a1458', name: 'NVIDIA GeForce RTX 4070 SUPER' },
+    { id: '8086:4682:d0001458', name: 'Intel(R) UHD Graphics 730' },
+  ];
+  let gpuPicked: string | null = null;
+  const unsubGpu = bus.subscribe('gpu:command', (e) => {
+    const c = e.data as GpuCommand;
+    if (c.action === 'pick') gpuPicked = c.card;
+  });
 
   const media: MediaPayload = {
     playing: true,
@@ -128,6 +148,47 @@ export function startMockSource(options: MockOptions = {}): () => void {
       swapUsedGib: 0.4,
       swapTotalGib: 8,
     });
+
+    gpuHistory.push(gpuLoad(t));
+    gpuHistory.splice(0, gpuHistory.length - 60);
+    const sensors = gpuMode !== 'nosensor' && gpuPicked !== GPU_CARDS[1].id;
+    const shown = sensors ? GPU_CARDS[0] : GPU_CARDS[1];
+    pub<GpuPayload>(
+      'telemetry:gpu',
+      'mock.gpu',
+      gpuMode === 'none'
+        ? {
+            available: false,
+            name: '',
+            card: '',
+            pct: 0,
+            engine: '',
+            memUsedGib: 0,
+            memTotalGib: 0,
+            tempC: null,
+            warnC: null,
+            fanRpm: null,
+            powerPct: null,
+            history: [],
+            cards: [],
+          }
+        : {
+            available: true,
+            name: shown.name,
+            card: shown.id,
+            cards: GPU_CARDS,
+            pct: gpuLoad(t),
+            engine: '3d',
+            // Integrated graphics shares the system's memory, and counts it.
+            memUsedGib: sensors ? 9.4 : 1.2,
+            memTotalGib: sensors ? 12 : 16.1,
+            tempC: !sensors ? null : gpuMode === 'hot' ? wave(t, 4, 85, 88) : wave(t, 4, 56, 64),
+            warnC: sensors ? 84 : null,
+            fanRpm: sensors ? wave(t, 6, 1480, 1720) : null,
+            powerPct: sensors ? wave(t, 7, 38, 74) : null,
+            history: [...gpuHistory],
+          }
+    );
 
     pub<NetPayload>('telemetry:net', 'mock.net', {
       rxBytesPerSec: wave(t, 5, 200_000, 12_000_000),
@@ -575,6 +636,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
     unsubLog();
     unsubUpdate();
     unsubPresence();
+    unsubGpu();
     unsubShown();
     stopGame();
     INPUT.forEach((type) => window.removeEventListener(type, onInput, { capture: true }));

@@ -4,6 +4,7 @@ pub mod disk;
 pub mod display;
 pub mod flow;
 pub mod game;
+pub mod gpu;
 pub mod media;
 pub mod mem;
 pub mod net;
@@ -25,6 +26,7 @@ pub fn spawn_all(app: AppHandle) {
     display::spawn(app.clone());
     cpu::spawn(app.clone());
     mem::spawn(app.clone());
+    gpu::spawn(app.clone());
     net::spawn(app.clone());
     disk::spawn(app.clone());
     flow::spawn(app.clone());

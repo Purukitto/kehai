@@ -45,6 +45,12 @@ export interface Settings {
    */
   followAttention: boolean;
   /**
+   * The graphics card Kehai shows, by the id the engine lists it under. Null
+   * for the one it picks itself: the card with the most memory of its own.
+   * The engine hears it over `gpu:command`.
+   */
+  gpuCard: string | null;
+  /**
    * Where the quota poller reads agent session transcripts. Null means the
    * engine's default. Kept here because this is the only settings store; the
    * engine hears it over `quota:command`.
@@ -219,6 +225,7 @@ function defaults(): Settings {
     autoHideBar: false,
     stageTab: null,
     followAttention: true,
+    gpuCard: null,
     transcriptRoot: null,
     autoCheckUpdates: false,
     focus: FOCUS_DEFAULTS,
@@ -404,6 +411,7 @@ function load(): Settings {
       autoHideBar: parsed.autoHideBar === true,
       stageTab: typeof parsed.stageTab === 'string' ? parsed.stageTab : null,
       followAttention: parsed.followAttention !== false,
+      gpuCard: typeof parsed.gpuCard === 'string' ? parsed.gpuCard : null,
       transcriptRoot: folder(parsed.transcriptRoot),
       autoCheckUpdates: parsed.autoCheckUpdates === true,
       focus: focus(parsed.focus),
@@ -447,6 +455,7 @@ interface Store {
   setAutoHideBar: (on: boolean) => void;
   setStageTab: (tab: string) => void;
   setFollowAttention: (on: boolean) => void;
+  setGpuCard: (card: string | null) => void;
   setTranscriptRoot: (path: string | null) => void;
   setAutoCheckUpdates: (on: boolean) => void;
   setFocus: (focus: Partial<FocusSettings>) => void;
@@ -588,6 +597,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setStageTab: (stageTab) => setSettings((prev) => ({ ...prev, stageTab })),
 
       setFollowAttention: (followAttention) => setSettings((prev) => ({ ...prev, followAttention })),
+
+      setGpuCard: (gpuCard) => setSettings((prev) => ({ ...prev, gpuCard })),
 
       setTranscriptRoot: (path) => setSettings((prev) => ({ ...prev, transcriptRoot: folder(path) })),
 
