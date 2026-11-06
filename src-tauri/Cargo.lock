@@ -2087,7 +2087,7 @@ version = "0.13.0"
 dependencies = [
  "base64 0.23.1",
  "chrono",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "httparse",
  "mdns-sd",
  "serde",

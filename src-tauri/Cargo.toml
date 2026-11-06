@@ -42,7 +42,7 @@ tauri-plugin-opener = "2"
 tauri-plugin-single-instance = "2"
 tungstenite = "0.30"
 httparse = "1"
-getrandom = "0.3"
+getrandom = "0.4"
 # While serving a remote panel, Kehai says on the local network that it is
 # there (its name and port), so a paired tablet finds it at a new address.
 mdns-sd = { version = "0.21.6", default-features = false }
