@@ -1,7 +1,10 @@
 import { bus } from './bus';
 import { startMockGame } from './mockGame';
 import type {
+  AgentCommand,
+  AgentJumped,
   AgentsPayload,
+  AgentVia,
   ArtPayload,
   ClockPayload,
   CpuPayload,
@@ -297,25 +300,43 @@ export function startMockSource(options: MockOptions = {}): () => void {
   // One session per state, in the order the engine sorts them. The last one
   // goes back and forth between working and a tool call, so both can be seen
   // changing without the engine.
+  //
+  // `?agents=today` draws the list as it is without Claude Code's session
+  // files: nothing to tap, and a session closed since still says it waits.
+  // `?agents=fail` answers every jump with a refusal.
   const started = Date.now();
+  const agentsMode = new URLSearchParams(location.search).get('agents');
+  const plain = agentsMode === 'today';
   let busyFlip = false;
   const pubAgents = () => {
     busyFlip = !busyFlip;
     const now = Date.now();
-    pub<AgentsPayload>('dev:agents', 'mock.agents', {
-      available: true,
-      reason: null,
-      sessions: [
-        { id: 'm1', project: 'kehai', worktree: 'agent-sessions', state: 'waiting', sinceMs: started - 192_000, subagents: 0 },
-        { id: 'm2', project: 'api-gateway', worktree: null, state: 'tool', sinceMs: started - 38_000, subagents: 2 },
-        busyFlip
-          ? { id: 'm3', project: 'dotfiles', worktree: null, state: 'working', sinceMs: started - 251_000, subagents: 0 }
-          : { id: 'm3', project: 'dotfiles', worktree: null, state: 'tool', sinceMs: now, subagents: 0 },
-      ],
-    });
+    const sessions: AgentsPayload['sessions'] = [
+      { id: 'm1', project: 'kehai', worktree: 'agent-sessions', state: 'waiting', sinceMs: started - 192_000, subagents: 0, via: 'desktop' },
+      { id: 'm2', project: 'api-gateway', worktree: null, state: 'tool', sinceMs: started - 38_000, subagents: 2, via: 'vscode' },
+      busyFlip
+        ? { id: 'm3', project: 'dotfiles', worktree: null, state: 'working', sinceMs: started - 251_000, subagents: 0, via: 'terminal' }
+        : { id: 'm3', project: 'dotfiles', worktree: null, state: 'tool', sinceMs: now, subagents: 0, via: 'terminal' },
+    ];
+    if (plain) {
+      sessions.splice(1, 0, { id: 'm0', project: 'shiren', worktree: null, state: 'waiting', sinceMs: started - 2_460_000, subagents: 0, via: null });
+      sessions.forEach((s) => (s.via = null));
+    }
+    pub<AgentsPayload>('dev:agents', 'mock.agents', { available: true, reason: null, sessions });
   };
   pubAgents();
   timers.push(window.setInterval(pubAgents, 20_000));
+
+  // A jump, answered as the engine would once the window is in front.
+  const unsubJump = bus.subscribe('agents:command', (e) => {
+    const { id } = e.data as AgentCommand;
+    const via = (bus.peek<AgentsPayload>('dev:agents')?.data.sessions.find((s) => s.id === id)?.via ?? null) as AgentVia | null;
+    const ok = agentsMode !== 'fail' && via !== null;
+    window.setTimeout(
+      () => pub<AgentJumped>('agents:jumped', 'mock.agents', { id, ok, via, reason: ok ? null : 'the window would not come forward' }),
+      120
+    );
+  });
 
   // media:command is the one topic the UI publishes. The engine owns the side
   // effect; here we reflect it back so the transport feels connected.
@@ -544,6 +565,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
 
   return () => {
     unsub();
+    unsubJump();
     unsubNotify();
     unsubRules();
     unsubDisplay();

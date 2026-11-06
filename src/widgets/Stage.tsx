@@ -7,7 +7,7 @@ import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
 import type { AgentsPayload, CpuPayload, MemPayload, QuotaPayload, SprintPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
-import { AgentRow, agentSentence, useNow, waitingOnYou } from './Agents';
+import { AgentRow, agentSentence, useJump, useNow, waitingOnYou } from './Agents';
 import { Meter } from './chrome';
 import { budgetPct, budgetStatus, totalTokens } from './Quota';
 import { SprintControls, focusedToday, sprintColor, sprintLabel, sprintStatus } from './Sprint';
@@ -55,6 +55,7 @@ export function Stage({ props }: WidgetProps) {
   const sprint = useTopic<SprintPayload>('flow:pomodoro');
   const now = useNow();
   const size = useTileSize();
+  const { said, jump } = useJump();
 
   // A tab whose source has said it cannot report is dropped rather than left
   // as a dead end in the hero tile. Only an explicit refusal counts: a topic
@@ -162,7 +163,7 @@ export function Stage({ props }: WidgetProps) {
       controls: (
         <div style={{ borderBottom: '1px solid var(--cc-line)', margin: '0 -16px' }}>
           {agents.sessions.slice(0, rowsFit).map((session) => (
-            <AgentRow key={session.id} session={session} now={now} />
+            <AgentRow key={session.id} session={session} now={now} said={said[session.id]} onJump={jump} />
           ))}
         </div>
       ),

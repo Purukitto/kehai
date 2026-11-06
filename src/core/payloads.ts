@@ -104,6 +104,28 @@ export interface AgentSession {
   sinceMs: number;
   /** Sub-agents it started that are still at work. */
   subagents: number;
+  /**
+   * What the session runs in, from the session file Claude Code keeps while
+   * it is open. Null when Kehai can't tell, and then a tap does nothing.
+   */
+  via: AgentVia | null;
+}
+
+export type AgentVia = 'desktop' | 'vscode' | 'terminal';
+
+/** Renderer → engine on `agents:command`. Never forwarded from a remote panel. */
+export interface AgentCommand {
+  action: 'jump';
+  id: string;
+}
+
+/** Engine → renderer on `agents:jumped`, once for each jump. */
+export interface AgentJumped {
+  id: string;
+  ok: boolean;
+  via: AgentVia | null;
+  /** Why not, for the log. The panel only says it couldn't. */
+  reason: string | null;
 }
 
 /** Engine → renderer on `dev:agents`. Mirrors `AgentsPayload` in `agents.rs`. */
