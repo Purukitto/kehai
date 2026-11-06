@@ -141,11 +141,21 @@ display. Kehai only stops drawing until you are back. When you are at your desk 
 nobody else's business, so the topic stays with the local panel, and a remote panel
 never goes quiet.
 
-Night is the renderer's alone, by the panel's own clock, between fixed hours: sunset
-would need a location, and Kehai asks for none. It is a brightness filter over the
-whole page, so every theme dims the same way and none needs a night version. A
-backlit panel only goes so far that way, since black stays as bright as the backlight.
-Turning the backlight itself down, where a display takes the command, is not done yet.
+Night is decided by the renderer, by the panel's own clock, between fixed hours:
+sunset would need a location, and Kehai asks for none. On a display that lets programs
+set its brightness (DDC/CI), the backlight itself goes down, at night and on the quiet
+panel, so what Kehai draws keeps its contrast and black is dark. The renderer says
+where to hold the display, as a share of the level you set, and the engine writes it.
+A backlight at its lowest is still lit, so the darkest level also puts a brightness
+filter over the whole page. On a display that doesn't answer, the filter does it all,
+so every theme dims the same way and none needs a night version.
+
+Many displays save each change to their own memory, which wears with writes. So the
+engine writes only when something changes, never a fade, and reads the display every
+few seconds instead, to notice its own buttons: by day they set your level, at night
+the change lasts until morning. It gives the display your level back when Kehai quits
+or is hidden in the tray, and at the next start after a crash, if the display still
+reads what Kehai left it at.
 
 ## The UI only consumes
 

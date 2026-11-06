@@ -25,7 +25,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/stage.png" alt="Kehai's Stage preset in the Obsidian theme: a large token-usage readout with a five-hour history, and clock, now playing and CPU, memory, unread and agents tiles along the bottom">
+  <img src="docs/screenshots/stage.png" alt="Kehai's Stage preset in the Obsidian theme: a large token-usage readout with a five-hour history, and clock, now playing and CPU, GPU, unread and agents tiles along the bottom">
 </p>
 
 ---
@@ -71,8 +71,8 @@ local, and stays out of the way.
     </td>
     <td valign="top">
       <strong>Quiet when you are away</strong><br>
-      With nobody at the desk it drops to the time and what is waiting on you, and it
-      can dim itself at night.
+      With nobody at the desk it drops to the time and what is waiting on you, and at
+      night it turns the display's own backlight down, where the display allows it.
     </td>
   </tr>
   <tr>
@@ -87,9 +87,9 @@ local, and stays out of the way.
 </table>
 
 <p align="center">
-  <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: CPU load, temperature and per-thread usage" width="32%">
-  <img src="docs/screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, the focus timer, notifications and a vitals strip, evenly weighted" width="32%">
-  <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock with agents, token usage, now playing, CPU and memory below it" width="32%">
+  <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: the processor and the graphics card side by side, each with its load, temperature and history" width="32%">
+  <img src="docs/screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, the focus timer, notifications and a status strip with CPU, GPU, GPU temperature, memory, network and unread, evenly weighted" width="32%">
+  <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock, with agents, token usage, now playing, and CPU, GPU, GPU temperature and memory below it" width="32%">
   <br>
   <sub>Stage in Phosphor · Panel in Obsidian · Ambient in Ice. Any preset takes any theme.</sub>
 </p>

@@ -6,6 +6,8 @@ import type {
   AgentsPayload,
   AgentVia,
   ArtPayload,
+  BacklightCommand,
+  BacklightPayload,
   ClockPayload,
   CpuPayload,
   DiskPayload,
@@ -88,6 +90,34 @@ export function startMockSource(options: MockOptions = {}): () => void {
     const c = e.data as GpuCommand;
     if (c.action === 'pick') gpuPicked = c.card;
   });
+
+  // The display Kehai is for answers DDC/CI, as the author's panel does.
+  // ?backlight=none for a display that doesn't, ?backlight=missing for Kehai
+  // on the main display while its own is gone, ?backlight=os for a system
+  // Kehai can't do it on yet.
+  const backlightMode = new URLSearchParams(location.search).get('backlight');
+  const BACKLIGHT_WHY: Record<string, string> = {
+    none: 'This display doesn’t let programs set its brightness, so at night Kehai darkens what it draws instead.',
+    missing: 'Kehai is on the main display while its own is missing, and leaves the brightness of every display alone until it’s back.',
+    os: 'Kehai can’t set a display’s brightness on this system yet, so at night it darkens what it draws instead.',
+  };
+  let backlightYours = 80;
+  let backlightHold: number | null = null;
+  const pubBacklight = () =>
+    pub<BacklightPayload>(
+      'app:backlight',
+      'mock.backlight',
+      backlightMode && BACKLIGHT_WHY[backlightMode]
+        ? { available: false, reason: BACKLIGHT_WHY[backlightMode], yours: null, now: null }
+        : { available: true, reason: null, yours: backlightYours, now: backlightHold ?? backlightYours }
+    );
+  const unsubBacklight = bus.subscribe('backlight:command', (e) => {
+    const c = e.data as BacklightCommand;
+    if (c.action === 'set') backlightYours = Math.max(0, Math.min(100, Math.round(c.level)));
+    if (c.action === 'hold') backlightHold = c.level;
+    pubBacklight();
+  });
+  pubBacklight();
 
   const media: MediaPayload = {
     playing: true,
@@ -637,6 +667,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
     unsubUpdate();
     unsubPresence();
     unsubGpu();
+    unsubBacklight();
     unsubShown();
     stopGame();
     INPUT.forEach((type) => window.removeEventListener(type, onInput, { capture: true }));

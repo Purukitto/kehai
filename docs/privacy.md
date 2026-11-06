@@ -22,12 +22,18 @@ All in its own app-data folder:
 | `remote.json` | The remote panel's key, once you turn the remote panel on | So paired devices stay paired |
 | `window.json` | Whether Kehai has a taskbar button, and whether it shows the panel when it starts | So both apply before the window is shown |
 | `games.json` | Each game you set up: where it is, the key in its file, and the port | So the game still reaches Kehai after a restart |
+| `backlight.json` | The brightness you set for the display Kehai is for, and the level Kehai last left it at | So a display turned down for the night gets your level back, even after Kehai stops unexpectedly |
 | `widgets\` | Widget files you add yourself, if you open the folder | Read, never run |
 
 Outside that folder, Kehai writes one file and only when you ask: **Set up** for a game
 widget puts `gamestate_integration_kehai_<widget>.cfg` in the game's own settings folder,
 after showing you where. **REMOVE** deletes it again, and Kehai never touches another
 program's file there.
+
+Kehai also changes one setting of the display it is for: its brightness, over the
+display's own control line (DDC/CI), at night and while you are away, where the display
+takes it. It touches no other display, and gives yours back when it quits. See
+[Away and night](using.md#away-and-night).
 
 Settings, layouts and themes are kept by the renderer, in its own browser storage.
 

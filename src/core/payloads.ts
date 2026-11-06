@@ -377,6 +377,40 @@ export interface PresencePayload {
  */
 export type PresenceCommand = { action: 'configure'; awayAfterSec: number | null };
 
+/**
+ * Engine → local renderer on `app:backlight`. Mirrors `BacklightPayload` in
+ * `backlight.rs`. The brightness of the display Kehai is for, which the
+ * display lets programs set over its own control line (DDC/CI). Never sent to
+ * a remote panel: a tablet's screen is its own.
+ */
+export interface BacklightPayload {
+  /**
+   * False when that display doesn't let Kehai set it, when Kehai is not on it,
+   * or on a system Kehai can't do it on yet.
+   */
+  available: boolean;
+  /** Why not, in a sentence. */
+  reason: string | null;
+  /**
+   * Yours, 0–100 of the display's range: what night and away come back to.
+   * The slider sets it, and so do the display's own buttons by day.
+   */
+  yours: number | null;
+  /** Where the display is now: below yours while night or away holds it down. */
+  now: number | null;
+}
+
+/**
+ * Renderer → engine on `backlight:command`. Mirrors `Command` in
+ * `backlight.rs`. The engine writes the display once per change, never in
+ * steps, since many displays save each change to their own memory.
+ */
+export type BacklightCommand =
+  /** Yours, from the slider. */
+  | { action: 'set'; level: number }
+  /** Hold the display here for now. Null gives it back to yours. */
+  | { action: 'hold'; level: number | null };
+
 /** Engine → renderer on `app:update`. Mirrors `UpdatePayload` in `update.rs`. */
 export interface UpdatePayload {
   /** The running version, read from the binary. */

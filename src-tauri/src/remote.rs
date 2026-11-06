@@ -56,15 +56,17 @@ const POLL: Duration = Duration::from_millis(100);
 /// Not for remote eyes: this server's own settings, key included, an update a
 /// remote panel could not install anyway, the host's monitors and window,
 /// which a browser has no part in, whether anyone is at the host's desk, the
-/// host's log, where its games are, the widget files in its folder, and what
-/// came of a tap that went to an agent's window. A game's own state is not
-/// here: a tablet shows its tile like any other.
-const PRIVATE_TOPICS: [&str; 10] = [
+/// host's log, where its games are, the widget files in its folder, what came
+/// of a tap that went to an agent's window, and the brightness of the host's
+/// display. A game's own state is not here: a tablet shows its tile like any
+/// other.
+const PRIVATE_TOPICS: [&str; 11] = [
     TOPIC,
     "app:update",
     "app:displays",
     "app:window",
     "os:presence",
+    "app:backlight",
     "app:log",
     "app:log-copy",
     "game:setup",

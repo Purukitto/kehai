@@ -52,9 +52,9 @@ subscribed and the engine replays every retained topic in reply.
 ## Commands
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for sixteen command topics — `media:command`, `notify:command`,
+read-only except for seventeen command topics — `media:command`, `notify:command`,
 `notify:rules`, `flow:command`, `quota:command`, `update:command`, `remote:command`,
-`display:command`, `presence:command`, `gpu:command`, `window:command`, `log:command`,
+`display:command`, `presence:command`, `backlight:command`, `gpu:command`, `window:command`, `log:command`,
 `log:context`, `game:command`, `widgets:command` and `agents:command`. The UI states an intent; the engine owns the
 side effect and runs it off the event thread, so a wedged media player cannot freeze
 the panel and a slow download cannot either.
@@ -106,6 +106,7 @@ checks every one again.
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
 | `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel |
+| `src-tauri/src/pollers/backlight.rs` | Sets the brightness of the display Kehai is for, over DDC/CI, and gives it back |
 | `src-tauri/src/pollers/gpu.rs` | The graphics card's load, memory and, from its driver, temperature, fan and power |
 | `src-tauri/src/pollers/game.rs` | Finds a game through Steam, writes and removes its file, and listens on 127.0.0.1 for what it sends |
 | `src-tauri/src/pollers/widgets.rs` | Hands the widgets folder's files to the panel to check |

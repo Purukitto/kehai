@@ -101,24 +101,50 @@ desktop with no tray, Kehai keeps its taskbar entry and closing it quits.
 
 ## Away and night
 
-**Settings → Appearance** turns everything Kehai draws down at night, between two
-times you set, and decides what the panel shows while nobody is at the computer.
+**Settings → Appearance** turns the panel down at night, between two times you set, and
+decides what it shows while nobody is at the computer.
+
+<p align="center">
+  <img src="screenshots/appearance.png" alt="Settings, Appearance, at night: This display's brightness at 80% as ten blocks with minus and plus, held at 36% for the night until 07:00, then the night's hours, 22:00 to 07:00, and how dim, Half" width="80%">
+</p>
+
+Most displays let programs set their brightness, over a control line called DDC/CI.
+On one that does, Kehai turns the display's own backlight down, so what it draws keeps
+its contrast and black is really dark. **This display → Brightness** sets the level
+night and away come back to, and the display's own buttons set it too. How far night
+goes is a share of that level:
+
+| How dim | The display | What Kehai draws |
+| --- | --- | --- |
+| **A little** | 75% of your level | As it is |
+| **Half** | 45% of your level | As it is |
+| **A lot** | As low as it goes | Darker as well |
+
+On a display that doesn't answer, or while Kehai is on another display than the one it
+is for, Kehai leaves every display's brightness alone and darkens what it draws instead.
 
 After a while with no keyboard, mouse or touch — 10 minutes unless you pick 5, 30 or
 never — it goes quiet. What it shows then is your choice:
 
 | Quiet view | Shows |
 | --- | --- |
-| **Clock** | The time, dim, and only what is running or waiting on you, with notifications as a count and never their text |
-| **Dimmed panel** | The panel as it was, at half brightness, with notification text hidden |
-| **Nothing** | Dark, until an agent waits on you |
+| **Clock** | The time, dim, and only what is running or waiting on you, with notifications as a count and never their text. The display turns down as at night |
+| **Dimmed panel** | The panel as it was, with notification text hidden. The display turns down as at night, or the panel is drawn at half brightness where it can't |
+| **Nothing** | Dark, with the display as low as it goes, until an agent waits on you. Then it shows the agent, with the display turned down as at night |
 
 A touch or a nudge of the mouse brings it back, and the first tap only wakes it, so it
 never presses a button you could not see. While Windows is locked its lock screen
 covers every display, and Kehai stops drawing.
 
-Setup turns both on. A copy that already had settings keeps both off until you turn
-them on.
+Many displays save each change of brightness to their own memory, so Kehai changes it
+only when something changes: night starting or ending, you leaving or coming back. A
+change made with the display's buttons by day becomes your level; at night it lasts
+until morning. When Kehai quits, or is hidden in the tray, the display gets your level
+back, and if Kehai ever stops unexpectedly, it puts it back the next time it starts.
+Setting the brightness works on Windows for now.
+
+Setup turns night and away on. A copy that already had settings keeps both off until
+you turn them on.
 
 ## Updating
 
