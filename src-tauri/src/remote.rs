@@ -56,9 +56,10 @@ const POLL: Duration = Duration::from_millis(100);
 /// Not for remote eyes: this server's own settings, key included, an update a
 /// remote panel could not install anyway, the host's monitors and window,
 /// which a browser has no part in, whether anyone is at the host's desk, the
-/// host's log, where its games are and the widget files in its folder. A
-/// game's own state is not here: a tablet shows its tile like any other.
-const PRIVATE_TOPICS: [&str; 9] = [
+/// host's log, where its games are, the widget files in its folder, and what
+/// came of a tap that went to an agent's window. A game's own state is not
+/// here: a tablet shows its tile like any other.
+const PRIVATE_TOPICS: [&str; 10] = [
     TOPIC,
     "app:update",
     "app:displays",
@@ -68,6 +69,7 @@ const PRIVATE_TOPICS: [&str; 9] = [
     "app:log-copy",
     "game:setup",
     "widgets:local",
+    "agents:jumped",
 ];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;

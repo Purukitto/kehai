@@ -105,7 +105,7 @@ export interface AgentSession {
   /** Sub-agents it started that are still at work. */
   subagents: number;
   /**
-   * What the session runs in, from the session file Claude Code keeps while
+   * What the session runs in, from the session file the agent keeps while
    * it is open. Null when Kehai can't tell, and then a tap does nothing.
    */
   via: AgentVia | null;

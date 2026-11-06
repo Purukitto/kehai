@@ -52,10 +52,10 @@ subscribed and the engine replays every retained topic in reply.
 ## Commands
 
 Each poller owns one thread, so a stalled source can only stall itself. The renderer is
-read-only except for fourteen command topics — `media:command`, `notify:command`,
+read-only except for fifteen command topics — `media:command`, `notify:command`,
 `notify:rules`, `flow:command`, `quota:command`, `update:command`, `remote:command`,
 `display:command`, `presence:command`, `window:command`, `log:command`,
-`log:context`, `game:command` and `widgets:command`. The UI states an intent; the engine owns the
+`log:context`, `game:command`, `widgets:command` and `agents:command`. The UI states an intent; the engine owns the
 side effect and runs it off the event thread, so a wedged media player cannot freeze
 the panel and a slow download cannot either.
 
@@ -102,6 +102,7 @@ checks every one again.
 | `src-tauri/src/pollers/` | One thread per source |
 | `src-tauri/src/pollers/media.rs` | Now playing, seek and the system volume |
 | `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |
+| `src-tauri/src/pollers/sessions.rs` | Which agent sessions are open, and bringing one's window to the front |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
 | `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel |

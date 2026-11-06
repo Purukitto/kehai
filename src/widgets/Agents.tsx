@@ -20,9 +20,10 @@ const SAID_MS = 1_500;
  */
 const ON_TABLET = REMOTE_PANEL || (!isTauri() && new URLSearchParams(location.search).has('tablet'));
 
+/** What a tap did, by what the session runs in. Bringing the window forward is all it does. */
 const OPENED: Record<AgentVia, string> = {
-  desktop: 'Opened in Claude',
-  vscode: 'Opened in VS Code',
+  desktop: 'Opened the desktop app',
+  vscode: 'Opened VS Code',
   terminal: 'Opened the terminal',
 };
 

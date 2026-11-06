@@ -301,7 +301,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
   // goes back and forth between working and a tool call, so both can be seen
   // changing without the engine.
   //
-  // `?agents=today` draws the list as it is without Claude Code's session
+  // `?agents=today` draws the list as it is without the agent's session
   // files: nothing to tap, and a session closed since still says it waits.
   // `?agents=fail` answers every jump with a refusal.
   const started = Date.now();
@@ -319,7 +319,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
         : { id: 'm3', project: 'dotfiles', worktree: null, state: 'tool', sinceMs: now, subagents: 0, via: 'terminal' },
     ];
     if (plain) {
-      sessions.splice(1, 0, { id: 'm0', project: 'shiren', worktree: null, state: 'waiting', sinceMs: started - 2_460_000, subagents: 0, via: null });
+      sessions.splice(1, 0, { id: 'm0', project: 'notes', worktree: null, state: 'waiting', sinceMs: started - 2_460_000, subagents: 0, via: null });
       sessions.forEach((s) => (s.via = null));
     }
     pub<AgentsPayload>('dev:agents', 'mock.agents', { available: true, reason: null, sessions });

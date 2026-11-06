@@ -118,6 +118,17 @@ matches a few fixed markers the agent itself writes in your place, such as the n
 leaves when you interrupt it. The folder's name is shown on the panel, and on a remote
 panel too.
 
+To know which sessions are still open, and to bring one's window forward when you tap
+it, the widget also reads the small file the agent keeps for each open session, in the
+`sessions` folder beside the transcript folder. It reads four fields: the process id,
+when that process started, the session id and what the session was started from (the
+desktop app, VS Code or a terminal). It never opens anything else in that folder, such
+as the key kept beside each file, and never writes there. The session's name, which the
+agent usually makes from your first prompt, is not read. A tap only brings an existing
+window to the front, and only a tap or a click on this PC can: a remote panel cannot.
+The log says which kind of window it went to, or why it could not, and never which
+session.
+
 ### Whether you are at the computer
 
 For the quiet panel, the engine asks Windows once a second how long it has been since

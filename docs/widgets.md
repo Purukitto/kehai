@@ -78,6 +78,22 @@ call that has not returned shows as **TOOL**. That is also all a permission prom
 looks like, because nothing is written until it is answered, so Kehai lights one that
 has been open for half a minute but never claims it is waiting on you.
 
+**Tap a session to go to it.** Its window comes to the front on the display it is on,
+and the row says so for a moment: **Opened the desktop app**, **Opened VS Code** or
+**Opened the terminal**. The one waiting on you says **Go to** under its status. The
+agent's desktop app has no way to open one session from outside, so it comes forward
+and you pick the session in its own list; Kehai doesn't pick a tab in a terminal or
+an editor either. If Windows keeps another window in front, the row says **Couldn't
+bring it forward**, and the log says why. Ambient's line goes to the session it names,
+and the tray's menu lists up to three sessions waiting on you, to go to with a click.
+
+Kehai knows which sessions are open from the small file the agent keeps for each one
+beside its transcripts. A session you have closed leaves the list, and stops counting
+as waiting. An agent that keeps no such files shows its sessions as before, with
+nothing to tap. Tablets can't go to a session, since only the PC can bring its own
+windows forward: a tap there says **Open it on the PC**. Going to a window works on
+Windows only for now.
+
 What these read, and what they never read, is in [Privacy](privacy.md).
 
 ## Game widgets

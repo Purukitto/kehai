@@ -82,6 +82,7 @@ panels are connected. Right-click it for the rest:
 
 | Item | Does |
 | --- | --- |
+| **Go to** a session | While agents wait on you, up to three, longest waiting first: brings that session's window to the front, as a tap on it in the panel does |
 | **Hide the panel** / **Show the panel** | The same as a click |
 | **Move to** | Puts the panel on another display, as Settings → Window does |
 | **Settings** | Shows the panel with Settings open |

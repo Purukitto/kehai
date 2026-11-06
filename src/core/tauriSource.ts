@@ -27,6 +27,7 @@ export const ENGINE_TOPICS = [
   'flow:pomodoro',
   'dev:llm_tokens',
   'dev:agents',
+  'agents:jumped',
   'media:now_playing',
   'media:art',
   'media:volume',
@@ -59,6 +60,7 @@ export const COMMAND_TOPICS = [
   'log:context',
   'game:command',
   'widgets:command',
+  'agents:command',
 ];
 
 export async function startTauriSource(): Promise<() => void> {

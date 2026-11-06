@@ -9,6 +9,24 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- **Tap an agent session to go to it.** Its window comes to the front on the display
+  it is on: the agent's desktop app, VS Code or the terminal it runs in. The session
+  waiting on you says **Go to**, and the row says for a moment what the tap did. The
+  desktop app comes forward as a whole, and you pick the session in its own list.
+  Ambient's agents line goes to the session it names. Windows only for now; on a
+  tablet a tap says to open it on the PC.
+- While agents wait on you, the tray's menu starts with up to three **Go to** items,
+  longest waiting first, with how long each has waited.
+
+### Changed
+
+- A session you have closed leaves the agents list, and no longer counts as waiting on
+  you, in the tile, the tray's icon and the main readout. Kehai reads which sessions
+  are open from the small file the agent keeps for each one; [Privacy](docs/privacy.md)
+  lists the four things it reads there.
+
 ## [0.12.2] - 2026-11-05
 
 ### Fixed

@@ -2,16 +2,20 @@ use std::collections::HashMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::RecvTimeoutError;
+use std::sync::{Mutex, MutexGuard};
 use std::thread;
 use std::time::Duration;
 
 use serde::de::{SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
-use tauri::AppHandle;
+use tauri::{AppHandle, Listener};
 
+use super::sessions::{self, Live, Via};
 use super::transcripts::{self, now_ms, parse_iso, transcript_root, Transcripts};
 use crate::bus;
 use crate::log;
+
+const SRC: &str = "poller.agents";
 
 /// How often the transcripts already followed are read on. An agent that has
 /// stopped to wait should say so about as soon as a glance would catch it.
@@ -64,6 +68,76 @@ pub struct AgentSession {
     pub since_ms: i64,
     /// Sub-agents it started that are still at work.
     pub subagents: u32,
+    /// What it runs in, while it is open. None when that can't be told, and
+    /// then the panel offers no way to go to it.
+    pub via: Option<Via>,
+}
+
+/// Renderer → engine on `agents:command`. Mirrors `AgentCommand` in
+/// `src/core/payloads.ts`. Never taken from a remote panel: only a tap on
+/// this PC may bring one of its windows forward.
+#[derive(Deserialize)]
+#[serde(tag = "action", rename_all = "snake_case")]
+enum Command {
+    Jump { id: String },
+}
+
+/// Engine → local renderer on `agents:jumped`, once for each jump. Mirrors
+/// `AgentJumped` in `src/core/payloads.ts`.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Jumped {
+    id: String,
+    ok: bool,
+    via: Option<Via>,
+    reason: Option<String>,
+}
+
+/// An open session a tap can go to: its process, and the last part of the
+/// folder it works in, which an editor's window title carries.
+#[derive(Clone)]
+struct Target {
+    id: String,
+    live: Live,
+    folder: Option<String>,
+}
+
+/// The sessions a tap can go to, as of the last tick.
+static TARGETS: Mutex<Vec<Target>> = Mutex::new(Vec::new());
+
+fn targets() -> MutexGuard<'static, Vec<Target>> {
+    TARGETS
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Brings the window a session runs in to the front, and tells the panel how
+/// that went. For a tap on the panel and a click in the tray's menu, which are
+/// what let Windows allow it.
+pub fn jump(app: &AppHandle, id: &str) {
+    let target = targets().iter().find(|t| t.id == id).cloned();
+    let result = match &target {
+        Some(t) => sessions::bring_forward(t.live, t.folder.as_deref()),
+        None => Err("the session is no longer open".to_string()),
+    };
+    let via = target.and_then(|t| t.live.via);
+    // What it runs in and why not, never which session: that is what it read.
+    match (&result, via) {
+        (Ok(()), Some(via)) => log::info(SRC, format!("went to a session in {via:?}")),
+        (Ok(()), None) => log::info(SRC, "went to a session"),
+        (Err(why), _) => log::warn(SRC, format!("could not go to a session: {why}")),
+    }
+    bus::publish(
+        app,
+        "agents:jumped",
+        SRC,
+        Jumped {
+            id: id.to_string(),
+            ok: result.is_ok(),
+            via,
+            reason: result.err(),
+        },
+    );
 }
 
 /// Declared in the order the list sorts in: whatever needs you first.
@@ -270,6 +344,18 @@ fn ran_locally(line: &str) -> bool {
 pub fn spawn(app: AppHandle) {
     let chosen_rx = transcripts::chosen_roots(&app);
 
+    let commands = app.clone();
+    app.listen("agents:command", move |event| {
+        match serde_json::from_str::<Command>(event.payload()) {
+            Ok(Command::Jump { id }) => {
+                // Off the event loop: finding a window walks every process.
+                let app = commands.clone();
+                thread::spawn(move || jump(&app, &id));
+            }
+            Err(err) => log::warn(SRC, format!("ignored a command: {err}")),
+        }
+    });
+
     thread::spawn(move || {
         let mut chosen = chosen_rx
             .recv_timeout(transcripts::FIRST_ROOT_GRACE)
@@ -279,6 +365,7 @@ pub fn spawn(app: AppHandle) {
         let mut unavailable: Option<String> = None;
         let mut last: Option<AgentsPayload> = None;
         let mut last_said = String::new();
+        let mut last_open = String::new();
         let mut tick = 0u32;
 
         loop {
@@ -298,13 +385,36 @@ pub fn spawn(app: AppHandle) {
                 followed.refresh(Session::read);
             }
 
+            // Which sessions are open, from the files the agent keeps beside
+            // its transcripts. None where it keeps none: then nothing is
+            // dropped for being closed, and nothing can be gone to.
+            let open = transcript_root(chosen.as_deref())
+                .ok()
+                .and_then(|root| sessions::folder(&root))
+                .and_then(|folder| sessions::open(&folder, sessions::alive));
+            let open_said = match &open {
+                Some(open) => format!("{} sessions open", open.len()),
+                None => "no sessions folder".to_string(),
+            };
+            if open_said != last_open {
+                log::detail(SRC, || open_said.clone());
+                last_open = open_said;
+            }
+
             let payload = match &unavailable {
-                Some(reason) => AgentsPayload::unavailable(reason.clone()),
-                None => AgentsPayload {
-                    available: true,
-                    reason: None,
-                    sessions: summarise(&followed, now),
-                },
+                Some(reason) => {
+                    targets().clear();
+                    AgentsPayload::unavailable(reason.clone())
+                }
+                None => {
+                    let (sessions, found) = summarise(&followed, now, open.as_ref());
+                    *targets() = found;
+                    AgentsPayload {
+                        available: true,
+                        reason: None,
+                        sessions,
+                    }
+                }
             };
             // Times in it are absolute, so an unchanged list needs no resend:
             // the bus retains the last one for whoever attaches later.
@@ -345,9 +455,16 @@ fn walk(
     }
 }
 
-fn summarise(followed: &Transcripts<Session>, now: i64) -> Vec<AgentSession> {
+/// The sessions to list, and which of them a tap can go to. With `open`
+/// known, a session that isn't open is left off: it waits on nobody.
+fn summarise(
+    followed: &Transcripts<Session>,
+    now: i64,
+    open: Option<&HashMap<String, Live>>,
+) -> (Vec<AgentSession>, Vec<Target>) {
     let mut busy: HashMap<String, u32> = HashMap::new();
     let mut sessions = Vec::new();
+    let mut found = Vec::new();
 
     for (path, tail) in followed.files() {
         let Some((state, since_ms)) = tail.state.state() else {
@@ -366,6 +483,21 @@ fn summarise(followed: &Transcripts<Session>, now: i64) -> Vec<AgentSession> {
         let Some(id) = path.file_stem().map(|s| s.to_string_lossy().into_owned()) else {
             continue;
         };
+        let live = match open {
+            Some(open) => match open.get(&id) {
+                Some(live) => Some(*live),
+                // Closed: nothing waits in a session nobody has open.
+                None => continue,
+            },
+            None => None,
+        };
+        if let Some(live) = live.filter(|l| l.via.is_some()) {
+            found.push(Target {
+                id: id.clone(),
+                live,
+                folder: tail.state.cwd.as_deref().and_then(last_part),
+            });
+        }
         let (project, worktree) = place(tail.state.cwd.as_deref(), path);
         sessions.push(AgentSession {
             id,
@@ -374,6 +506,7 @@ fn summarise(followed: &Transcripts<Session>, now: i64) -> Vec<AgentSession> {
             state,
             since_ms,
             subagents: 0,
+            via: live.and_then(|l| l.via),
         });
     }
 
@@ -381,7 +514,14 @@ fn summarise(followed: &Transcripts<Session>, now: i64) -> Vec<AgentSession> {
         session.subagents = busy.get(&session.id).copied().unwrap_or(0);
     }
     sessions.sort_by_key(|s| (s.state, s.since_ms));
-    sessions
+    (sessions, found)
+}
+
+/// The last part of a path, on either kind of separator.
+fn last_part(path: &str) -> Option<String> {
+    path.split(['/', '\\'])
+        .rfind(|p| !p.is_empty())
+        .map(str::to_string)
 }
 
 /// The session a sub-agent's transcript belongs to:
@@ -592,6 +732,48 @@ mod tests {
             ("kehai".to_string(), None)
         );
         assert_eq!(place(None, transcript), ("D--Code-kehai".to_string(), None));
+    }
+
+    #[test]
+    fn the_jump_reads_and_answers_as_the_renderer_expects() {
+        let Command::Jump { id } =
+            serde_json::from_str(r#"{"action":"jump","id":"abc"}"#).expect("command parses");
+        assert_eq!(id, "abc");
+
+        let answer = serde_json::to_value(Jumped {
+            id: "abc".into(),
+            ok: false,
+            via: Some(Via::Vscode),
+            reason: Some("why".into()),
+        })
+        .expect("serialises");
+        assert_eq!(
+            answer,
+            serde_json::json!({ "id": "abc", "ok": false, "via": "vscode", "reason": "why" })
+        );
+    }
+
+    #[test]
+    fn a_session_says_what_it_runs_in() {
+        let session = AgentSession {
+            id: "s".into(),
+            project: "kehai".into(),
+            worktree: None,
+            state: State::Waiting,
+            since_ms: 0,
+            subagents: 0,
+            via: Some(Via::Desktop),
+        };
+        let json = serde_json::to_value(&session).expect("serialises");
+        assert_eq!(json["via"], "desktop");
+        assert_eq!(json["sinceMs"], 0);
+    }
+
+    #[test]
+    fn an_editor_window_is_told_by_the_folder_it_has_open() {
+        assert_eq!(last_part(r"D:\Code\kehai\"), Some("kehai".to_string()));
+        assert_eq!(last_part("/home/me/src/api"), Some("api".to_string()));
+        assert_eq!(last_part(""), None);
     }
 
     #[test]
