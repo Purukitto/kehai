@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-06
+
 ### Added
 
 - **Tap an agent session to go to it.** Its window comes to the front on the display
@@ -431,7 +433,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Purukitto/kehai/compare/v0.12.2...v0.13.0
 [0.12.2]: https://github.com/Purukitto/kehai/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/Purukitto/kehai/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/Purukitto/kehai/compare/v0.11.0...v0.12.0
