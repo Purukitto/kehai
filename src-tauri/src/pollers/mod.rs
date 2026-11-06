@@ -10,6 +10,7 @@ pub mod net;
 pub mod notify;
 pub mod presence;
 pub mod quota;
+mod sessions;
 mod transcripts;
 pub mod update;
 pub mod widgets;

@@ -1,11 +1,98 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
+import { bus } from '../core/bus';
 import { humanDuration, mmss } from '../core/format';
+import { REMOTE_PANEL } from '../core/remoteSource';
+import { isTauri } from '../core/tauriSource';
 import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
-import type { AgentSession, AgentsPayload, ClockPayload } from '../core/payloads';
+import type { AgentCommand, AgentJumped, AgentSession, AgentsPayload, AgentVia, ClockPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { Awaiting, Pane } from './chrome';
+
+/** How long a row says what its tap did, before it goes back to its time. */
+const SAID_MS = 1_500;
+
+/**
+ * A tablet can't bring a window forward on the PC: Windows lets only the
+ * program you last touched do that. `?tablet` draws it in the mock.
+ */
+const ON_TABLET = REMOTE_PANEL || (!isTauri() && new URLSearchParams(location.search).has('tablet'));
+
+/** What a tap did, by what the session runs in. Bringing the window forward is all it does. */
+const OPENED: Record<AgentVia, string> = {
+  desktop: 'Opened the desktop app',
+  vscode: 'Opened VS Code',
+  terminal: 'Opened the terminal',
+};
+
+export interface Said {
+  text: string;
+  color: string;
+}
+
+/**
+ * Going to a session, and what the last tap on each led to, for a moment.
+ * One per widget, shared by its rows.
+ */
+export function useJump() {
+  const [said, setSaid] = useState<Record<string, Said>>({});
+  const timers = useRef(new Map<string, number>());
+
+  const say = (id: string, s: Said) => {
+    setSaid((prev) => ({ ...prev, [id]: s }));
+    window.clearTimeout(timers.current.get(id));
+    timers.current.set(
+      id,
+      window.setTimeout(() => {
+        timers.current.delete(id);
+        setSaid(({ [id]: _, ...rest }) => rest);
+      }, SAID_MS)
+    );
+  };
+
+  useEffect(() => {
+    const live = timers.current;
+    const stop = bus.subscribe('agents:jumped', (e) => {
+      // The bus hands back the last answer on subscribe. Only a fresh one is news.
+      if (Date.now() - e.ts > SAID_MS) return;
+      const r = e.data as AgentJumped;
+      say(
+        r.id,
+        r.ok
+          ? { text: r.via ? OPENED[r.via] : 'Opened', color: 'var(--cc-text)' }
+          : { text: 'Couldn’t bring it forward', color: 'var(--cc-danger)' }
+      );
+    });
+    return () => {
+      stop();
+      live.forEach((t) => window.clearTimeout(t));
+    };
+  }, []);
+
+  const jump = (session: AgentSession) => {
+    if (!session.via) return;
+    if (ON_TABLET) {
+      say(session.id, { text: 'Open it on the PC', color: 'var(--cc-muted)' });
+      return;
+    }
+    bus.publish<AgentCommand>('agents:command', 'widget.agents', { action: 'jump', id: session.id });
+  };
+
+  return { said, jump };
+}
+
+/** Enter or Space on something drawn as a row rather than a button. */
+const onKey = (go: () => void) => (e: KeyboardEvent) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    go();
+  }
+};
+
+/** Whose move it is, so the row says it can be gone to. */
+const yours = (s: AgentSession) => s.state === 'waiting' || s.state === 'error';
 
 /**
  * A tool call open this long is lit. It may be a permission prompt, which a
@@ -84,10 +171,37 @@ export function agentSentence(session: AgentSession, now: number): string {
 
 const ELLIPSIS: CSSProperties = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-export function AgentRow({ session, now, divider = true }: { session: AgentSession; now: number; divider?: boolean }) {
+export function AgentRow({
+  session,
+  now,
+  divider = true,
+  said,
+  onJump,
+}: {
+  session: AgentSession;
+  now: number;
+  divider?: boolean;
+  said?: Said;
+  onJump?: (session: AgentSession) => void;
+}) {
   const status = agentStatus(session, now);
+  const [pressed, setPressed] = useState(false);
+  const tappable = Boolean(onJump && session.via);
+  // Only where the next move is yours, and never on a tablet, which can't go.
+  const cue = tappable && yours(session) && !ON_TABLET;
+  const go = () => onJump?.(session);
   return (
     <div
+      role={tappable ? 'button' : undefined}
+      tabIndex={tappable ? 0 : undefined}
+      aria-label={tappable ? `Go to ${name(session)}` : undefined}
+      onClick={tappable ? go : undefined}
+      onKeyDown={tappable ? onKey(go) : undefined}
+      onPointerDown={tappable ? () => setPressed(true) : undefined}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      data-agent-row={session.id}
       style={{
         flex: 'none',
         height: ROW_H,
@@ -97,6 +211,8 @@ export function AgentRow({ session, now, divider = true }: { session: AgentSessi
         padding: '0 16px',
         borderTop: divider ? '1px solid var(--cc-line)' : '1px solid transparent',
         minWidth: 0,
+        cursor: tappable ? 'pointer' : undefined,
+        background: pressed ? 'var(--cc-pane-2)' : undefined,
       }}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -109,7 +225,16 @@ export function AgentRow({ session, now, divider = true }: { session: AgentSessi
       </div>
       <div style={{ flex: 'none', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
         <span style={{ fontSize: 13, fontWeight: 500, color: status.color, whiteSpace: 'nowrap' }}>{status.label}</span>
-        <span className="cc-mini">{sinceText(now - session.sinceMs)}</span>
+        {said ? (
+          <span className="cc-mini" style={{ color: said.color, whiteSpace: 'nowrap' }}>
+            {said.text}
+          </span>
+        ) : (
+          <span className="cc-mini" style={{ whiteSpace: 'nowrap' }}>
+            {sinceText(now - session.sinceMs)}
+            {cue && <span style={{ color: 'var(--cc-accent)' }}> · Go to ›</span>}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -127,6 +252,7 @@ export function Agents({ props }: WidgetProps) {
   const agents = useTopic<AgentsPayload>('dev:agents');
   const size = useTileSize();
   const now = useNow();
+  const { said, jump } = useJump();
   // Ambient asks for the line whatever the height: one fact, stated large.
   const short = useBreakpoint(size.h, LINE_BELOW);
   const line = props.density === 'line' || short;
@@ -162,9 +288,22 @@ export function Agents({ props }: WidgetProps) {
     const top = agents.sessions[0];
     // One line in a tall tile reads larger: it grows with the tile, up to twice.
     const k = Math.max(1, Math.min(2, size.h / 110));
+    // The line goes to the session it names.
+    const tappable = Boolean(top?.via);
+    const topSaid = top ? said[top.id] : undefined;
+    // Beside the cue the line only needs the name: the count already says it waits.
+    const cue = Boolean(top && tappable && yours(top) && !topSaid && !ON_TABLET);
+    const go = () => top && jump(top);
     return (
       <div
+        role={tappable ? 'button' : undefined}
+        tabIndex={tappable ? 0 : undefined}
+        aria-label={tappable && top ? `Go to ${name(top)}` : undefined}
+        onClick={tappable ? go : undefined}
+        onKeyDown={tappable ? onKey(go) : undefined}
+        data-agent-row={top?.id}
         style={{
+          cursor: tappable ? 'pointer' : undefined,
           flex: 1,
           background: 'var(--cc-pane)',
           padding: props.density === 'line' ? '0 40px' : '0 20px',
@@ -180,8 +319,22 @@ export function Agents({ props }: WidgetProps) {
         </span>
         <span className="cc-display" style={{ fontSize: Math.round(20 * k), color: head.color, flex: 'none', whiteSpace: 'nowrap' }}>{head.text}</span>
         {top && (
-          <span style={{ fontSize: Math.round(13 * Math.min(k, 1.5)), color: 'var(--cc-muted)', minWidth: 0, ...ELLIPSIS }}>
-            {agentSentence(top, now)}
+          <span
+            style={{
+              fontSize: Math.round(13 * Math.min(k, 1.5)),
+              color: topSaid ? topSaid.color : 'var(--cc-muted)',
+              minWidth: 0,
+              ...ELLIPSIS,
+            }}
+          >
+            {topSaid ? topSaid.text : cue ? name(top) : agentSentence(top, now)}
+          </span>
+        )}
+        {cue && (
+          <span
+            style={{ flex: 'none', fontSize: Math.round(13 * Math.min(k, 1.5)), color: 'var(--cc-accent)', whiteSpace: 'nowrap' }}
+          >
+            Go to ›
           </span>
         )}
       </div>
@@ -205,7 +358,9 @@ export function Agents({ props }: WidgetProps) {
             <span className="cc-mini">No sessions in the last hour</span>
           </div>
         ) : (
-          shown.map((session, i) => <AgentRow key={session.id} session={session} now={now} divider={i > 0} />)
+          shown.map((session, i) => (
+            <AgentRow key={session.id} session={session} now={now} divider={i > 0} said={said[session.id]} onJump={jump} />
+          ))
         )}
       </div>
       {hidden > 0 && (
