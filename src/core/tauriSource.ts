@@ -33,6 +33,7 @@ export const ENGINE_TOPICS = [
   'media:art',
   'media:volume',
   'sys:notify',
+  'notify:opened',
   'app:update',
   'app:remote',
   'app:displays',

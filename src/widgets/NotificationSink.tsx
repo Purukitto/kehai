@@ -1,12 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent } from 'react';
 import { bus } from '../core/bus';
 import { mmss, p2 } from '../core/format';
+import { ON_TABLET, SAID_MS, SURE_MS, useSaid, useSure } from '../core/front';
+import type { Said } from '../core/front';
 import { useHideText } from '../core/quiet';
 import { REMOTE_PANEL } from '../core/remoteSource';
 import { useSettings } from '../core/settings';
 import { useTileSize } from '../core/TileSize';
 import { useTopic } from '../core/useTopic';
-import type { NotifyCommand, NotifyItem, NotifyPayload, SprintPayload } from '../core/payloads';
+import type { NotifyCommand, NotifyItem, NotifyOpened, NotifyPayload, SprintPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { Pane } from './chrome';
 
@@ -40,6 +43,8 @@ interface Line {
   /** Everything the row stands for, which its dismiss clears. */
   ids: number[];
   item: NotifyItem | null;
+  /** What a tap opens, as the engine traced it. */
+  opens: NotifyItem['opens'];
 }
 
 /** Newest first, as the items come. A name-only app's row sits where its newest one would. */
@@ -47,8 +52,9 @@ function lines(items: NotifyItem[]): Line[] {
   const out: Line[] = [];
   const grouped = new Map<string, Line>();
   for (const item of items) {
+    const opens = item.opens ?? null;
     if (!item.nameOnly) {
-      out.push({ key: `${item.id}:${item.atMs}`, app: item.app, source: item.source, atMs: item.atMs, ids: [item.id], item });
+      out.push({ key: `${item.id}:${item.atMs}`, app: item.app, source: item.source, atMs: item.atMs, ids: [item.id], item, opens });
       continue;
     }
     const group = grouped.get(item.app);
@@ -56,33 +62,121 @@ function lines(items: NotifyItem[]): Line[] {
       group.ids.push(item.id);
       continue;
     }
-    const line = { key: `app:${item.app}`, app: item.app, source: item.source, atMs: item.atMs, ids: [item.id], item: null };
+    const line = { key: `app:${item.app}`, app: item.app, source: item.source, atMs: item.atMs, ids: [item.id], item: null, opens };
     grouped.set(item.app, line);
     out.push(line);
   }
   return out;
 }
 
-function Row({ line, dense }: { line: Line; dense: boolean }) {
+/** What a tap did, by how the engine got there. */
+const OPENED: Record<NonNullable<NotifyOpened['how']>, string> = {
+  front: 'Opened',
+  started: 'Starting it',
+  list: 'Opened Windows’ list',
+};
+
+/**
+ * Opening a row's app on the PC, and what the last tap on each row led to,
+ * for a moment. A row its app came forward for leaves once the engine has
+ * cleared it, so it says so first.
+ */
+function useOpen() {
+  const { said, say } = useSaid();
+  const sure = useSure();
+
+  useEffect(() => {
+    const stop = bus.subscribe('notify:opened', (e) => {
+      // The bus hands back the last answer on subscribe. Only a fresh one is news.
+      if (Date.now() - e.ts > SAID_MS) return;
+      const r = e.data as NotifyOpened;
+      say(
+        String(r.id),
+        r.ok && r.how
+          ? { text: OPENED[r.how], color: 'var(--cc-text)' }
+          : { text: 'Couldn’t open it', color: 'var(--cc-danger)' }
+      );
+    });
+    return stop;
+    // `say` only sets state and timers it owns, so the first one serves.
+  }, []);
+
+  const open = (line: Line) => {
+    if (!line.opens) return;
+    const key = String(line.ids[0]);
+    if (ON_TABLET) {
+      say(key, { text: 'Open it on the PC', color: 'var(--cc-muted)' });
+      return;
+    }
+    if (!sure(key)) {
+      say(key, { text: 'Tap again to open', color: 'var(--cc-accent)' }, SURE_MS);
+      return;
+    }
+    bus.publish<NotifyCommand>('notify:command', 'widget.notify', { action: 'open', id: line.ids[0], ids: line.ids });
+  };
+
+  // A row is keyed by its first notification, which the answer names.
+  const saidOf = (line: Line): Said | undefined => said[String(line.ids[0])];
+  return { open, saidOf };
+}
+
+/** Enter or Space on something drawn as a row rather than a button. */
+const onKey = (go: () => void) => (e: KeyboardEvent) => {
+  if (e.target !== e.currentTarget) return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    go();
+  }
+};
+
+function Row({ line, dense, said, onOpen }: { line: Line; dense: boolean; said?: Said; onOpen?: (line: Line) => void }) {
   const item = line.item;
+  const [pressed, setPressed] = useState(false);
+  const tappable = Boolean(onOpen && line.opens);
+  // Every row that opens says so, except on a tablet, which can't.
+  const cue = tappable && !ON_TABLET;
+  const go = () => onOpen?.(line);
   return (
     <div
       className="cc-notify-row"
+      role={tappable ? 'button' : undefined}
+      tabIndex={tappable ? 0 : undefined}
+      aria-label={tappable ? (line.opens === 'list' ? 'Open it in Windows’ notification list' : `Open ${line.source}`) : undefined}
+      onClick={tappable ? go : undefined}
+      onKeyDown={tappable ? onKey(go) : undefined}
+      onPointerDown={tappable ? () => setPressed(true) : undefined}
+      onPointerUp={() => setPressed(false)}
+      onPointerLeave={() => setPressed(false)}
+      onPointerCancel={() => setPressed(false)}
+      data-notify-row={line.ids[0]}
       style={{
         flex: 'none',
+        width: '100%',
         padding: dense ? '6px 16px' : '8px 16px 10px',
         borderTop: '1px solid var(--cc-line)',
+        cursor: tappable ? 'pointer' : undefined,
+        background: pressed ? 'var(--cc-pane-2)' : undefined,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--cc-muted)', flex: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>
           {shortSource(line.source)}
         </span>
-        <span className="cc-mini" style={{ flex: 'none' }}>{timeOf(line.atMs)}</span>
+        {said ? (
+          <span className="cc-mini" style={{ flex: 'none', color: said.color, whiteSpace: 'nowrap' }}>
+            {said.text}
+          </span>
+        ) : (
+          <span className="cc-mini" style={{ flex: 'none' }}>{timeOf(line.atMs)}</span>
+        )}
         <div style={{ flex: 1 }} />
         <button
           className="cc-dismiss"
-          onClick={() => clear(line.ids)}
+          onClick={(e) => {
+            // The row opens; its cross only dismisses.
+            e.stopPropagation();
+            clear(line.ids);
+          }}
           aria-label="Dismiss"
           title={item ? 'Dismiss — also clears it from the system tray' : 'Dismiss them all — also clears them from the system tray'}
         >
@@ -91,30 +185,39 @@ function Row({ line, dense }: { line: Line; dense: boolean }) {
           </svg>
         </button>
       </div>
-      {item ? (
-        <div
-          style={{
-            fontSize: dense ? 13 : 14,
-            color: 'var(--cc-text)',
-            marginTop: 2,
-            lineHeight: 1.35,
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {item.title || item.body || '(no text)'}
-        </div>
-      ) : (
-        <div style={{ fontSize: 13, color: 'var(--cc-muted)', marginTop: 2 }}>
-          {line.ids.length} new
-          {!dense && (
-            <span className="cc-mini" style={{ marginLeft: 8 }}>
-              what they say isn’t shown
-            </span>
-          )}
-        </div>
-      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+        {item ? (
+          <div
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontSize: dense ? 13 : 14,
+              color: 'var(--cc-text)',
+              marginTop: 2,
+              lineHeight: 1.35,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {item.title || item.body || '(no text)'}
+          </div>
+        ) : (
+          <div style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--cc-muted)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {line.ids.length} new
+            {!dense && (
+              <span className="cc-mini" style={{ marginLeft: 8 }}>
+                what they say isn’t shown
+              </span>
+            )}
+          </div>
+        )}
+        {cue && (
+          <span aria-hidden className="cc-notify-cue" style={{ flex: 'none', width: 28, textAlign: 'center', fontSize: 15, lineHeight: 1, color: 'var(--cc-dim)' }}>
+            ›
+          </span>
+        )}
+      </div>
       {!dense && item && item.body && item.title && (
         <div
           style={{
@@ -160,6 +263,7 @@ export function NotificationSink(_: WidgetProps) {
   const hideText = useHideText();
   // An app's id, or ALL.
   const [filter, setFilter] = useState(ALL);
+  const { open, saidOf } = useOpen();
 
   const chips = useMemo(() => {
     const names = new Map<string, string>();
@@ -281,13 +385,17 @@ export function NotificationSink(_: WidgetProps) {
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      {/*
+        Rows that don't fit whole wrap into a second column, which is out of
+        sight: a row cut through is a tap target cut through.
+      */}
+      <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column', flexWrap: 'wrap', alignContent: 'flex-start' }}>
         {rows.length === 0 ? (
-          <div style={{ margin: 'auto', textAlign: 'center' }}>
+          <div style={{ margin: 'auto', width: '100%', textAlign: 'center' }}>
             <span className="cc-mini">Nothing waiting</span>
           </div>
         ) : (
-          rows.map((line) => <Row key={line.key} line={line} dense={dense} />)
+          rows.map((line) => <Row key={line.key} line={line} dense={dense} said={saidOf(line)} onOpen={open} />)
         )}
       </div>
 

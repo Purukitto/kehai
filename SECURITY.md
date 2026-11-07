@@ -39,7 +39,9 @@ surface is what it reads and what it exposes:
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
   `notify:command`, `notify:rules`, `flow:command`, `quota:command`, `update:command`,
   `remote:command`, `display:command`, `presence:command`, `game:command` and
-  `widgets:command`. `notify:rules` says which
+  `widgets:command`. `notify:command` dismisses notifications, and opens the app of one the tile
+  shows, by the Start menu entry for its app id, or the Windows notification list; it
+  names no app, path or link, and a remote panel can never send `open`. `notify:rules` says which
   apps' notifications reach the panel and what remote panels see; a remote panel can
   never send it, and until it arrives remote panels are shown none. `media:command` drives
   the player and this computer's volume, with positions and levels the engine puts in

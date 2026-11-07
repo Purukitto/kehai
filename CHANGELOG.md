@@ -9,6 +9,24 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+### Added
+
+- **Tap a notification to open its app.** Its window comes to the front on the
+  display it is on, or, with no window, the app starts from its Start menu entry,
+  which also brings back an app waiting in the tray. Once it is up, the notification
+  is cleared, as clicking it in Windows does. Windows doesn't tell other programs which
+  chat or link a notification leads to, so this opens the app rather than that message.
+  A notification that comes from no app, such as Windows' own notices, opens the
+  Windows notification list instead. Rows that open have a › at the end. Windows only
+  for now; on a tablet a tap says to open it on the PC.
+
+### Changed
+
+- While a game or a video fills its display, a tap on a notification or an agent
+  session asks for a second tap before it brings a window forward.
+- The Notifications tile shows only rows that fit whole, instead of cutting the last
+  one through.
+
 ## [0.15.0] - 2026-11-06
 
 ### Added

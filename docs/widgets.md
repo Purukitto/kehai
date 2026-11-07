@@ -18,7 +18,7 @@
 | **Agents** `agents` | Which agent sessions are working and which are waiting on you | agent sessions |
 | **Token usage** `quota` | Agent tokens in the current 5-hour block, and when it resets | agent tokens |
 | **Now playing** `media` | Track, transport, seek, cover art and this computer's volume | media session |
-| **Notifications** `notify` | System notification feed, dismissable | notifications |
+| **Notifications** `notify` | System notification feed: tap one to open its app, or dismiss it | notifications |
 | **Clock** `clock` | Time and date; hours over minutes in a tall tile | clock |
 | **Focus timer** `sprint` | Start, pause, skip, reset | focus timer |
 | **Counter-Strike 2** `cs2` | Your health, armour, money, weapon, the score and your match, while you play | Counter-Strike 2, sent by the game to this PC |
@@ -70,6 +70,25 @@ of the count. Kehai decides this before anything reaches the panel, so a hidden 
 notifications never leave this computer. The Windows list itself is left alone, and
 **Clear all** clears only what the tile shows.
 
+**Tap a notification to open its app.** Its window comes to the front on the display
+it is on, restored if it was minimised. An app with no window, such as one waiting in
+the tray, is started from its Start menu entry, as the Start menu would start it, and
+shows itself. Once it is up, the notification is cleared from the tile and from the
+Windows list, as clicking it in Windows does. A row that opens has a › at the end of
+its text, and for a moment says what the tap did: **Opened**, **Starting it**, or
+**Couldn't open it**, in which case the notification stays and the log says why.
+
+Windows tells other programs which app a notification came from, never the chat or
+link it leads to, so a tap brings the app forward rather than that message. A phone's
+notifications through Phone Link open Phone Link. A notification Kehai can't trace to an
+app, such as an older program's tray pop-up or Windows' own notices, opens the Windows
+notification list on the main display instead, where clicking it does exactly what it
+meant; it stays on the tile until it leaves that list. A **Name only** row opens its
+app and, once it is up, clears all of that app's notifications.
+
+Tablets can't open apps on the PC: a tap there says **Open it on the PC**. Opening an
+app works on Windows only for now.
+
 While a focus block runs, the tile shows only how many are waiting and when the break
 comes, unless the options turn that off. It does not follow Windows' Do Not Disturb:
 Windows does not tell other apps reliably whether it is on, and a tile that went quiet
@@ -77,6 +96,17 @@ while Do Not Disturb showed off would look broken.
 
 Remote panels see each app's name and how many unless the options say otherwise:
 **Same as here**, **Name only** or **Nothing**.
+
+Rows that don't fit whole in the tile wait off it, rather than the last one being cut
+through; the count at the foot still includes them.
+
+### While a game is full screen
+
+A tap that brings a window forward would also take the front from a game or a video
+filling the main display. So while another program fills its display, the first tap on
+a notification or an agent session only says **Tap again to open** (or **Tap again to
+go to it**) for 3 seconds, and a second tap on the same row goes. The tray's menu needs
+no second click, since using it already means leaving the game.
 
 ### Now playing
 
@@ -112,6 +142,8 @@ and you pick the session in its own list; Kehai doesn't pick a tab in a terminal
 an editor either. If Windows keeps another window in front, the row says **Couldn't
 bring it forward**, and the log says why. Ambient's line goes to the session it names,
 and the tray's menu lists up to three sessions waiting on you, to go to with a click.
+While a game or a video is full screen, a tap asks for a second, as
+[a notification does](#while-a-game-is-full-screen).
 
 Kehai knows which sessions are open from the small file the agent keeps for each one
 beside its transcripts. A session you have closed leaves the list, and stops counting
@@ -234,10 +266,11 @@ only what the game already shows you.
 | Media session, transport and seek | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
 | System volume | the default output, as the volume keys turn it | not wired | not wired |
 | Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |
+| Opening a notification's app | its window, else its Start menu entry; Windows' list for the rest | not wired | not wired |
 | Agent token usage | optional — needs local agent transcripts | same | same |
 | Agent sessions | optional — the same transcripts | same | same |
 | Focus timer | kept by the engine | same | same |
-| Whether you are at the computer | time since the last input, and the lock | not wired | not wired |
+| Whether you are at the computer | time since the last input, the lock, and whether the window in front fills its display | not wired | not wired |
 | The display's brightness | over the display's own control line (DDC/CI), where it answers | not wired | not wired |
 | A game's state | sent by the game to `127.0.0.1` once set up; Steam found through the registry | the same; Steam found in your home folder | not wired |
 

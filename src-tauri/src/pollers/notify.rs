@@ -7,10 +7,15 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Listener};
 
+use super::launch::{self, How, Opens};
 use crate::bus;
 use crate::log;
 
+const SRC: &str = "poller.notify";
 const INTERVAL: Duration = Duration::from_millis(3000);
+/// How long a row says its app came forward before it is cleared, as long as
+/// the panel shows what a tap did.
+const SAID: Duration = Duration::from_millis(1500);
 
 /// Mirrors `NotifyPayload` in `src/core/payloads.ts`.
 #[derive(Serialize, Clone, Default, PartialEq)]
@@ -48,6 +53,10 @@ pub struct Item {
     pub at_ms: i64,
     /// Its app shows its name only, so the title and body are empty.
     pub name_only: bool,
+    /// What a tap on it opens: its app, or Windows' own list for one that
+    /// can't be traced to an app. None where neither can. A remote panel gets
+    /// it too, to say such a row opens on the PC; it can't ask for it.
+    pub opens: Option<Opens>,
 }
 
 /// One app in the list. Mirrors `NotifyApp` in `src/core/payloads.ts`.
@@ -103,13 +112,27 @@ struct RulesCommand {
 
 /// What the sink asks for. Dismissing removes the toast from the system tray,
 /// not just from this feed — the widget is a view onto the real thing.
-/// `listen` is the go-ahead to ask for access and start reading.
+/// `listen` is the go-ahead to ask for access and start reading. `open`
+/// brings the app of `id` forward; never taken from a remote panel.
 #[derive(Deserialize)]
 struct Command {
     action: String,
     id: Option<u32>,
     /// For `clear`: the ones the tile shows. Without them, all it may show.
+    /// For `open`: what the row stands for, cleared once its app is up.
     ids: Option<Vec<u32>>,
+}
+
+/// Engine → local renderer on `notify:opened`, once for each open. Mirrors
+/// `NotifyOpened` in `src/core/payloads.ts`.
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct Opened {
+    id: u32,
+    ok: bool,
+    how: Option<How>,
+    /// Why not, for the log. The panel only says it couldn't.
+    reason: Option<String>,
 }
 
 /// Whether the platform has anything to ask. Where it has nothing, there is no
@@ -179,7 +202,10 @@ fn shape(raw: Vec<Item>, rule: impl Fn(&str) -> Rule) -> (Vec<Item>, Vec<App>) {
 
 /// A fresh read, as the panel may show it.
 fn current() -> NotifyPayload {
-    let raw = platform::read();
+    let mut raw = platform::read();
+    for item in &mut raw {
+        item.opens = launch::opens(&item.app);
+    }
     let (items, apps) = {
         let rules = RULES.lock().unwrap_or_else(|e| e.into_inner());
         shape(raw, |app| rule_of(&rules, app))
@@ -236,6 +262,56 @@ fn redact(envelope: &serde_json::Value, remote: Option<Remote>) -> serde_json::V
     out
 }
 
+/// Opens the app of a notification the panel shows, says how it went, and
+/// once its app is up, clears what the row stood for. Whether anything was
+/// cleared.
+fn open(app: &AppHandle, id: u32, ids: Vec<u32>) -> bool {
+    let items = current().items;
+    // Only what the tile shows: never a hidden app's, never one gone since.
+    let Some(item) = items.iter().find(|i| i.id == id) else {
+        return false;
+    };
+    let result = if item.opens.is_some() {
+        launch::open(&item.app)
+    } else {
+        Err("nothing to open it with".to_string())
+    };
+    // How, and why not, never which app: that is what it read.
+    match &result {
+        Ok(How::Front) => log::info(SRC, "brought a notification's app forward"),
+        Ok(How::Started) => log::info(SRC, "started a notification's app"),
+        Ok(How::List) => log::info(SRC, "opened Windows' notification list"),
+        Err(why) => log::warn(SRC, format!("could not open a notification's app: {why}")),
+    }
+    let came_forward = matches!(result, Ok(How::Front | How::Started));
+    bus::publish(
+        app,
+        "notify:opened",
+        SRC,
+        Opened {
+            id,
+            ok: result.is_ok(),
+            how: result.as_ref().ok().copied(),
+            reason: result.err(),
+        },
+    );
+    if !came_forward {
+        // Windows' list is where it can be clicked, so it stays.
+        return false;
+    }
+    // The row says so first, then leaves, as clicking it in Windows does.
+    thread::sleep(SAID);
+    let its_app = item.app.clone();
+    let ids: Vec<u32> = current()
+        .items
+        .iter()
+        .filter(|i| i.app == its_app && ids.contains(&i.id))
+        .map(|i| i.id)
+        .collect();
+    platform::remove(&ids);
+    true
+}
+
 fn publish_current(app: &AppHandle) {
     if GRANTED.load(Ordering::SeqCst) {
         bus::publish(app, "sys:notify", "poller.notify", current());
@@ -287,6 +363,12 @@ pub fn spawn(app: AppHandle) {
                         None => shown,
                     };
                     platform::remove(&ids);
+                }
+                "open" => {
+                    let Some(id) = cmd.id else { return };
+                    if !open(&app, id, cmd.ids.unwrap_or_else(|| vec![id])) {
+                        return;
+                    }
                 }
                 _ => return,
             }
@@ -480,6 +562,7 @@ mod platform {
                     .unwrap_or_default(),
                 at_ms,
                 name_only: false,
+                opens: None,
             });
         }
 
@@ -642,6 +725,7 @@ mod platform {
                         body: plain(&body),
                         at_ms: now_ms(),
                         name_only: false,
+                        opens: None,
                     };
                     let Ok(mut feed) = FEED.lock() else { continue };
                     // A replacement updates the one on screen, and keeps its id.
@@ -788,6 +872,7 @@ mod tests {
             body: format!("body {id}"),
             at_ms,
             name_only: false,
+            opens: Some(Opens::App),
         }
     }
 
@@ -833,7 +918,7 @@ mod tests {
             "topic": "sys:notify",
             "data": {
                 "available": true,
-                "items": [{ "id": 1, "title": "Mum", "body": "Sunday?", "nameOnly": false }],
+                "items": [{ "id": 1, "title": "Mum", "body": "Sunday?", "nameOnly": false, "opens": "app" }],
                 "apps": [{ "id": "chat" }, { "id": "hidden" }],
                 "withheld": false
             }
@@ -879,5 +964,21 @@ mod tests {
     fn same_as_here_passes_the_items_through() {
         let out = redact(&envelope(), Some(Remote::Same));
         assert_eq!(out["data"]["items"][0]["title"], "Mum");
+    }
+
+    #[test]
+    fn what_a_row_opens_reaches_the_panel_as_a_word() {
+        let mut i = item(1, "chat", 0);
+        assert_eq!(
+            serde_json::to_value(&i).expect("an item serialises")["opens"],
+            "app"
+        );
+        i.opens = Some(Opens::List);
+        assert_eq!(
+            serde_json::to_value(&i).expect("an item serialises")["opens"],
+            "list"
+        );
+        i.opens = None;
+        assert!(serde_json::to_value(&i).expect("an item serialises")["opens"].is_null());
     }
 }
