@@ -100,10 +100,22 @@ struct Target {
     id: String,
     live: Live,
     folder: Option<String>,
+    /// It waits on you, which the dock counts on the app it runs in.
+    waiting: bool,
 }
 
 /// The sessions a tap can go to, as of the last tick.
 static TARGETS: Mutex<Vec<Target>> = Mutex::new(Vec::new());
+
+/// The processes of the open sessions that wait on you, for the dock to find
+/// the app each runs in. Which session, and what it said, stay here.
+pub fn waiting() -> Vec<u32> {
+    targets()
+        .iter()
+        .filter(|t| t.waiting)
+        .map(|t| t.live.pid)
+        .collect()
+}
 
 fn targets() -> MutexGuard<'static, Vec<Target>> {
     TARGETS
@@ -496,6 +508,7 @@ fn summarise(
                 id: id.clone(),
                 live,
                 folder: tail.state.cwd.as_deref().and_then(last_part),
+                waiting: state == State::Waiting,
             });
         }
         let (project, worktree) = place(tail.state.cwd.as_deref(), path);

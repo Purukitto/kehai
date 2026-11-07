@@ -190,6 +190,12 @@ export interface MediaPayload {
   durationSec: number;
   hasArt: boolean;
   player: string;
+  /**
+   * The player's own app id, the one its notifications and Start entry carry,
+   * so a dock button for that app can say it is playing. Null when the player
+   * gave none.
+   */
+  playerApp: string | null;
   /** The player takes a new position. Some browser tabs don't. */
   canSeek: boolean;
 }
@@ -650,3 +656,116 @@ export interface LocalWidgetsPayload {
 
 /** Renderer → engine on `widgets:command`. */
 export type WidgetsCommand = { action: 'open' };
+
+// ------------------------------------------------------------------ dock
+
+/**
+ * Something a dock button or a scene step opens, as the engine knows it: an
+ * app by the id its Start entry carries, a Steam game by its app number, a
+ * web link, or a file or folder chosen with Windows' own picker.
+ */
+export type DockTarget =
+  | { kind: 'app'; id: string }
+  | { kind: 'game'; id: string }
+  | { kind: 'link'; url: string }
+  | { kind: 'path'; path: string; folder: boolean };
+
+/** One app in the Start menu, which a button can open. */
+export interface DockApp {
+  id: string;
+  name: string;
+  /** A window of it is open now. */
+  running: boolean;
+}
+
+/** One installed Steam game. */
+export interface DockGame {
+  /** Steam's app number, as text. */
+  id: string;
+  name: string;
+  running: boolean;
+  /** From Steam's own record, 0 for never. */
+  playedMs: number;
+}
+
+/**
+ * Engine → local renderer on `dock:apps`: what the add sheet offers. Sent when
+ * the sheet asks, never polled: first at once, then again once every app's
+ * icon is made. Mirrors `AppsPayload` in `pollers/dock.rs`.
+ */
+export interface DockAppsPayload {
+  apps: DockApp[];
+  games: DockGame[];
+  /** Null when Steam isn't installed, or Kehai can't find it. */
+  steam: string | null;
+  /** Icons and covers as data URLs, by `kind:id`. */
+  icons: Record<string, string>;
+}
+
+/** What the engine knows of one pinned app or game, by `kind:id`. */
+export interface DockLive {
+  running: boolean;
+  /** It has the microphone open now, by Windows' own record. */
+  listening: boolean;
+  /** Agent sessions run in it that wait on you. */
+  waiting: number;
+}
+
+/**
+ * Engine → renderer on `dock:state`: only what the dock's buttons name, on a
+ * change. Mirrors `StatePayload` in `pollers/dock.rs`.
+ */
+export interface DockStatePayload {
+  live: Record<string, DockLive>;
+}
+
+/**
+ * Engine → renderer on `dock:icons`: the icon or cover of each app and game
+ * the buttons name, as data URLs by `kind:id`. Mirrors `IconsPayload`.
+ */
+export interface DockIconsPayload {
+  icons: Record<string, string>;
+}
+
+/**
+ * Renderer → engine on `dock:pins`: everything the buttons and scenes open.
+ * The engine opens nothing else. Mirrors `Pins` in `pollers/dock.rs`.
+ */
+export interface DockPins {
+  targets: DockTarget[];
+}
+
+/** Renderer → engine on `dock:command`. Mirrors `Command` in `pollers/dock.rs`. */
+export type DockCommand =
+  | { action: 'list' }
+  /** `at`: when it was pressed. A replayed press is older and dropped. */
+  | { action: 'open'; press: string; target: DockTarget; at: number }
+  | { action: 'pick'; folder: boolean };
+
+/** Engine → local renderer on `dock:picked`: a file or folder picked in Windows' picker. */
+export interface DockPicked {
+  path: string;
+  folder: boolean;
+  name: string;
+}
+
+/** Engine → local renderer on `dock:opened`: how one open ended. */
+export interface DockOpened {
+  /** The press it answers, as the renderer named it. */
+  press: string;
+  ok: boolean;
+  /** `launched` is a game handed to Steam. */
+  how: 'front' | 'started' | 'launched' | 'link' | null;
+  reason: string | null;
+}
+
+/** Engine → renderer on `os:mic`: the default microphone, as Windows' mic settings show it. */
+export interface MicPayload {
+  available: boolean;
+  muted: boolean;
+  /** Apps with it open now, by name, newest first. */
+  listening: string[];
+}
+
+/** Renderer → engine on `mic:command`. */
+export type MicCommand = { action: 'mute'; muted: boolean };

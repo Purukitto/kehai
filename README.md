@@ -58,9 +58,10 @@ local, and stays out of the way.
       playing on the machine.
     </td>
     <td valign="top">
-      <strong>Notifications and focus</strong><br>
+      <strong>Notifications and a dock</strong><br>
       The system's notifications: tap one to bring its app forward, or dismiss it. And a
-      focus timer that keeps today's focused time across restarts.
+      dock of your apps, Steam games, scenes and the mic's mute, each showing what Kehai
+      knows about it, beside a focus timer that keeps today's time across restarts.
     </td>
   </tr>
   <tr>
@@ -88,7 +89,7 @@ local, and stays out of the way.
 
 <p align="center">
   <img src="docs/screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: the processor and the graphics card side by side, each with its load, temperature and history" width="32%">
-  <img src="docs/screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, the focus timer, notifications and a status strip with CPU, GPU, GPU temperature, memory, network and unread, evenly weighted" width="32%">
+  <img src="docs/screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, a dock of apps, toggles and a scene, notifications and a status strip with CPU, GPU, GPU temperature, memory, network and unread, evenly weighted" width="32%">
   <img src="docs/screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock, with agents, token usage, now playing, and CPU, GPU, GPU temperature and memory below it" width="32%">
   <br>
   <sub>Stage in Phosphor · Panel in Obsidian · Ambient in Ice. Any preset takes any theme.</sub>

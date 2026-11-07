@@ -1,0 +1,8 @@
+{
+  "kehai": 1,
+  "id": "dock",
+  "name": "Dock",
+  "about": "Buttons you choose: apps, games, links, toggles and scenes, each with what Kehai knows about it.",
+  "min": [2, 2],
+  "sources": ["apps", "mic", "notifications", "media", "agents", "focus"]
+}

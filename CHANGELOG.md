@@ -11,6 +11,17 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ### Added
 
+- **A dock of your own.** The Dock tile holds buttons you choose, in groups, and each
+  one shows what Kehai already knows: an app's notifications, an agent waiting in it,
+  that it is playing or has the microphone, or a game's score during a match. A tap
+  brings an app forward or starts it, starts a Steam game through Steam, or opens a
+  link, a file or a folder you picked. **Scenes** do several of these in one tap, and can
+  also switch the layout, start the focus timer, set the sound, the microphone, the
+  music or the display's brightness. Hold the tile to add and arrange buttons. Windows
+  only for now.
+- **Mute the microphone from the panel.** The dock's **Mic** button mutes this PC's
+  microphone for every app, shows in the danger colour while it is muted, and says
+  which app is listening.
 - **Tap a notification to open its app.** Its window comes to the front on the
   display it is on, or, with no window, the app starts from its Start menu entry,
   which also brings back an app waiting in the tray. Once it is up, the notification
@@ -22,8 +33,10 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ### Changed
 
-- While a game or a video fills its display, a tap on a notification or an agent
-  session asks for a second tap before it brings a window forward.
+- The Panel preset has a Dock where the Focus timer was; the dock's Focus button starts
+  and pauses the timer and shows its countdown. Your own layouts are unchanged.
+- While a game or a video fills its display, a tap on a notification, an agent session
+  or a dock button asks for a second tap before it brings a window forward.
 - The Notifications tile shows only rows that fit whole, instead of cutting the last
   one through.
 

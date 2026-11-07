@@ -2090,6 +2090,7 @@ dependencies = [
  "getrandom 0.4.3",
  "httparse",
  "mdns-sd",
+ "png",
  "serde",
  "serde_json",
  "sysinfo",
@@ -2102,6 +2103,7 @@ dependencies = [
  "tauri-plugin-window-state",
  "tungstenite",
  "windows 0.61.3",
+ "winreg",
  "zbus",
 ]
 

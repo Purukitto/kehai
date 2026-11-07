@@ -140,14 +140,115 @@ pub fn open(app: &str) -> Result<How, String> {
     platform::open(app)
 }
 
+// ----------------------------------------------------------------- the dock
+
+/// One app in the Start menu: the name it shows there, and the id it starts by.
+#[derive(Serialize, Clone, PartialEq, Eq, Debug)]
+pub struct StartApp {
+    pub id: String,
+    pub name: String,
+}
+
+/// Whether a Start entry is an app someone would put in a dock: not a web
+/// link, a document beside an app, or its uninstaller.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn is_app(id: &str, name: &str) -> bool {
+    let id_lower = id.to_ascii_lowercase();
+    let pathlike = id.contains('\\') || id.contains('/');
+    !id.is_empty()
+        && !name.trim().is_empty()
+        && !id.contains("://")
+        && !name.to_ascii_lowercase().starts_with("uninstall")
+        && (!pathlike || id_lower.ends_with(".exe"))
+}
+
+/// The apps in the Start menu, by name.
+pub fn start_menu() -> Vec<StartApp> {
+    platform::start_menu()
+}
+
+/// Brings an app's window forward, or starts it from its Start entry. Unlike a
+/// notification's, an app with no Start entry opens nothing.
+pub fn open_app(id: &str) -> Result<How, String> {
+    platform::open_app(id)
+}
+
+/// Opens a web link, a file or a folder the way Windows opens one clicked in
+/// File Explorer. Only for what the dock checked first.
+pub fn open_thing(target: &str) -> Result<(), String> {
+    platform::open_thing(target)
+}
+
+/// Which of these apps have a window open now, from one look at the windows.
+pub fn running(ids: &[String]) -> std::collections::HashSet<String> {
+    platform::running(ids)
+}
+
+/// Whether a process runs inside this app: the app is its program, or the
+/// program of a process above it, as the app an agent's session runs in is.
+pub fn hosts(id: &str, pid: u32) -> bool {
+    platform::hosts(id, pid)
+}
+
+/// Whether Windows' privacy records, which name an app by its package or by
+/// its program's path, mean this app.
+pub fn is_holder(id: &str, package: Option<&str>, exe: Option<&str>) -> bool {
+    platform::is_holder(id, package, exe)
+}
+
+/// What the Start menu calls a package or a program, for saying which app has
+/// the microphone. A program with no Start entry goes by its file's name.
+pub fn name_for(package: Option<&str>, exe: Option<&str>) -> Option<String> {
+    platform::name_for(package, exe)
+}
+
+/// An app's own icon, square, as a PNG data URL.
+pub fn icon(id: &str, px: u32) -> Option<String> {
+    platform::icon(id, px)
+}
+
+/// A program's file name without `.exe`, for one that has no Start entry.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn file_stem(exe: &str) -> Option<String> {
+    let name = exe.rsplit(['\\', '/']).next()?;
+    let stem = name
+        .strip_suffix(".exe")
+        .or_else(|| name.strip_suffix(".EXE"))
+        .unwrap_or(name);
+    (!stem.is_empty()).then(|| stem.to_string())
+}
+
+/// Windows hands icons over in blue-green-red order with each colour already
+/// multiplied by its opacity. PNG wants red first and colours as they are. An
+/// icon with no opacity at all has none to speak of: it is solid.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn straighten(bgra: &mut [u8]) {
+    let solid = bgra.chunks_exact(4).all(|p| p[3] == 0);
+    for p in bgra.chunks_exact_mut(4) {
+        p.swap(0, 2);
+        if solid {
+            p[3] = 255;
+        } else if p[3] > 0 && p[3] < 255 {
+            let a = u16::from(p[3]);
+            for c in &mut p[..3] {
+                *c = ((u16::from(*c) * 255 + a / 2) / a).min(255) as u8;
+            }
+        }
+    }
+}
+
 #[cfg(windows)]
 mod platform {
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
     use std::sync::{LazyLock, Mutex};
     use std::time::{Duration, Instant};
 
-    use windows::core::{GUID, HSTRING, PCWSTR, PWSTR};
-    use windows::Win32::Foundation::{CloseHandle, HWND, PROPERTYKEY};
+    use windows::core::{Interface, GUID, HSTRING, PCWSTR, PWSTR};
+    use windows::Win32::Foundation::{CloseHandle, HWND, PROPERTYKEY, SIZE};
+    use windows::Win32::Graphics::Gdi::{
+        DeleteObject, GetDC, GetDIBits, GetObjectW, ReleaseDC, BITMAP, BITMAPINFO,
+        BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HBITMAP, HGDIOBJ,
+    };
     use windows::Win32::Storage::Packaging::Appx::GetApplicationUserModelId;
     use windows::Win32::System::Com::StructuredStorage::{
         PropVariantClear, PropVariantToStringAlloc,
@@ -162,16 +263,17 @@ mod platform {
     };
     use windows::Win32::UI::Shell::{
         BHID_EnumItems, FOLDERID_AppsFolder, IEnumShellItems, IShellItem, IShellItem2,
-        SHCreateItemInKnownFolder, SHGetIDListFromObject, SHGetKnownFolderItem, ShellExecuteExW,
-        KF_FLAG_DEFAULT, SEE_MASK_FLAG_NO_UI, SEE_MASK_IDLIST, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW,
-        SIGDN_PARENTRELATIVEPARSING,
+        IShellItemImageFactory, SHCreateItemInKnownFolder, SHGetIDListFromObject,
+        SHGetKnownFolderItem, ShellExecuteExW, KF_FLAG_DEFAULT, SEE_MASK_FLAG_NO_UI,
+        SEE_MASK_IDLIST, SEE_MASK_NOASYNC, SHELLEXECUTEINFOW, SIGDN_NORMALDISPLAY,
+        SIGDN_PARENTRELATIVEPARSING, SIIGBF_BIGGERSIZEOK, SIIGBF_ICONONLY,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
         AllowSetForegroundWindow, ASFW_ANY, SW_SHOWNORMAL,
     };
 
     use super::super::front;
-    use super::{family, pick, How, Opens, Route, Whose};
+    use super::{family, file_stem, is_app, pick, straighten, How, Opens, Route, StartApp, Whose};
 
     /// `System.AppUserModel.ID`: the app id a window or a Start entry carries.
     const PKEY_APP_ID: PROPERTYKEY = PROPERTYKEY {
@@ -418,11 +520,265 @@ mod platform {
         }
         start(&route.id).map(|()| How::Started)
     }
+
+    // ------------------------------------------------------------- the dock
+
+    /// The Start menu's apps, kept for a while: it changes when something is
+    /// installed, not from one look to the next.
+    type Menu = Option<(Vec<StartApp>, Instant)>;
+    static MENU: LazyLock<Mutex<Menu>> = LazyLock::new(|| Mutex::new(None));
+    const MENU_FOR: Duration = Duration::from_secs(300);
+
+    #[allow(unsafe_code)]
+    fn read_menu() -> Vec<StartApp> {
+        let mut all: Vec<StartApp> = Vec::new();
+        // SAFETY: the Start menu's own folder, and its items, each released as it goes.
+        unsafe {
+            let Ok(folder) =
+                SHGetKnownFolderItem::<IShellItem>(&FOLDERID_AppsFolder, KF_FLAG_DEFAULT, None)
+            else {
+                return all;
+            };
+            let Ok(items) = folder.BindToHandler::<_, IEnumShellItems>(None, &BHID_EnumItems)
+            else {
+                return all;
+            };
+            loop {
+                let mut one = [None];
+                let mut got = 0u32;
+                if items.Next(&mut one, Some(&mut got)).is_err() || got == 0 {
+                    break;
+                }
+                let Some(item) = one[0].take() else { break };
+                let id = take(
+                    item.GetDisplayName(SIGDN_PARENTRELATIVEPARSING)
+                        .unwrap_or(PWSTR::null()),
+                );
+                let name = take(
+                    item.GetDisplayName(SIGDN_NORMALDISPLAY)
+                        .unwrap_or(PWSTR::null()),
+                );
+                if let (Some(id), Some(name)) = (id, name) {
+                    if is_app(&id, &name) && !all.iter().any(|a| a.id == id) {
+                        all.push(StartApp { id, name });
+                    }
+                }
+            }
+        }
+        all.sort_by_key(|a| a.name.to_lowercase());
+        all
+    }
+
+    pub fn start_menu() -> Vec<StartApp> {
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        let mut menu = MENU.lock().unwrap_or_else(|e| e.into_inner());
+        if let Some((apps, at)) = menu.as_ref() {
+            if at.elapsed() < MENU_FOR {
+                return apps.clone();
+            }
+        }
+        let apps = read_menu();
+        *menu = Some((apps.clone(), Instant::now()));
+        apps
+    }
+
+    pub fn open_app(id: &str) -> Result<How, String> {
+        let _com = Apartment::join(COINIT(
+            COINIT_APARTMENTTHREADED.0 | COINIT_DISABLE_OLE1DDE.0,
+        ));
+        let route = route(id).ok_or_else(|| "it is no longer in the Start menu".to_string())?;
+        if let Some(hwnd) = pick(&windows(), &route) {
+            return front::raise(hwnd).map(|()| How::Front);
+        }
+        start(&route.id).map(|()| How::Started)
+    }
+
+    pub fn open_thing(target: &str) -> Result<(), String> {
+        let _com = Apartment::join(COINIT(
+            COINIT_APARTMENTTHREADED.0 | COINIT_DISABLE_OLE1DDE.0,
+        ));
+        let target = HSTRING::from(target);
+        let mut info = SHELLEXECUTEINFOW {
+            lpFile: PCWSTR(target.as_ptr()),
+            ..Default::default()
+        };
+        shell_open(&mut info)
+    }
+
+    pub fn running(ids: &[String]) -> HashSet<String> {
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        let wins = windows();
+        ids.iter()
+            .filter(|id| route(id).is_some_and(|r| pick(&wins, &r).is_some()))
+            .cloned()
+            .collect()
+    }
+
+    /// How far up from an agent's process its app can be.
+    const MAX_UP: usize = 12;
+
+    pub fn hosts(id: &str, pid: u32) -> bool {
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        let Some(route) = route(id) else { return false };
+        let procs = front::processes();
+        let mut at = pid;
+        for _ in 0..MAX_UP {
+            let Some((parent, name)) = procs.get(&at) else {
+                return false;
+            };
+            if name == "explorer.exe" || name == "services.exe" {
+                return false;
+            }
+            let whose = Whose {
+                window: None,
+                package: package_id(at),
+                image: front::image(at),
+            };
+            if super::by_id(&whose, &route) || super::by_program(&whose, &route) {
+                return true;
+            }
+            if *parent == 0 || *parent == at {
+                return false;
+            }
+            at = *parent;
+        }
+        false
+    }
+
+    pub fn is_holder(id: &str, package: Option<&str>, exe: Option<&str>) -> bool {
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        let Some(route) = route(id) else { return false };
+        let by_package =
+            package.is_some_and(|p| family(&route.id).is_some_and(|f| f.eq_ignore_ascii_case(p)));
+        let by_exe = exe.is_some_and(|e| {
+            route
+                .exe
+                .as_deref()
+                .is_some_and(|r| super::same_program(e, r))
+        });
+        by_package || by_exe
+    }
+
+    pub fn name_for(package: Option<&str>, exe: Option<&str>) -> Option<String> {
+        let menu = start_menu();
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        if let Some(p) = package {
+            if let Some(app) = menu
+                .iter()
+                .find(|a| family(&a.id).is_some_and(|f| f.eq_ignore_ascii_case(p)))
+            {
+                return Some(app.name.clone());
+            }
+        }
+        if let Some(e) = exe {
+            let found = menu.iter().find(|a| {
+                route(&a.id)
+                    .and_then(|r| r.exe)
+                    .is_some_and(|r| super::same_program(e, &r))
+            });
+            return found.map(|a| a.name.clone()).or_else(|| file_stem(e));
+        }
+        None
+    }
+
+    #[allow(unsafe_code)]
+    pub fn icon(id: &str, px: u32) -> Option<String> {
+        let _com = Apartment::join(COINIT_MULTITHREADED);
+        let item = entry(id)?;
+        // SAFETY: a live item; the bitmap it hands back is ours, deleted below.
+        let bitmap = unsafe {
+            let factory: IShellItemImageFactory = item.cast().ok()?;
+            factory
+                .GetImage(
+                    SIZE {
+                        cx: px as i32,
+                        cy: px as i32,
+                    },
+                    SIIGBF_ICONONLY | SIIGBF_BIGGERSIZEOK,
+                )
+                .ok()?
+        };
+        let pixels = rgba(bitmap);
+        // SAFETY: made by GetImage above, and not used after this.
+        let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
+        let (w, h, data) = pixels?;
+        png_url(w, h, &data)
+    }
+
+    /// A bitmap's pixels as straight RGBA, top row first.
+    #[allow(unsafe_code)]
+    fn rgba(bitmap: HBITMAP) -> Option<(u32, u32, Vec<u8>)> {
+        let mut bm = BITMAP::default();
+        // SAFETY: a live bitmap, and a structure of the size passed.
+        let got = unsafe {
+            GetObjectW(
+                HGDIOBJ(bitmap.0),
+                size_of::<BITMAP>() as i32,
+                Some((&mut bm as *mut BITMAP).cast()),
+            )
+        };
+        if got == 0 || !(1..=512).contains(&bm.bmWidth) || !(1..=512).contains(&bm.bmHeight) {
+            return None;
+        }
+        let (w, h) = (bm.bmWidth, bm.bmHeight);
+        let mut info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: w,
+                // Negative: the top row first.
+                biHeight: -h,
+                biPlanes: 1,
+                biBitCount: 32,
+                biCompression: BI_RGB.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let mut data = vec![0u8; (w * h * 4) as usize];
+        // SAFETY: the screen's context, released below; a buffer of the size
+        // the header describes.
+        let lines = unsafe {
+            let dc = GetDC(None);
+            let n = GetDIBits(
+                dc,
+                bitmap,
+                0,
+                h as u32,
+                Some(data.as_mut_ptr().cast()),
+                &mut info,
+                DIB_RGB_COLORS,
+            );
+            ReleaseDC(None, dc);
+            n
+        };
+        if lines == 0 {
+            return None;
+        }
+        straighten(&mut data);
+        Some((w as u32, h as u32, data))
+    }
+
+    /// Icons go to the panel as PNG, which the webview draws without help.
+    fn png_url(w: u32, h: u32, rgba: &[u8]) -> Option<String> {
+        use base64::Engine;
+        let mut out = Vec::new();
+        {
+            let mut encoder = png::Encoder::new(&mut out, w, h);
+            encoder.set_color(png::ColorType::Rgba);
+            encoder.set_depth(png::BitDepth::Eight);
+            let mut writer = encoder.write_header().ok()?;
+            writer.write_image_data(rgba).ok()?;
+        }
+        Some(format!(
+            "data:image/png;base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(out)
+        ))
+    }
 }
 
 #[cfg(not(windows))]
 mod platform {
-    use super::{How, Opens};
+    use super::{How, Opens, StartApp};
 
     pub fn opens(_app: &str) -> Option<Opens> {
         None
@@ -430,6 +786,38 @@ mod platform {
 
     pub fn open(_app: &str) -> Result<How, String> {
         Err("opening a notification's app works only on Windows so far".to_string())
+    }
+
+    pub fn start_menu() -> Vec<StartApp> {
+        Vec::new()
+    }
+
+    pub fn open_app(_id: &str) -> Result<How, String> {
+        Err("the dock opens apps only on Windows so far".to_string())
+    }
+
+    pub fn open_thing(_target: &str) -> Result<(), String> {
+        Err("the dock opens things only on Windows so far".to_string())
+    }
+
+    pub fn running(_ids: &[String]) -> std::collections::HashSet<String> {
+        std::collections::HashSet::new()
+    }
+
+    pub fn hosts(_id: &str, _pid: u32) -> bool {
+        false
+    }
+
+    pub fn is_holder(_id: &str, _package: Option<&str>, _exe: Option<&str>) -> bool {
+        false
+    }
+
+    pub fn name_for(_package: Option<&str>, _exe: Option<&str>) -> Option<String> {
+        None
+    }
+
+    pub fn icon(_id: &str, _px: u32) -> Option<String> {
+        None
     }
 }
 
@@ -551,6 +939,42 @@ mod tests {
             pick(&[(9, whose(None, None, Some(r"C:\y.exe")))], &plain),
             None
         );
+    }
+
+    #[test]
+    fn only_apps_are_offered_for_the_dock() {
+        assert!(is_app("com.squirrel.Discord.Discord", "Discord"));
+        assert!(is_app(
+            "Microsoft.YourPhone_8wekyb3d8bbwe!App",
+            "Phone Link"
+        ));
+        assert!(is_app(r"D:\Steam\Steam.exe", "Steam"));
+        assert!(!is_app(
+            "http://support.steampowered.com/",
+            "Steam Support Center"
+        ));
+        assert!(!is_app(r"{6D809377}\App\readme.txt", "Read me"));
+        assert!(!is_app("App.Uninstall", "Uninstall App"));
+        assert!(!is_app("", "Nameless"));
+    }
+
+    #[test]
+    fn a_program_without_an_entry_goes_by_its_file_name() {
+        assert_eq!(file_stem(r"C:\Apps\Chat\Chat.exe").as_deref(), Some("Chat"));
+        assert_eq!(file_stem("C:/x/rec.EXE").as_deref(), Some("rec"));
+        assert_eq!(file_stem(r"C:\x\"), None);
+    }
+
+    #[test]
+    fn icons_come_out_red_first_and_unmultiplied() {
+        // Half-opaque pure blue, premultiplied: B=128, A=128.
+        let mut px = vec![128, 0, 0, 128, 10, 20, 30, 255];
+        straighten(&mut px);
+        assert_eq!(px, vec![0, 0, 255, 128, 30, 20, 10, 255]);
+        // An icon with no opacity at all is solid.
+        let mut flat = vec![1, 2, 3, 0];
+        straighten(&mut flat);
+        assert_eq!(flat, vec![3, 2, 1, 255]);
     }
 
     /// Where each app that has sent notifications on this PC leads, read from

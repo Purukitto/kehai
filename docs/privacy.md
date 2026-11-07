@@ -9,7 +9,7 @@ read.
 - [What it writes](#what-it-writes)
 - [What it sends](#what-it-sends)
 - [What it listens for](#what-it-listens-for)
-- [Five sources worth stating plainly](#five-sources-worth-stating-plainly)
+- [Sources worth stating plainly](#sources-worth-stating-plainly)
 
 ## What it writes
 
@@ -23,12 +23,16 @@ All in its own app-data folder:
 | `window.json` | Whether Kehai has a taskbar button, and whether it shows the panel when it starts | So both apply before the window is shown |
 | `games.json` | Each game you set up: where it is, the key in its file, and the port | So the game still reaches Kehai after a restart |
 | `backlight.json` | The brightness you set for the display Kehai is for, and the level Kehai last left it at | So a display turned down for the night gets your level back, even after Kehai stops unexpectedly |
+| `dock.json` | Each file or folder you picked for the dock in Windows' picker | So the dock opens those, and no other file |
 | `widgets\` | Widget files you add yourself, if you open the folder | Read, never run |
 
 Outside that folder, Kehai writes one file and only when you ask: **Set up** for a game
 widget puts `gamestate_integration_kehai_<widget>.cfg` in the game's own settings folder,
 after showing you where. **REMOVE** deletes it again, and Kehai never touches another
 program's file there.
+
+With the dock's **Mic** button, Kehai mutes or unmutes this PC's default microphone, and
+the one Windows uses for calls, as Windows' own sound settings do.
 
 Kehai also changes one setting of the display it is for: its brightness, over the
 display's own control line (DDC/CI), at night and while you are away, where the display
@@ -46,7 +50,8 @@ The log is in the local app-data folder, under `logs`:
 
 The log holds versions, displays, folder paths Kehai was given, ports, and the errors
 the system returned. It never holds notification text, anything from an agent
-transcript, what is playing, the remote key or a pairing link. **More detail** adds how
+transcript, what is playing, the remote key, a pairing link, or which app, game, link
+or file a dock button opened. **More detail** adds how
 often each source published, and turns itself off when Kehai restarts.
 
 ## What it sends
@@ -83,7 +88,7 @@ a paired tablet can find it again after the router hands it a new address. The
 pairing link and code carry the same name. Turn the remote panel off and the
 announcement stops. More in [Remote panel](remote-panel.md).
 
-## Five sources worth stating plainly
+## Sources worth stating plainly
 
 ### Notifications
 
@@ -154,6 +159,26 @@ duration and a yes or no, never what was pressed or where. So that a tap doesn't
 a game out of the front, it also asks which window is in front and whether that window
 fills its display, keeping only the yes or no, never the window's title or program.
 None of it is kept, and none of it reaches a remote panel.
+
+### The dock
+
+The dock's add sheet lists the apps in the Start menu, with their icons, and the games
+in Steam's libraries, from Steam's own files on this PC: each game's manifest (its name,
+folder and when it was last played) and the cover Steam keeps for it. It reads these
+only while the sheet is open, keeps them in memory, and never sends the list beyond
+this PC's panel.
+
+For the apps and games on its buttons, every few seconds, it looks at which windows are
+open and the programs they belong to, never their contents; at Windows' own privacy
+records of which apps have the microphone open now, the same ones the taskbar's
+microphone indicator reads, never when an app last used it; and, for an agent session
+waiting on you, at the programs above the session's process, to find the app it runs
+in. A tablet sees the buttons, their icons and covers, and which app is listening, never
+the list of what is installed.
+
+A button opens only what the dock holds: an app by its Start menu entry, a game through
+Steam, an https link, or a file or folder picked in Windows' picker on this PC. Only a
+tap on this PC opens anything; a remote panel cannot.
 
 ### Games
 

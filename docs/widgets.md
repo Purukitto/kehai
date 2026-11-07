@@ -19,6 +19,7 @@
 | **Token usage** `quota` | Agent tokens in the current 5-hour block, and when it resets | agent tokens |
 | **Now playing** `media` | Track, transport, seek, cover art and this computer's volume | media session |
 | **Notifications** `notify` | System notification feed: tap one to open its app, or dismiss it | notifications |
+| **Dock** `dock` | Buttons you choose: apps, Steam games, links and files, toggles and scenes, each showing what Kehai knows about it | apps and games, microphone, notifications, media session, agent sessions, focus timer |
 | **Clock** `clock` | Time and date; hours over minutes in a tall tile | clock |
 | **Focus timer** `sprint` | Start, pause, skip, reset | focus timer |
 | **Counter-Strike 2** `cs2` | Your health, armour, money, weapon, the score and your match, while you play | Counter-Strike 2, sent by the game to this PC |
@@ -104,8 +105,9 @@ through; the count at the foot still includes them.
 
 A tap that brings a window forward would also take the front from a game or a video
 filling the main display. So while another program fills its display, the first tap on
-a notification or an agent session only says **Tap again to open** (or **Tap again to
-go to it**) for 3 seconds, and a second tap on the same row goes. The tray's menu needs
+a notification, an agent session or a dock button that opens something only says **Tap
+again to open** (or **Tap again to go to it**, or **Tap again**) for 3 seconds, and a
+second tap on the same one goes. The tray's menu needs
 no second click, since using it already means leaving the game.
 
 ### Now playing
@@ -153,6 +155,46 @@ windows forward: a tap there says **Open it on the PC**. Going to a window works
 Windows only for now.
 
 What these read, and what they never read, is in [Privacy](privacy.md).
+
+### Dock
+
+A Dock tile holds buttons you choose. Each button is kept once and sorted into groups,
+such as Work, Play or a call, and each Dock tile shows one group, picked in its options:
+a layout for games can show your games while Panel shows the apps you work in. A button
+can be in more than one group. A new dock starts with one group of four toggles.
+
+- **An app** from the Start menu. A tap brings its window to the front, or starts it as
+  the Start menu would. Its button shows what Kehai already knows about it: how many of
+  its notifications are in the Windows list, an agent session waiting in it (a count in
+  the accent colour), that it is what Now playing shows, that it has the microphone, and
+  a small dot while it has a window open. Each of these can be turned off in the
+  button's options.
+- **A Steam game**, with the cover Steam keeps for it on this PC. A tap brings the game
+  forward if it is running, or asks Steam to start it, as Steam's own shortcuts do. A
+  game Kehai reads, such as Counter-Strike 2, shows the score during a match.
+- **A link, a file or a folder**: an https link, or a file or folder picked in Windows'
+  own picker. Windows opens it as File Explorer would.
+- **A toggle.** **Mic** mutes this PC's microphone for every app, and says which app is
+  listening. **Sound** mutes the PC, as the mute key does. **Focus** starts and pauses
+  the focus timer and shows its countdown. **Music** plays and pauses what Now playing
+  shows. A muted microphone or PC shows in the danger colour.
+- **A scene**: several steps in order from one tap. A step opens an app, a game, a link
+  or a file, or sets something: the layout on this panel, the focus timer, the PC's
+  sound, the microphone, the music, or the display's brightness. A scene never closes
+  anything, sends no keystrokes and runs no commands. If a step fails, the rest still
+  run, and the button says how many did.
+
+Buttons are as big as the tile allows, down to a finger's width; any that don't fit go
+behind **+N**, which shows the whole group in the tile until **Back**. A free place says
+**Add**. Hold the tile, or right-click it, to add, change, reorder (drag ⠿) or remove
+buttons and groups. Removing a button asks for a second tap.
+
+A tap says what it did for a moment: **Opened**, **Starting it**, **Steam is starting
+it**, or **Couldn't open it**, and the log says why. While a game or a video fills its
+display, a button that would bring something forward asks for a second tap, as
+[a notification does](#while-a-game-is-full-screen); toggles act at once. Tablets show
+the dock and what it knows, live, and a tap there says to press it on the PC. The dock
+works on Windows only for now.
 
 ## Game widgets
 
@@ -265,6 +307,8 @@ only what the game already shows you.
 | Graphics card temperature, fan and power | from the card's driver, where it reports them (Windows 10 2004 or later) | not wired | not wired |
 | Media session, transport and seek | via GSMTC, including cover art | via MPRIS; cover art only from local files | not wired |
 | System volume | the default output, as the volume keys turn it | not wired | not wired |
+| Microphone mute, and which app is listening | the default microphone (and the one for calls); Windows' privacy records | not wired | not wired |
+| Dock: apps, Steam games, links and files | the Start menu, and Steam's library and cached covers | not wired | not wired |
 | Notifications | via `UserNotificationListener` | via a session-bus monitor; only those that arrive while Kehai runs | not wired |
 | Opening a notification's app | its window, else its Start menu entry; Windows' list for the rest | not wired | not wired |
 | Agent token usage | optional — needs local agent transcripts | same | same |

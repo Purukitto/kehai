@@ -46,8 +46,10 @@ It only reads unless **Allow control** is on, and even then it can only press th
 buttons the panel has: play, skip and seek, the volume, dismissing a notification, and
 starting or pausing the focus timer. It can never change a setting, name a file or
 start an update. Holding a tile there says the options are on the host, and tapping a
-notification or an agent session says to open it on the PC, since only the PC can bring
-its own windows forward.
+notification, an agent session or a dock button says to open it on the PC, since only
+the PC can bring its own windows forward. The dock shows there with what it knows, live,
+including which app is listening on the microphone, but its buttons, the **Mic** among
+them, are pressed only on the PC.
 
 Notifications reach it as each app's name and how many, never what they say, unless
 the host's Notifications options say **Same as here** or **Nothing**. An app hidden on

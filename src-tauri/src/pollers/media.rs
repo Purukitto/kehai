@@ -20,6 +20,9 @@ pub struct MediaPayload {
     pub duration_sec: u64,
     pub has_art: bool,
     pub player: String,
+    /// The player's own app id, the one its notifications and Start entry
+    /// carry, so a dock button for that app can say it is playing.
+    pub player_app: Option<String>,
     /// The player takes a new position. Some browser tabs don't.
     pub can_seek: bool,
 }
@@ -233,6 +236,11 @@ mod platform {
                 .SourceAppUserModelId()
                 .map(|s| friendly(&s.to_string()))
                 .unwrap_or_else(|_| "Unknown".to_string()),
+            player_app: session
+                .SourceAppUserModelId()
+                .ok()
+                .map(|s| s.to_string())
+                .filter(|s| !s.is_empty()),
             can_seek: playback
                 .Controls()
                 .and_then(|c| c.IsPlaybackPositionEnabled())
@@ -556,6 +564,7 @@ mod platform {
                 .unwrap_or(0),
             has_art: art_path(metadata).is_some(),
             player: identity(bus, &name),
+            player_app: None,
             can_seek: matches!(
                 props.get("CanSeek").map(|v| &**v).map(plain),
                 Some(Value::Bool(true))
