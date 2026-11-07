@@ -6,8 +6,8 @@
 
 <p align="center">
   A companion dashboard for a secondary display. System telemetry, coding agents and
-  their token usage, media and notifications, in a quiet panel you read out of the
-  corner of your eye.
+  their token usage, media, notifications and a dock of your apps and games, in a quiet
+  panel you read out of the corner of your eye.
 </p>
 
 <p align="center">
@@ -154,6 +154,8 @@ header on a touchscreen. [Using Kehai](docs/using.md) covers the rest.
   of its own.
 - It reads no notifications until you press **Allow**, and no prompt or response text
   from agent transcripts, ever.
+- The dock opens only what you put on it, and only from a tap on this PC: an app by its
+  Start menu entry, a game through Steam, an https link, or a file you picked.
 
 The details, source by source, are in [Privacy](docs/privacy.md).
 
@@ -161,7 +163,7 @@ The details, source by source, are in [Privacy](docs/privacy.md).
 
 - HTTPS for the remote panel, so it can be used on a network you do not trust
 - Media and notifications on macOS, which keeps both behind private frameworks
-- The system volume on Linux
+- The system volume, the microphone and the dock on Linux
 - Code signing, so installers stop tripping SmartScreen
 
 ## Contributing
