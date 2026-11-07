@@ -751,29 +751,21 @@ export function startMockSource(options: MockOptions = {}): () => void {
     ['#4f9fd0', '#0e1d2a'],
     ['#b7473f', '#140c0c'],
   ];
-  const cover = (name: string, i: number) => {
+  // Drawn art with no words on it: the button already says the game's name, as
+  // a real cover's art does without it.
+  const cover = (i: number) => {
     const [a, b] = COVER_HUES[i % COVER_HUES.length];
-    const lines = name
-      .replace(/:.*/, '')
-      .split(' ')
-      .reduce<string[]>((acc, w) => {
-        const last = acc[acc.length - 1];
-        if (last && `${last} ${w}`.length <= 12) acc[acc.length - 1] = `${last} ${w}`;
-        else acc.push(w);
-        return acc;
-      }, []);
-    const text = lines
-      .map((l, j) => `<text x="300" y="${640 + j * 74}" text-anchor="middle" font-family="Segoe UI, sans-serif" font-weight="700" font-size="64" fill="#fff" opacity=".92">${l}</text>`)
-      .join('');
+    const x = 180 + ((i * 47) % 260);
+    const ridge = `0,${640 + (i % 3) * 30} 160,${560 + (i % 2) * 50} 330,${620 - (i % 4) * 20} 470,${540 + (i % 3) * 25} 600,${600 - (i % 2) * 40} 600,900 0,900`;
     return svg(
-      `<defs><linearGradient id="c" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="600" height="900" fill="url(#c)"/><circle cx="${180 + ((i * 47) % 260)}" cy="300" r="180" fill="#fff" opacity=".08"/>${text}`,
+      `<defs><linearGradient id="c" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="600" height="900" fill="url(#c)"/><circle cx="${x}" cy="300" r="180" fill="#fff" opacity=".1"/><polygon points="${ridge}" fill="#000" opacity=".35"/>`,
       600,
       900
     );
   };
   const dockIcons: Record<string, string> = {
     ...Object.fromEntries(Object.entries(APP_ICONS).map(([id, src]) => [`app:${id}`, src])),
-    ...Object.fromEntries(GAMES.map((g, i) => [`game:${g.id}`, cover(g.name, i)])),
+    ...Object.fromEntries(GAMES.map((g, i) => [`game:${g.id}`, cover(i)])),
   };
   const pubDock = () =>
     pub<DockStatePayload>('dock:state', 'mock.dock', {
