@@ -9,8 +9,8 @@
         { "widget": "quota", "area": [1, 4, 5, 7], "props": {} },
         { "widget": "agents", "area": [1, 7, 5, 13], "props": {} },
         { "widget": "media", "area": [5, 1, 8, 5], "props": { "art": true } },
-        { "widget": "sprint", "area": [5, 5, 8, 8], "props": {} },
-        { "widget": "notify", "area": [5, 8, 8, 13], "props": {} },
+        { "widget": "dock", "area": [5, 5, 8, 9], "props": {} },
+        { "widget": "notify", "area": [5, 9, 8, 13], "props": {} },
         { "widget": "vitals", "area": [8, 1, 9, 13], "props": { "show": ["cpu", "gpu", "gputemp", "mem", "net", "unread"] } }
       ]
     },
@@ -20,7 +20,7 @@
         { "widget": "clock", "area": [1, 1, 3, 4], "props": { "seconds": false } },
         { "widget": "quota", "area": [3, 1, 5, 4], "props": {} },
         { "widget": "agents", "area": [1, 4, 5, 9], "props": {} },
-        { "widget": "sprint", "area": [1, 9, 3, 13], "props": {} },
+        { "widget": "dock", "area": [1, 9, 3, 13], "props": {} },
         { "widget": "media", "area": [3, 9, 5, 13], "props": { "art": true } },
         { "widget": "notify", "area": [1, 13, 4, 17], "props": {} },
         { "widget": "vitals", "area": [4, 13, 5, 17], "props": { "show": ["cpu", "gpu", "unread"] } }
@@ -32,7 +32,7 @@
         { "widget": "clock", "area": [1, 1, 3, 5], "props": { "seconds": false } },
         { "widget": "quota", "area": [1, 5, 3, 9], "props": {} },
         { "widget": "agents", "area": [3, 1, 6, 9], "props": {} },
-        { "widget": "sprint", "area": [6, 1, 8, 5], "props": {} },
+        { "widget": "dock", "area": [6, 1, 8, 5], "props": {} },
         { "widget": "media", "area": [6, 5, 8, 9], "props": { "art": true } },
         { "widget": "notify", "area": [8, 1, 12, 9], "props": {} },
         { "widget": "vitals", "area": [12, 1, 13, 9], "props": { "show": ["cpu", "gpu", "gputemp", "mem", "unread"] } }

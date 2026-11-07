@@ -7,6 +7,8 @@ import { WidgetError, parseWidget, topicsOf } from '../core/widget';
 import type { WidgetDescription } from '../core/widget';
 import { Agents } from './Agents';
 import { Clock } from './Clock';
+import { Dock } from './Dock';
+import { DockOptions } from './dockOptions';
 import { GameTile } from './Game';
 import type { GameDescription } from './Game';
 import { GameOptions } from './gameOptions';
@@ -21,6 +23,7 @@ import { OPTIONS } from './options';
 import agents from './agents.widget.json';
 import clock from './clock.widget.json';
 import cs2 from './cs2.widget.json';
+import dock from './dock.widget.json';
 import media from './media.widget.json';
 import notify from './notify.widget.json';
 import quota from './quota.widget.json';
@@ -33,6 +36,7 @@ import vitals from './vitals.widget.json';
 const COMPONENTS: Record<string, ComponentType<WidgetProps>> = {
   agents: Agents,
   clock: Clock,
+  dock: Dock,
   media: NowPlaying,
   notify: NotificationSink,
   quota: Quota,
@@ -43,7 +47,7 @@ const COMPONENTS: Record<string, ComponentType<WidgetProps>> = {
 };
 
 /** Bundled with Kehai and updated with it. */
-const BUNDLED: WidgetDescription[] = [agents, clock, cs2, media, notify, quota, sprint, stage, telemetry, vitals].map((raw) =>
+const BUNDLED: WidgetDescription[] = [agents, clock, cs2, dock, media, notify, quota, sprint, stage, telemetry, vitals].map((raw) =>
   parseWidget(raw)
 );
 
@@ -61,7 +65,7 @@ function spec(widget: WidgetDescription, local = false): WidgetSpec {
   }
   const component = COMPONENTS[widget.id];
   if (!component) throw new Error(`${widget.id}.widget.json has no component in the registry`);
-  const options = (OPTIONS as Record<string, WidgetSpec['options']>)[widget.id];
+  const options = ({ ...OPTIONS, dock: DockOptions } as Record<string, WidgetSpec['options']>)[widget.id];
   return { ...widget, topics, component, options, local };
 }
 

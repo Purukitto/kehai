@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="screenshots/stage-phosphor.png" alt="Stage preset in the Phosphor theme, on the Machine tab: the processor and the graphics card side by side, each with its load, temperature and history" width="32%">
-  <img src="screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, the focus timer, notifications and a status strip with CPU, GPU, GPU temperature, memory, network and unread, evenly weighted" width="32%">
+  <img src="screenshots/panel.png" alt="Panel preset in the Obsidian theme: clock, token usage, agents, now playing, a dock of apps, toggles and a scene, notifications and a status strip with CPU, GPU, GPU temperature, memory, network and unread, evenly weighted" width="32%">
   <img src="screenshots/ambient.png" alt="Ambient preset in the Ice theme: a very large clock, with agents, token usage, now playing, and CPU, GPU, GPU temperature and memory below it" width="32%">
   <br>
   <sub>Stage in Phosphor · Panel in Obsidian · Ambient in Ice. Any preset takes any theme.</sub>
@@ -23,7 +23,7 @@ Three layouts ship. They use the same widgets and differ only in where those go.
 | Preset | Idea |
 | --- | --- |
 | **Stage** | One large readout with tabs for tokens, agents, machine and focus, and supporting tiles around it. The default. |
-| **Panel** | Everything at once, evenly weighted: the densest useful arrangement. |
+| **Panel** | Everything at once, evenly weighted: the densest useful arrangement, with a Dock where the apps and toggles you reach for are. |
 | **Ambient** | Nine values, large, for a panel that is mostly in the corner of your eye. |
 
 Stage's main readout follows attention: it moves to **Agents** while one is waiting on

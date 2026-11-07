@@ -12,6 +12,13 @@ import type {
   CpuPayload,
   DiskPayload,
   DisplayCommand,
+  DockAppsPayload,
+  DockCommand,
+  DockIconsPayload,
+  DockOpened,
+  DockPicked,
+  DockPins,
+  DockStatePayload,
   DisplaysPayload,
   FlowCommand,
   LogCommand,
@@ -23,6 +30,8 @@ import type {
   GpuCommand,
   GpuPayload,
   MemPayload,
+  MicCommand,
+  MicPayload,
   NetPayload,
   NotifyCommand,
   NotifyItem,
@@ -128,6 +137,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
     durationSec: 348,
     hasArt: true,
     player: 'Spotify',
+    playerApp: 'spotify',
     canSeek: true,
   };
   const volume: VolumePayload = { level: 40, muted: false };
@@ -675,6 +685,140 @@ export function startMockSource(options: MockOptions = {}): () => void {
   pubLog();
   lookPresence();
 
+  // The dock: a Start menu of made-up apps with drawn icons, the author's
+  // Steam games with drawn covers, and what the engine would know of them.
+  // `?dock=fail` refuses every open, `?dock=scenefail` only Terminal's;
+  // `?mic=muted` starts muted, `?mic=none` has no microphone, `?mic=quiet`
+  // has nobody listening.
+  const dockMode = new URLSearchParams(location.search).get('dock');
+  const micMode = new URLSearchParams(location.search).get('mic');
+  const svg = (inner: string, w = 64, h = 64) =>
+    `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}">${inner}</svg>`)}`;
+  const tile = (a: string, b: string, glyph: string) =>
+    svg(
+      `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><g fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">${glyph}</g>`
+    );
+  const APP_ICONS: Record<string, string> = {
+    agent: tile('#d9a46a', '#9c5f33', '<path d="M32 15l15 17-15 17-15-17z" fill="#fff" stroke="none"/>'),
+    editor: tile('#3b8de0', '#1d4f9a', '<path d="M25 22L15 32l10 10M39 22l10 10-10 10"/>'),
+    browser: tile('#f2913f', '#c2412b', '<circle cx="32" cy="32" r="15"/><path d="M17 32h30M32 17c7 7 7 23 0 30M32 17c-7 7-7 23 0 30" stroke-width="3"/>'),
+    chat: tile('#7176f4', '#3e42b2', '<path d="M16 19h32v21H31l-9 7v-7h-6z" fill="#fff" stroke="none"/>'),
+    terminal: tile('#33363d', '#141519', '<path d="M18 23l9 9-9 9M31 43h15"/>'),
+    spotify: tile('#2fc56d', '#16864a', '<path d="M27 43V22l17-4v21"/><circle cx="23" cy="43" r="4.5" fill="#fff" stroke="none"/><circle cx="40" cy="39" r="4.5" fill="#fff" stroke="none"/>'),
+    files: tile('#f4c654', '#d0921f', '<path d="M15 22a3 3 0 0 1 3-3h9l4 4h15a3 3 0 0 1 3 3v15a3 3 0 0 1-3 3H18a3 3 0 0 1-3-3z" fill="#fff" stroke="none" opacity=".95"/>'),
+    mail: tile('#38b6e8', '#1a6fb0', '<rect x="15" y="20" width="34" height="24" rx="3"/><path d="M16 22l16 12 16-12"/>'),
+    notes: tile('#a978e6', '#6c3fb0', '<path d="M21 17h22v30H21zM26 25h12M26 32h12M26 39h7"/>'),
+    recorder: tile('#3a3d45', '#17181c', '<circle cx="32" cy="32" r="12" fill="#ef5b5b" stroke="none"/><circle cx="32" cy="32" r="17"/>'),
+    calendar: tile('#ef6b6b', '#b8313a', '<rect x="16" y="19" width="32" height="28" rx="3"/><path d="M16 27h32M24 15v8M40 15v8"/>'),
+    photos: tile('#5cc0c9', '#2a7c9e', '<rect x="15" y="18" width="34" height="28" rx="3"/><path d="M17 42l10-11 8 8 5-5 8 8"/>'),
+    steam: tile('#2a475e', '#121d28', '<circle cx="38" cy="26" r="7"/><circle cx="24" cy="40" r="5"/><path d="M28 37l6-6"/>'),
+    phone: tile('#4f8ef7', '#2852b8', '<rect x="22" y="14" width="20" height="36" rx="4"/><path d="M29 44h6"/>'),
+  };
+  const APPS: DockAppsPayload['apps'] = [
+    { id: 'agent', name: 'Agent', running: true },
+    { id: 'editor', name: 'Editor', running: true },
+    { id: 'browser', name: 'Browser', running: true },
+    { id: 'chat', name: 'Chat', running: true },
+    { id: 'spotify', name: 'Spotify', running: true },
+    { id: 'terminal', name: 'Terminal', running: false },
+    { id: 'files', name: 'Files', running: false },
+    { id: 'mail', name: 'Mail', running: false },
+    { id: 'notes', name: 'Notes', running: false },
+    { id: 'recorder', name: 'Recorder', running: false },
+    { id: 'calendar', name: 'Calendar', running: false },
+    { id: 'photos', name: 'Photos', running: false },
+    { id: 'steam', name: 'Steam', running: false },
+    { id: 'phone', name: 'Phone', running: false },
+  ];
+  const DAYS = 86_400_000;
+  const GAMES: DockAppsPayload['games'] = [
+    { id: '730', name: 'Counter-Strike 2', running: false, playedMs: Date.now() - 2 * DAYS },
+    { id: '1422450', name: 'Deadlock', running: false, playedMs: Date.now() - 6 * DAYS },
+    { id: '1903340', name: 'Clair Obscur: Expedition 33', running: false, playedMs: Date.now() - 9 * DAYS },
+    { id: '1091500', name: 'Cyberpunk 2077', running: false, playedMs: Date.now() - 20 * DAYS },
+    { id: '1158310', name: 'Crusader Kings III', running: false, playedMs: Date.now() - 41 * DAYS },
+    { id: '489830', name: 'The Elder Scrolls V: Skyrim Special Edition', running: false, playedMs: Date.now() - 80 * DAYS },
+    { id: '949230', name: 'Cities: Skylines II', running: false, playedMs: Date.now() - 120 * DAYS },
+    { id: '870780', name: 'Control Ultimate Edition', running: false, playedMs: 0 },
+  ];
+  const COVER_HUES: [string, string][] = [
+    ['#c98a3a', '#2a1c10'],
+    ['#7d5a9e', '#151020'],
+    ['#d8b26a', '#2b2216'],
+    ['#e5e44a', '#3a1630'],
+    ['#a33a32', '#1b0d0c'],
+    ['#7e8fa0', '#14181d'],
+    ['#4f9fd0', '#0e1d2a'],
+    ['#b7473f', '#140c0c'],
+  ];
+  const cover = (name: string, i: number) => {
+    const [a, b] = COVER_HUES[i % COVER_HUES.length];
+    const lines = name
+      .replace(/:.*/, '')
+      .split(' ')
+      .reduce<string[]>((acc, w) => {
+        const last = acc[acc.length - 1];
+        if (last && `${last} ${w}`.length <= 12) acc[acc.length - 1] = `${last} ${w}`;
+        else acc.push(w);
+        return acc;
+      }, []);
+    const text = lines
+      .map((l, j) => `<text x="300" y="${640 + j * 74}" text-anchor="middle" font-family="Segoe UI, sans-serif" font-weight="700" font-size="64" fill="#fff" opacity=".92">${l}</text>`)
+      .join('');
+    return svg(
+      `<defs><linearGradient id="c" x1="0" y1="0" x2="0.4" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="600" height="900" fill="url(#c)"/><circle cx="${180 + ((i * 47) % 260)}" cy="300" r="180" fill="#fff" opacity=".08"/>${text}`,
+      600,
+      900
+    );
+  };
+  const dockIcons: Record<string, string> = {
+    ...Object.fromEntries(Object.entries(APP_ICONS).map(([id, src]) => [`app:${id}`, src])),
+    ...Object.fromEntries(GAMES.map((g, i) => [`game:${g.id}`, cover(g.name, i)])),
+  };
+  const pubDock = () =>
+    pub<DockStatePayload>('dock:state', 'mock.dock', {
+      live: {
+        ...Object.fromEntries(APPS.map((a) => [`app:${a.id}`, { running: a.running, listening: a.id === 'chat' && micMode !== 'quiet' && micMode !== 'none', waiting: 0 }])),
+        'app:agent': { running: true, listening: false, waiting: new URLSearchParams(location.search).get('agents') === 'today' ? 2 : 1 },
+        ...Object.fromEntries(GAMES.map((g) => [`game:${g.id}`, { running: g.running, listening: false, waiting: 0 }])),
+      },
+    });
+  pubDock();
+  // Icons for what the buttons name, as the engine sends them.
+  const unsubPins = bus.subscribe('dock:pins', (e) => {
+    const keys = new Set((e.data as DockPins).targets.map((t) => (t.kind === 'app' || t.kind === 'game' ? `${t.kind}:${t.id}` : '')));
+    pub<DockIconsPayload>('dock:icons', 'mock.dock', { icons: Object.fromEntries(Object.entries(dockIcons).filter(([k]) => keys.has(k))) });
+  });
+  const mic: MicPayload = { available: micMode !== 'none', muted: micMode === 'muted', listening: micMode === 'quiet' || micMode === 'none' ? [] : ['Chat'] };
+  pub<MicPayload>('os:mic', 'mock.mic', { ...mic });
+  const unsubMic = bus.subscribe('mic:command', (e) => {
+    const c = e.data as MicCommand;
+    if (c.action === 'mute' && mic.available) mic.muted = c.muted;
+    pub<MicPayload>('os:mic', 'mock.mic', { ...mic, listening: [...mic.listening] });
+  });
+  const unsubDock = bus.subscribe('dock:command', (e) => {
+    const c = e.data as DockCommand;
+    if (c.action === 'list') {
+      window.setTimeout(() => pub<DockAppsPayload>('dock:apps', 'mock.dock', { apps: APPS, games: GAMES, steam: 'D:/Steam', icons: dockIcons }), 80);
+      return;
+    }
+    // Windows' picker, answered at once with a made-up choice.
+    if (c.action === 'pick') {
+      window.setTimeout(
+        () =>
+          pub<DockPicked>('dock:picked', 'mock.dock', c.folder ? { path: String.raw`D:\Projects`, folder: true, name: 'Projects' } : { path: String.raw`D:\Notes\Plan.md`, folder: false, name: 'Plan' }),
+        300
+      );
+      return;
+    }
+    if (c.action !== 'open') return;
+    const t = c.target;
+    const ok = dockMode !== 'fail' && !(dockMode === 'scenefail' && t.kind === 'app' && t.id === 'terminal');
+    const running = t.kind === 'app' ? APPS.find((a) => a.id === t.id)?.running : t.kind === 'game' ? GAMES.find((g) => g.id === t.id)?.running : false;
+    const how: DockOpened['how'] = !ok ? null : t.kind === 'link' || t.kind === 'path' ? 'link' : running ? 'front' : t.kind === 'game' ? 'launched' : 'started';
+    window.setTimeout(() => pub<DockOpened>('dock:opened', 'mock.dock', { press: c.press, ok, how, reason: ok ? null : 'it would not start' }), 120);
+  });
+
   // Everything the game widgets read, unless the engine owns all of it.
   const stopGame = skip.has('game:cs2') ? () => undefined : startMockGame(pub);
 
@@ -686,6 +830,9 @@ export function startMockSource(options: MockOptions = {}): () => void {
   return () => {
     unsub();
     unsubJump();
+    unsubDock();
+    unsubPins();
+    unsubMic();
     unsubNotify();
     unsubRules();
     unsubDisplay();

@@ -38,8 +38,8 @@ surface is what it reads and what it exposes:
   a bug.
 - **The IPC boundary.** The renderer is read-only except for `media:command`,
   `notify:command`, `notify:rules`, `flow:command`, `quota:command`, `update:command`,
-  `remote:command`, `display:command`, `presence:command`, `game:command` and
-  `widgets:command`. `notify:command` dismisses notifications, and opens the app of one the tile
+  `remote:command`, `display:command`, `presence:command`, `game:command`,
+  `widgets:command`, `dock:command`, `dock:pins` and `mic:command`. `notify:command` dismisses notifications, and opens the app of one the tile
   shows, by the Start menu entry for its app id, or the Windows notification list; it
   names no app, path or link, and a remote panel can never send `open`. `notify:rules` says which
   apps' notifications reach the panel and what remote panels see; a remote panel can
@@ -57,7 +57,14 @@ surface is what it reads and what it exposes:
   folder picker, writes or removes Kehai's own file in that game's cfg folder, or shows
   that folder; the engine checks the widget's source again before writing, keeps the
   folder inside the game's, and writes only block names. `widgets:command` opens the
-  widgets folder. A path that lets renderer content reach anything else in the engine
+  widgets folder. `dock:pins` lists what the dock's buttons open, and `dock:command`
+  opens one of those, lists the Start menu and Steam's games, or opens Windows' file
+  picker. The engine opens an app only by its Start menu entry, a game only by its
+  Steam app number, a link only if it is plain https, and a file or folder only if it
+  was picked in that picker on this PC (kept in `dock.json`); it drops an open older
+  than a few seconds, and nothing it is given becomes a command line. `mic:command`
+  mutes or unmutes the default microphone. None of the three can come from a remote
+  panel. A path that lets renderer content reach anything else in the engine
   is in scope.
 - **Network requests.** Kehai makes none other than, when you ask for it, the update
   check and download. The font is bundled. While the remote panel is on, it announces

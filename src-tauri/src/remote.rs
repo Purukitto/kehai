@@ -57,10 +57,12 @@ const POLL: Duration = Duration::from_millis(100);
 /// remote panel could not install anyway, the host's monitors and window,
 /// which a browser has no part in, whether anyone is at the host's desk, the
 /// host's log, where its games are, the widget files in its folder, what came
-/// of a tap that went to an agent's window or a notification's app, and the
-/// brightness of the host's display. A game's own state is not here: a tablet
-/// shows its tile like any other.
-const PRIVATE_TOPICS: [&str; 12] = [
+/// of a tap that went to an agent's window or a notification's app, the
+/// brightness of the host's display, every app and game installed on it (the
+/// dock's add sheet), what came of a dock button, and the files picked for it.
+/// A game's own state is not here: a tablet shows its tile like any other, and
+/// the dock's buttons with what they know.
+const PRIVATE_TOPICS: [&str; 15] = [
     TOPIC,
     "app:update",
     "app:displays",
@@ -73,6 +75,9 @@ const PRIVATE_TOPICS: [&str; 12] = [
     "widgets:local",
     "agents:jumped",
     "notify:opened",
+    "dock:apps",
+    "dock:opened",
+    "dock:picked",
 ];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;
@@ -1053,7 +1058,28 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
 
 #[cfg(test)]
 mod tests {
-    use super::allowed;
+    use super::{allowed, outward};
+
+    #[test]
+    fn a_remote_panel_never_presses_the_dock_or_the_mic() {
+        assert!(!allowed("dock:command", "open"));
+        assert!(!allowed("dock:command", "list"));
+        assert!(!allowed("dock:command", "pick"));
+        assert!(!allowed("dock:pins", "pins"));
+        assert!(!allowed("mic:command", "mute"));
+    }
+
+    #[test]
+    fn a_remote_panel_sees_the_dock_but_not_what_is_installed() {
+        let on =
+            |topic: &str| outward(&serde_json::json!({ "topic": topic, "data": {} })).is_some();
+        assert!(on("dock:state"));
+        assert!(on("dock:icons"));
+        assert!(on("os:mic"));
+        assert!(!on("dock:apps"));
+        assert!(!on("dock:opened"));
+        assert!(!on("dock:picked"));
+    }
 
     #[test]
     fn a_remote_panel_may_dismiss_but_never_open() {

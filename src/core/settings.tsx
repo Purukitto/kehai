@@ -1,3 +1,5 @@
+import { DOCK_DEFAULTS, parseDock } from './dock';
+import type { DockSettings } from './dock';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { isThemeId, parseLayout, safeParseLayout } from './layout';
@@ -110,6 +112,8 @@ export interface Settings {
    * still goes back.
    */
   matchLayout: MatchLayout | null;
+  /** The dock's buttons and groups, for every Dock tile on every layout. */
+  dock: DockSettings;
 }
 
 export interface GameSettings {
@@ -238,6 +242,7 @@ function defaults(): Settings {
     hideExplained: false,
     games: {},
     matchLayout: null,
+    dock: DOCK_DEFAULTS,
   };
 }
 
@@ -424,6 +429,7 @@ function load(): Settings {
       hideExplained: parsed.hideExplained === true,
       games: games(parsed.games),
       matchLayout: matchLayout(parsed.matchLayout),
+      dock: parseDock(parsed.dock),
     };
   } catch {
     return defaults();
@@ -484,6 +490,7 @@ interface Store {
    * back to. Null when it ends: back, unless the layout was changed meanwhile.
    */
   setMatchLayout: (next: MatchLayout | null) => void;
+  setDock: (fn: (dock: DockSettings) => DockSettings) => void;
   /** Back to a fresh install's settings, setup included. */
   reset: () => void;
 }
@@ -674,6 +681,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           const back = prev.layoutId === was.to && findLayout(prev, was.from) ? was.from : prev.layoutId;
           return { ...prev, matchLayout: null, layoutId: back };
         }),
+
+      setDock: (fn) => setSettings((prev) => ({ ...prev, dock: fn(prev.dock) })),
 
       reset: () => setSettings(defaults()),
     };

@@ -18,6 +18,7 @@ import { DIM, useDimPreview, useNight } from './core/night';
 import type {
   AgentsPayload,
   DisplaysPayload,
+  DockPins,
   FlowCommand,
   GpuCommand,
   LogCommand,
@@ -42,6 +43,7 @@ import type { RemoteLink } from './core/remoteSource';
 import { HideText } from './core/quiet';
 import { useGames } from './core/gameSession';
 import { useMatchLayout } from './core/matchLayout';
+import { pinsOf } from './core/dock';
 import { findLayout, useSettings } from './core/settings';
 import type { QuietShow } from './core/settings';
 import { SOURCES, SOURCE_IDS } from './core/sources';
@@ -319,6 +321,14 @@ export default function App() {
       remote: notifyRemote,
     });
   }, [rules, notifyRemote]);
+
+  // What the dock's buttons and scenes open: the engine opens nothing else,
+  // and says what it knows of each.
+  const pins = JSON.stringify(pinsOf(settings.dock));
+  useEffect(() => {
+    if (REMOTE) return;
+    bus.publish<DockPins>('dock:pins', 'settings', { targets: JSON.parse(pins) as DockPins['targets'] });
+  }, [pins]);
 
   // Every app seen goes on the list in the Notifications options, at SHOW.
   useEffect(() => {

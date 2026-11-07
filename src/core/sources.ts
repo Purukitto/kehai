@@ -18,6 +18,8 @@ export const SOURCES = {
   agents: { name: 'Agent sessions', topics: ['dev:agents'] },
   media: { name: 'Media session', topics: ['media:now_playing', 'media:art', 'media:volume'] },
   notifications: { name: 'Notifications', topics: ['sys:notify'] },
+  apps: { name: 'Apps and games', topics: ['dock:state', 'dock:icons'] },
+  mic: { name: 'Microphone', topics: ['os:mic'] },
 } as const satisfies Record<string, { name: string; topics: readonly string[] }>;
 
 export type SourceId = keyof typeof SOURCES;
