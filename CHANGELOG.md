@@ -9,6 +9,8 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Befo
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-07
+
 ### Added
 
 - **A dock of your own.** The Dock tile holds buttons you choose, in groups, and each
@@ -507,7 +509,8 @@ Cut but never published. Everything here first shipped in 0.2.0.
 - The font loads from Google Fonts, so the first launch needs a connection.
 - The installers are unsigned, so SmartScreen warns the first time you run one.
 
-[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/Purukitto/kehai/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/Purukitto/kehai/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/Purukitto/kehai/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/Purukitto/kehai/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Purukitto/kehai/compare/v0.12.2...v0.13.0
