@@ -257,6 +257,12 @@ export interface NotifyItem {
   atMs: number;
   /** Its app shows its name only: the engine sends no title or body. */
   nameOnly: boolean;
+  /**
+   * What a tap on it opens on the PC: its app, or Windows' own notification
+   * list for one Kehai can't trace to an app (a tray icon's pop-up, Windows'
+   * own notices). Null where neither opens, and on a remote panel's copy.
+   */
+  opens: 'app' | 'list' | null;
 }
 
 /** One app with notifications in the list. Mirrors `App` in `notify.rs`. */
@@ -300,7 +306,26 @@ export type NotifyCommand =
   | { action: 'listen' }
   | { action: 'dismiss'; id: number }
   /** The ones the tile shows. Without ids, all it may show; a hidden app's are never cleared. */
-  | { action: 'clear'; ids?: number[] };
+  | { action: 'clear'; ids?: number[] }
+  /**
+   * Brings `id`'s app forward, or opens Windows' list for it. Once its app
+   * came forward, `ids` (what the row stands for) are cleared. Never
+   * forwarded from a remote panel.
+   */
+  | { action: 'open'; id: number; ids: number[] };
+
+/** Engine → local renderer on `notify:opened`, once for each open. */
+export interface NotifyOpened {
+  id: number;
+  ok: boolean;
+  /**
+   * Its window came to the front; it had none, so it was started as the Start
+   * menu would; or Windows' list was opened instead.
+   */
+  how: 'front' | 'started' | 'list' | null;
+  /** Why not, for the log. The panel only says it couldn't. */
+  reason: string | null;
+}
 
 /**
  * Renderer → engine on `notify:rules`, at launch and on every change. Its own
@@ -369,6 +394,11 @@ export interface PresencePayload {
    * renderer sent. Locked while the system's lock screen covers every display.
    */
   state: 'here' | 'away' | 'locked';
+  /**
+   * A game or a video fills a display, by Windows' own account. A tap that
+   * would take the front from it asks for a second.
+   */
+  fullscreen: boolean;
 }
 
 /**

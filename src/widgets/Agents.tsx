@@ -1,24 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { bus } from '../core/bus';
 import { humanDuration, mmss } from '../core/format';
-import { REMOTE_PANEL } from '../core/remoteSource';
-import { isTauri } from '../core/tauriSource';
+import { ON_TABLET, SAID_MS, SURE_MS, useSaid, useSure } from '../core/front';
+import type { Said } from '../core/front';
 import { useTileSize } from '../core/TileSize';
 import { useBreakpoint } from '../core/useBreakpoint';
 import { useTopic } from '../core/useTopic';
 import type { AgentCommand, AgentJumped, AgentSession, AgentsPayload, AgentVia, ClockPayload } from '../core/payloads';
 import type { WidgetProps } from '../core/types';
 import { Awaiting, Pane } from './chrome';
-
-/** How long a row says what its tap did, before it goes back to its time. */
-const SAID_MS = 1_500;
-
-/**
- * A tablet can't bring a window forward on the PC: Windows lets only the
- * program you last touched do that. `?tablet` draws it in the mock.
- */
-const ON_TABLET = REMOTE_PANEL || (!isTauri() && new URLSearchParams(location.search).has('tablet'));
 
 /** What a tap did, by what the session runs in. Bringing the window forward is all it does. */
 const OPENED: Record<AgentVia, string> = {
@@ -27,33 +18,15 @@ const OPENED: Record<AgentVia, string> = {
   terminal: 'Opened the terminal',
 };
 
-export interface Said {
-  text: string;
-  color: string;
-}
-
 /**
  * Going to a session, and what the last tap on each led to, for a moment.
  * One per widget, shared by its rows.
  */
 export function useJump() {
-  const [said, setSaid] = useState<Record<string, Said>>({});
-  const timers = useRef(new Map<string, number>());
-
-  const say = (id: string, s: Said) => {
-    setSaid((prev) => ({ ...prev, [id]: s }));
-    window.clearTimeout(timers.current.get(id));
-    timers.current.set(
-      id,
-      window.setTimeout(() => {
-        timers.current.delete(id);
-        setSaid(({ [id]: _, ...rest }) => rest);
-      }, SAID_MS)
-    );
-  };
+  const { said, say } = useSaid();
+  const sure = useSure();
 
   useEffect(() => {
-    const live = timers.current;
     const stop = bus.subscribe('agents:jumped', (e) => {
       // The bus hands back the last answer on subscribe. Only a fresh one is news.
       if (Date.now() - e.ts > SAID_MS) return;
@@ -65,16 +38,18 @@ export function useJump() {
           : { text: 'Couldn’t bring it forward', color: 'var(--cc-danger)' }
       );
     });
-    return () => {
-      stop();
-      live.forEach((t) => window.clearTimeout(t));
-    };
+    return stop;
+    // `say` only sets state and timers it owns, so the first one serves.
   }, []);
 
   const jump = (session: AgentSession) => {
     if (!session.via) return;
     if (ON_TABLET) {
       say(session.id, { text: 'Open it on the PC', color: 'var(--cc-muted)' });
+      return;
+    }
+    if (!sure(session.id)) {
+      say(session.id, { text: 'Tap again to go to it', color: 'var(--cc-accent)' }, SURE_MS);
       return;
     }
     bus.publish<AgentCommand>('agents:command', 'widget.agents', { action: 'jump', id: session.id });

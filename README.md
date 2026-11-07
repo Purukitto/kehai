@@ -59,8 +59,8 @@ local, and stays out of the way.
     </td>
     <td valign="top">
       <strong>Notifications and focus</strong><br>
-      The system's notifications, dismissable, and a focus timer that keeps today's
-      focused time across restarts.
+      The system's notifications: tap one to bring its app forward, or dismiss it. And a
+      focus timer that keeps today's focused time across restarts.
     </td>
   </tr>
   <tr>

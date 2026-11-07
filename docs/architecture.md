@@ -102,10 +102,12 @@ checks every one again.
 | `src-tauri/src/pollers/` | One thread per source |
 | `src-tauri/src/pollers/media.rs` | Now playing, seek and the system volume |
 | `src-tauri/src/pollers/transcripts.rs` | Finds and follows agent transcripts, for the quota and agents pollers |
-| `src-tauri/src/pollers/sessions.rs` | Which agent sessions are open, and bringing one's window to the front |
+| `src-tauri/src/pollers/sessions.rs` | Which agent sessions are open, and which window each runs in |
+| `src-tauri/src/pollers/front.rs` | The windows open on this PC, and bringing one to the front |
+| `src-tauri/src/pollers/launch.rs` | Where a notification's app id leads, and opening that app or Windows' list |
 | `src-tauri/src/pollers/update.rs` | Checks GitHub Releases and hands over to the installer |
 | `src-tauri/src/pollers/display.rs` | Keeps the window on the display it is for, and names the displays |
-| `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel |
+| `src-tauri/src/pollers/presence.rs` | Says whether anyone is at the computer, for the quiet panel, and whether something fills its display |
 | `src-tauri/src/pollers/backlight.rs` | Sets the brightness of the display Kehai is for, over DDC/CI, and gives it back |
 | `src-tauri/src/pollers/gpu.rs` | The graphics card's load, memory and, from its driver, temperature, fan and power |
 | `src-tauri/src/pollers/game.rs` | Finds a game through Steam, writes and removes its file, and listens on 127.0.0.1 for what it sends |

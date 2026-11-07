@@ -26,6 +26,7 @@ import type {
   NetPayload,
   NotifyCommand,
   NotifyItem,
+  NotifyOpened,
   NotifyPayload,
   NotifyRules,
   PresenceCommand,
@@ -277,7 +278,11 @@ export function startMockSource(options: MockOptions = {}): () => void {
   let listening = false;
   let rules: NotifyRules['apps'] = {};
   const at = Date.now();
-  const note = (id: number, app: string, source: string, title: string, body: string, ago: number): NotifyItem => ({
+  // `?notify=fail` answers every open with a refusal; `?notify=nolist` is a
+  // Windows that won't open its own list on request, so those rows don't open;
+  // `?notify=today` is the tile before any of it, when no row opens.
+  const notifyMode = new URLSearchParams(location.search).get('notify');
+  const note = (id: number, app: string, source: string, title: string, body: string, ago: number, opens: NotifyItem['opens'] = 'app'): NotifyItem => ({
     id,
     app,
     source,
@@ -285,14 +290,19 @@ export function startMockSource(options: MockOptions = {}): () => void {
     body,
     atMs: at - ago,
     nameOnly: false,
+    opens: notifyMode === 'today' || (opens === 'list' && notifyMode === 'nolist') ? null : opens,
   });
   let tray: NotifyItem[] = [
     note(1, 'ci', 'Continuous Integration', 'build #2841 passed', 'windows-msvc, 3m 12s', 60_000),
     note(2, 'chat', 'Chat', 'standup moved to 15:30', '', 120_000),
+    note(6, 'windows', 'Windows', 'Restart to finish installing updates', 'Pick a time, or restart now', 180_000, 'list'),
     note(3, 'git', 'Git', 'pushed 4 commits', 'origin/feat/event-bus', 240_000),
     note(4, 'chat', 'Chat', 'lunch?', 'in ten', 600_000),
     note(5, 'chat', 'Chat', 'are you around', '', 900_000),
   ];
+  // Chat sits in the tray with no window, so opening it starts it as the
+  // Start menu would; the others have a window to bring forward.
+  const howOpen = (i: NotifyItem): NotifyOpened['how'] => (i.opens === 'list' ? 'list' : i.app === 'chat' ? 'started' : 'front');
   const onTile = () =>
     tray.flatMap((i) => {
       const rule = rules[i.app] ?? 'show';
@@ -314,7 +324,24 @@ export function startMockSource(options: MockOptions = {}): () => void {
   const unsubNotify = bus.subscribe('notify:command', (e) => {
     const cmd = e.data as NotifyCommand;
     if (cmd.action === 'listen' && !listening) listening = true;
-    else if (cmd.action === 'dismiss' || cmd.action === 'clear') {
+    else if (cmd.action === 'open') {
+      // Opened as the engine would: only what the tile shows, and a row whose
+      // app came forward is cleared once it has said so.
+      const shownNow = onTile();
+      const item = shownNow.find((i) => i.id === cmd.id);
+      if (!item?.opens) return;
+      const ok = notifyMode !== 'fail';
+      const how = ok ? howOpen(item) : null;
+      window.setTimeout(() => pub<NotifyOpened>('notify:opened', 'mock.notify', { id: item.id, ok, how, reason: ok ? null : 'the window would not come forward' }), 120);
+      if (ok && how !== 'list') {
+        const may = new Set(shownNow.map((i) => i.id));
+        window.setTimeout(() => {
+          tray = tray.filter((i) => !(may.has(i.id) && cmd.ids.includes(i.id)));
+          pubNotify();
+        }, 120 + 1_500);
+      }
+      return;
+    } else if (cmd.action === 'dismiss' || cmd.action === 'clear') {
       const may = new Set(onTile().map((i) => i.id));
       const ids = cmd.action === 'dismiss' ? [cmd.id] : (cmd.ids ?? [...may]);
       tray = tray.filter((i) => !(may.has(i.id) && ids.includes(i.id)));
@@ -362,6 +389,8 @@ export function startMockSource(options: MockOptions = {}): () => void {
   // panel can be tried without the engine. Like the engine it publishes only
   // changes, so a state published by hand while reviewing stays until the next
   // input puts it right.
+  // `?fullscreen`: a game fills the main display, so taps that take the front ask twice.
+  const FULL_SCREEN = new URLSearchParams(location.search).has('fullscreen');
   let awayAfterMs: number | null = null;
   let lastInput = Date.now();
   let decided: PresencePayload['state'] | null = null;
@@ -372,7 +401,7 @@ export function startMockSource(options: MockOptions = {}): () => void {
   const lookPresence = (correct = false) => {
     const state = awayAfterMs !== null && Date.now() - lastInput >= awayAfterMs ? 'away' : 'here';
     if (state !== decided || (correct && state !== shown)) {
-      pub<PresencePayload>('os:presence', 'mock.presence', { available: true, reason: null, state });
+      pub<PresencePayload>('os:presence', 'mock.presence', { available: true, reason: null, state, fullscreen: FULL_SCREEN });
     }
     decided = state;
   };

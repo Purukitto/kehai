@@ -57,10 +57,10 @@ const POLL: Duration = Duration::from_millis(100);
 /// remote panel could not install anyway, the host's monitors and window,
 /// which a browser has no part in, whether anyone is at the host's desk, the
 /// host's log, where its games are, the widget files in its folder, what came
-/// of a tap that went to an agent's window, and the brightness of the host's
-/// display. A game's own state is not here: a tablet shows its tile like any
-/// other.
-const PRIVATE_TOPICS: [&str; 11] = [
+/// of a tap that went to an agent's window or a notification's app, and the
+/// brightness of the host's display. A game's own state is not here: a tablet
+/// shows its tile like any other.
+const PRIVATE_TOPICS: [&str; 12] = [
     TOPIC,
     "app:update",
     "app:displays",
@@ -72,6 +72,7 @@ const PRIVATE_TOPICS: [&str; 11] = [
     "game:setup",
     "widgets:local",
     "agents:jumped",
+    "notify:opened",
 ];
 /// Close codes in the application range, read by `remoteSource.ts`.
 const CLOSE_UNPAIRED: u16 = 4401;
@@ -1047,5 +1048,19 @@ fn session(ws: &mut WebSocket<TcpStream>, shared: &Shared, stop: &AtomicBool) {
                 return;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::allowed;
+
+    #[test]
+    fn a_remote_panel_may_dismiss_but_never_open() {
+        assert!(allowed("notify:command", "dismiss"));
+        assert!(allowed("notify:command", "clear"));
+        assert!(!allowed("notify:command", "open"));
+        assert!(!allowed("notify:command", "listen"));
+        assert!(!allowed("agents:command", "jump"));
     }
 }

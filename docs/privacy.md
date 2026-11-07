@@ -104,6 +104,17 @@ Kehai applies that as it reads them, so a hidden app's notifications, and a name
 app's text, never reach the panel or the network. Remote panels see names and counts
 only, unless you choose otherwise.
 
+To open a notification's app when you tap it, Kehai looks up the Start menu entry for
+the app id Windows gives with the notification, and the program that entry runs. When
+you tap, it looks at the windows open on this PC: the app id each carries, if any, and
+the program it belongs to, to find the app's window. It reads no window's contents, and
+keeps none of this beyond which entry each app id leads to, in memory, until Kehai
+quits. With no window to bring forward, it starts the app from its Start menu entry, and
+for a notification with no app it opens Windows' own notification list. Only an app
+with a notification the tile shows can be opened, never by a path or a link, and only
+by a tap on this PC: a remote panel cannot. The log says how a tap went, never which
+app.
+
 ### Agent token usage
 
 The quota widget tallies token counts by tailing local coding agent session
@@ -139,8 +150,10 @@ session.
 
 For the quiet panel, the engine asks Windows once a second how long it has been since
 the last keyboard, mouse, pen or touch input, and whether the session is locked: a
-duration and a yes or no, never what was pressed or where. Neither is kept, and
-neither reaches a remote panel.
+duration and a yes or no, never what was pressed or where. So that a tap doesn't pull
+a game out of the front, it also asks which window is in front and whether that window
+fills its display, keeping only the yes or no, never the window's title or program.
+None of it is kept, and none of it reaches a remote panel.
 
 ### Games
 
